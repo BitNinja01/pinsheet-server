@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Report Card &mdash; {{ round.date }} at {{ round.course }}</h2>
+<table class="data-table report-card">
+    <thead>
+        <tr>
+            <th>Stat</th><th>This Round</th><th>L20 Avg</th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for label, this_val, l20_val, higher_better, suffix, precision in rows %}
+        <tr>
+            <td>{{ label }}</td>
+            <td>{% if this_val is not none %}{{ this_val|round(precision) }}{% else %}&mdash;{% endif %}{{ suffix }}</td>
+            <td>{% if l20_val is not none %}{{ l20_val|round(precision) }}{% else %}&mdash;{% endif %}{{ suffix }}</td>
+            <td>
+                {% if this_val is not none and l20_val is not none and this_val != l20_val %}
+                    {% set better = (this_val < l20_val) if not higher_better else (this_val > l20_val) %}
+                    <span class="{% if better %}delta-good{% else %}delta-bad{% endif %}">
+                        {% if this_val > l20_val %}&#9650;{% else %}&#9660;{% endif %}
+                    </span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

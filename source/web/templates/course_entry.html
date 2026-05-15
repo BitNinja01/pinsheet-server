@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="draft-notice" id="draft-resume" style="display:none">
+    <p>You have an unfinished course draft.</p>
+    <button class="btn btn-accent" id="draft-resume-btn">Resume</button>
+    <button class="btn" id="draft-discard-btn">Discard</button>
+</div>
+
+<div class="wizard" id="course-wizard">
+    <h1 class="wizard-title">New Course</h1>
+
+    <div class="wizard-step" data-step="name">
+        <label class="step-label">Course Name</label>
+        <input type="text" class="step-input" id="course-name" placeholder="e.g. Augusta National">
+    </div>
+
+    <div class="wizard-step" data-step="location">
+        <label class="step-label">Location (optional)</label>
+        <input type="text" class="step-input" id="course-location" placeholder="City, State">
+    </div>
+
+    <div class="wizard-step" data-step="tees">
+        <label class="step-label">Tee Sets</label>
+        <div id="tees-container"></div>
+        <button class="btn" id="btn-add-tee" style="margin-top:0.5rem">+ Add Tee</button>
+    </div>
+
+    <div class="wizard-step" data-step="holes">
+        <label class="step-label">Holes</label>
+        <div id="course-holes-area"></div>
+    </div>
+
+    <div class="wizard-step" data-step="submit">
+        <button class="btn btn-accent" id="submit-course">Save Course</button>
+    </div>
+</div>
+{% endblock %}

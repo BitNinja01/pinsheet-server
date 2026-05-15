@@ -11,13 +11,41 @@
                 {{ p.value }}
             {% endif %}
         </div>
-        <div class="stat-secondary">L20: {{ p.secondary }}</div>
+        <div class="stat-secondary">{% if p.subtitle %}{{ p.subtitle }}{% else %}L20: {{ p.secondary }}{% endif %}</div>
     </div>
     {% endfor %}
 </div>
 
 <section class="recent-rounds">
     <h2>Recent Rounds</h2>
-    <p class="placeholder">Round history coming soon.</p>
+    {% if rounds %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th>Tees</th>
+                <th>Score</th>
+                <th>+/-</th>
+                <th>Diff</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rounds %}
+            <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
+                class="clickable-row{% if r.in_handicap %} in-handicap{% endif %}">
+                <td>{{ r.date }}</td>
+                <td>{{ r.course }}</td>
+                <td>{{ r.tees }}</td>
+                <td>{{ r.total }}</td>
+                <td>{% if r.score_to_par is not none %}{{ '%+d'|format(r.score_to_par) }}{% else %}&mdash;{% endif %}</td>
+                <td>{{ r.differential }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="placeholder">No rounds yet. <a href="/rounds/new">Enter your first round</a>.</p>
+    {% endif %}
 </section>
 {% endblock %}

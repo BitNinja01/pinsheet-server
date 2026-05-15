@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="course-detail">
+    <h2>{{ name }}</h2>
+    {% if course.location %}
+    <p class="course-location">{{ course.location }}</p>
+    {% endif %}
+
+    <div class="course-meta">
+        <div class="meta-item"><span class="meta-label">Times Played</span> {{ play_count }}</div>
+        {% if first_played %}
+        <div class="meta-item"><span class="meta-label">First Played</span> {{ first_played }}</div>
+        {% endif %}
+        {% if last_played %}
+        <div class="meta-item"><span class="meta-label">Last Played</span> {{ last_played }}</div>
+        {% endif %}
+    </div>
+
+    <div class="round-actions">
+        <button class="btn" id="btn-delete-course">Delete</button>
+    </div>
+
+    {% if tees %}
+    <h3>Tees</h3>
+    <table class="data-table tee-table">
+        <thead>
+            <tr>
+                <th>Tee</th>
+                <th>Rating</th>
+                <th>Slope</th>
+                <th>Yardage</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for tee_name, t in tees.items() %}
+            <tr>
+                <td>{{ tee_name }}</td>
+                <td>{{ t.get("rating", "&mdash;") }}</td>
+                <td>{{ t.get("slope", "&mdash;") }}</td>
+                <td>{{ t.get("yardage", "&mdash;") }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if holes %}
+    <h3>Holes</h3>
+    <table class="data-table hole-table">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>Index</th>
+                {% for tee_name in tees.keys() %}
+                <th>{{ tee_name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in holes %}
+            <tr>
+                <td>{{ h.num }}</td>
+                <td>{{ h.par }}</td>
+                <td>{{ h.index }}</td>
+                {% for tee_name in tees.keys() %}
+                <td>{{ h.yardages.get(tee_name, "&mdash;") }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById("btn-delete-course")?.addEventListener("click", function () {
+    if (!confirm("Delete course &quot;{{ name }}&quot;? This cannot be undone.")) return;
+    fetch("/api/courses/{{ name }}", { method: "DELETE" })
+        .then(function () { window.location.href = "/courses"; });
+});
+</script>
+{% endblock %}

@@ -117,3 +117,289 @@ body {
     color: var(--text-muted);
     font-style: italic;
 }
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+.data-table th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+.data-table td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.clickable-row {
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.clickable-row:hover {
+    background: rgba(255,255,255,0.03);
+}
+.in-handicap {
+    background: rgba(0,230,118,0.06);
+}
+
+.wizard {
+    max-width: 640px;
+    margin: 0 auto;
+}
+.wizard-title {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+.wizard-step {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+.step-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+.step-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+.step-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+textarea.step-input {
+    resize: vertical;
+    font-family: var(--font);
+}
+.radio-group {
+    display: flex;
+    gap: 1.5rem;
+}
+.radio-group label {
+    font-size: 0.875rem;
+    color: var(--text);
+    cursor: pointer;
+}
+.radio-group input[type="radio"] {
+    margin-right: 0.25rem;
+    accent-color: var(--accent);
+}
+select.step-input {
+    appearance: none;
+    cursor: pointer;
+}
+.btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+.btn-accent {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+}
+.draft-notice {
+    max-width: 640px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.scorecard-input th {
+    text-align: center;
+    font-size: 0.7rem;
+}
+.scorecard-input td {
+    text-align: center;
+    padding: 0.25rem 0.3rem;
+}
+.scorecard-input td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.hole-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-size: 0.75rem;
+    padding: 0.15rem 0.1rem;
+    text-align: center;
+    width: 2.5rem;
+}
+.hole-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+select.hole-input {
+    width: 3rem;
+    cursor: pointer;
+    appearance: none;
+}
+.totals-row td {
+    font-weight: 700;
+    color: var(--accent);
+    padding: 0.5rem 0.3rem;
+    border-top: 1px solid var(--border);
+}
+.par {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.round-summary {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+.summary-item {
+    font-size: 0.875rem;
+}
+.summary-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+.round-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.scorecard-view th {
+    text-align: center;
+    width: 50px;
+}
+.scorecard-view td {
+    text-align: center;
+}
+.subtotal-row td {
+    padding: 0.5rem 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+}
+.eagle { color: var(--accent); font-weight: 700; }
+.birdie-score { color: var(--accent); }
+.bogey-score { color: #ffa726; }
+.double-score { color: #ef5350; }
+.one-putt { color: var(--accent); font-weight: 700; }
+.three-putt { color: #ef5350; }
+.has-penalty { color: #ef5350; }
+.round-notes {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.delta-good { color: var(--accent); }
+.delta-bad { color: #ef5350; }
+.report-card td:last-child { width: 2rem; }
+.report-card { margin-top: 1.5rem; }
+
+.section-actions {
+    margin-bottom: 1.5rem;
+}
+.course-detail h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+.course-location {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+.course-meta {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.meta-item {
+    font-size: 0.875rem;
+}
+.meta-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+.course-detail h3 {
+    font-size: 1rem;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--accent);
+}
+
+.tee-set {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.tee-set-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.tee-set-title {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.tee-remove-btn {
+    padding: 0.1rem 0.4rem;
+    font-size: 1rem;
+    line-height: 1;
+}
+.tee-numbers {
+    display: flex;
+    gap: 0.75rem;
+}
+.tee-numbers label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.tee-numbers input {
+    display: block;
+    margin-top: 0.15rem;
+    width: 5.5rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 0.8rem;
+}
