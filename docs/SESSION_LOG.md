@@ -44,3 +44,33 @@
 - `docs/SESSION_LOG.md` — this entry
 
 **Next**: Complete dashboard route (rounds table + trends), then round entry wizard.
+
+## 2026-05-15 14:00 UTC — Session end
+
+**What was done**:
+- Ran full brainstorming → design spec → implementation plan workflow
+- Wrote design spec (`docs/superpowers/specs/2026-05-15-web-rewrite-design.md`): 12 screens, route map, API design, CSS themes, 6-phase breakdown
+- Wrote implementation plan (`docs/superpowers/plans/2026-05-15-web-rewrite-plan.md`): Phase 2 (Rounds) in full bite-sized detail, Phases 3-6 scaffolded
+- Restructured code into `source/` directory to match original pinsheet layout
+- Fixed `store.py` _DATA_DIR path for source/ nesting (repo root /data)
+- Renamed Gitea repo from `pinsheet-pywebview` → `pinsheet-modern` via API
+- Updated git remote and pushed 5 commits
+
+**Design decisions**:
+- 1×6 horizontal stat panel row on dashboard
+- Progressive disclosure wizards for round/course entry
+- Hybrid navigation: server-rendered pages + vanilla JS fetch() for inline actions
+- Trend graphs deferred — dashboard is stat panels + rounds table only
+- Season summary and GHIN export screens included in spec
+- Chart.js vendored in static/vendor/ for future use
+
+**Files touched**:
+- `source/store.py` — fixed _DATA_DIR to `Path(__file__).parent.parent / "data"`
+- `docs/superpowers/specs/2026-05-15-web-rewrite-design.md` — new design spec (341 lines)
+- `docs/superpowers/plans/2026-05-15-web-rewrite-plan.md` — new implementation plan (1308 lines)
+- `AGENTS.md` — updated run command to `python source/main.py`
+- `docs/RUNBOOK.md` — updated run command
+- `docs/HANDOFF.md` — updated state, next actions, repo remote URL
+- `docs/SESSION_LOG.md` — this entry
+
+**Next**: Task 2.1 — complete dashboard with rounds table and last-year HI
