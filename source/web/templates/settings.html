@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Settings</h2>
+
+<form class="settings-form" id="settings-form">
+
+    <div class="settings-group">
+        <h3>Theme</h3>
+        <div class="theme-swatches">
+            {% for t in themes %}
+            <button type="button" class="theme-swatch theme-swatch-{{ t }}"
+                    data-theme="{{ t }}"
+                    title="{{ t|capitalize }}"
+                    {% if settings.get("theme", "green") == t %}data-active="true"{% endif %}></button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="settings-group">
+        <h3>Handicap</h3>
+        <label class="settings-toggle">
+            <input type="checkbox" id="include-9hole"
+                   {% if settings.get("include_9hole", true) %}checked{% endif %}>
+            Include 9-hole rounds in handicap
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" id="auto-calc"
+                   {% if settings.get("auto_calc", true) %}checked{% endif %}>
+            Auto-calculate handicap from rounds
+        </label>
+        <div class="settings-field">
+            <label>Handicap Target</label>
+            <input type="number" class="step-input" id="handicap-target"
+                   value="{{ settings.get('handicap_target', '') }}"
+                   placeholder="Optional" step="0.1" min="0" max="54">
+        </div>
+    </div>
+
+    <div class="settings-group">
+        <h3>Rounds</h3>
+        <label class="settings-toggle">
+            <input type="checkbox" id="show-report"
+                   {% if settings.get("show_report", true) %}checked{% endif %}>
+            Show report card after completing a round
+        </label>
+    </div>
+
+    <div class="settings-group">
+        <h3>Season Tracking</h3>
+        <label class="settings-toggle">
+            <input type="checkbox" id="season-enabled"
+                   {% if settings.get("season_enabled", false) %}checked{% endif %}>
+            Season tracking enabled
+        </label>
+        <div class="settings-field-row">
+            <div class="settings-field">
+                <label>Start (MM-DD)</label>
+                <input type="text" class="step-input" id="season-start"
+                       value="{{ '%02d-%02d'|format(settings.get('season_start_month', 1), settings.get('season_start_day', 1)) }}"
+                       placeholder="01-01">
+            </div>
+            <div class="settings-field">
+                <label>End (MM-DD)</label>
+                <input type="text" class="step-input" id="season-end"
+                       value="{{ '%02d-%02d'|format(settings.get('season_end_month', 12), settings.get('season_end_day', 28)) }}"
+                       placeholder="12-28">
+            </div>
+        </div>
+    </div>
+
+</form>
+{% endblock %}

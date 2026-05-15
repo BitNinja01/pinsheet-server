@@ -32,6 +32,12 @@ from calc.scoring import (
     calc_scoring_average, calc_par_or_better_percent, calc_big_number_rate, calc_scoring_avg_by_par_type,
     calc_clean_card_percent, calc_scoring_consistency, calc_penalty_stats,
     calc_momentum_recovery, calc_personal_bests,
+    calc_rounds_total, calc_golfiest_month, calc_most_common_day,
+    calc_best_single_round, calc_best_3round_stretch, calc_biggest_improvement,
+    calc_first_score_milestone, calc_first_hi_milestone, calc_score_breakdown,
+    calc_hole_in_ones, calc_best_gir_round, calc_best_fir_round,
+    calc_most_played_course, calc_season_yardage, calc_penalty_free_rounds,
+    calc_hi_journey, calc_season_rounds,
     STAT_CATALOG, DEFAULT_DASHBOARD_STATS,
 )
 
@@ -126,6 +132,8 @@ def _penalties_per_round(rounds):
 @app.route("/")
 def dashboard():
     settings = load_settings()
+    if not settings.get("welcome_shown"):
+        return render_template("welcome.html", settings=settings)
     courses = get_courses()
     all_rounds = get_all_rounds()
     include_9hole = settings.get("include_9hole", True)
@@ -178,6 +186,14 @@ def dashboard():
 
     return render_template("dashboard.html", panels=panels, rounds=rounds_data,
                            last_year_hi=last_year_hi, settings=settings)
+
+
+@app.route("/api/welcome", methods=["POST"])
+def api_welcome_done():
+    settings = load_settings()
+    settings["welcome_shown"] = True
+    save_settings(settings)
+    return jsonify({"ok": True})
 
 
 @app.route("/rounds/new")
@@ -643,6 +659,79 @@ def stats():
     sections["trends"] = {"label": "Trends", "headline": "Round-by-round performance history.", "trends": trend_rows}
 
     return render_template("stats.html", sections=sections, settings=settings)
+
+
+@app.route("/settings")
+def settings_page():
+    settings = load_settings()
+    courses = get_courses()
+    themes = [
+        "green", "ocean", "amber", "sunset", "purple", "teal",
+        "crimson", "midnight", "rose", "gold", "slate", "lime",
+    ]
+    return render_template("settings.html", settings=settings, courses=courses, themes=themes)
+
+
+@app.route("/api/settings", methods=["PUT"])
+def api_settings_put():
+    data = request.get_json()
+    save_settings(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/season")
+def season_summary():
+    settings = load_settings()
+    courses = get_courses()
+    all_rounds = get_all_rounds()
+    include_9hole = settings.get("include_9hole", True)
+
+    if settings.get("season_enabled"):
+        season_rounds = calc_season_rounds(all_rounds, settings)
+    else:
+        season_rounds = all_rounds
+
+    hi = calc_handicap_index(all_rounds, include_9hole)
+    journey = calc_hi_journey(all_rounds, season_rounds, hi)
+    most_played = calc_most_played_course(season_rounds)
+    golfiest = calc_golfiest_month(season_rounds)
+    common_day = calc_most_common_day(season_rounds)
+    best_round = calc_best_single_round(season_rounds)
+    best_stretch = calc_best_3round_stretch(season_rounds)
+    biggest_improvement = calc_biggest_improvement(season_rounds)
+    first_score_ms = calc_first_score_milestone(season_rounds, all_rounds)
+    first_hi_ms = calc_first_hi_milestone(season_rounds, all_rounds)
+    breakdown = calc_score_breakdown(season_rounds, courses)
+    hole_in_ones = calc_hole_in_ones(season_rounds, courses)
+    best_gir = calc_best_gir_round(season_rounds)
+    best_fir = calc_best_fir_round(season_rounds, courses)
+    walking_miles = calc_season_yardage(season_rounds, courses, "walking")
+    riding_miles = calc_season_yardage(season_rounds, courses, "riding")
+    penalty_free = calc_penalty_free_rounds(season_rounds)
+    rounds_count = len(season_rounds)
+    total_rounds = calc_rounds_total(all_rounds)
+
+    return render_template("season_summary.html",
+        settings=settings,
+        rounds_count=rounds_count,
+        total_rounds=total_rounds,
+        journey=journey,
+        most_played=most_played,
+        golfiest=golfiest,
+        common_day=common_day,
+        best_round=best_round,
+        best_stretch=best_stretch,
+        biggest_improvement=biggest_improvement,
+        first_score_ms=first_score_ms,
+        first_hi_ms=first_hi_ms,
+        breakdown=breakdown,
+        hole_in_ones=hole_in_ones,
+        best_gir=best_gir,
+        best_fir=best_fir,
+        walking_miles=walking_miles,
+        riding_miles=riding_miles,
+        penalty_free=penalty_free,
+    )
 
 
 def main():

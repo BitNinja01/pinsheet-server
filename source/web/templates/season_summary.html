@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Season Summary</h2>
+
+<div class="season-meta">
+    <div class="meta-item"><span class="meta-label">Rounds</span> {{ rounds_count }} this season ({{ total_rounds }} total)</div>
+</div>
+
+{% if journey %}
+<div class="season-group">
+    <h3>Handicap Journey</h3>
+    <div class="season-row">
+        <span>Started at <strong>{{ journey[0]|round(1) }}</strong></span>
+        <span>&rarr; Ended at <strong>{{ journey[1]|round(1) }}</strong></span>
+        <span class="{% if journey[2] > 0 %}delta-good{% else %}delta-bad{% endif %}">
+            ({% if journey[2] > 0 %}&#9660;{% else %}&#9650;{% endif %} {{ journey[2]|abs|round(1) }})
+        </span>
+    </div>
+</div>
+{% endif %}
+
+{% if most_played %}
+<div class="season-group">
+    <h3>Most Played Course</h3>
+    <p>{{ most_played[0] }} &mdash; {{ most_played[1] }} rounds, avg diff {{ most_played[2]|round(1) }}</p>
+</div>
+{% endif %}
+
+{% if golfiest[1] > 0 %}
+<div class="season-group">
+    <h3>Golfiest Month</h3>
+    <p>{{ golfiest[0] }} ({{ golfiest[1] }} rounds)</p>
+</div>
+{% endif %}
+
+{% if common_day[1] > 0 %}
+<div class="season-group">
+    <h3>Most Common Day</h3>
+    <p>{{ common_day[0] }} ({{ common_day[1] }} rounds)</p>
+</div>
+{% endif %}
+
+{% if breakdown %}
+<div class="season-group">
+    <h3>Score Breakdown</h3>
+    <table class="data-table">
+        <thead>
+            <tr><th>Eagles</th><th>Birdies</th><th>Pars</th><th>Bogeys</th><th>Doubles</th><th>Triple+</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ breakdown.eagle }}</td>
+                <td>{{ breakdown.birdie }}</td>
+                <td>{{ breakdown.par }}</td>
+                <td>{{ breakdown.bogey }}</td>
+                <td>{{ breakdown.double }}</td>
+                <td>{{ breakdown.triple_plus }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if best_round %}
+<div class="season-group">
+    <h3>Best Round</h3>
+    <p>{{ best_round.date }} at {{ best_round.course }} &mdash; {{ best_round.total_gross }} (diff {{ best_round.differential }})</p>
+</div>
+{% endif %}
+
+{% if best_stretch %}
+<div class="season-group">
+    <h3>Best 3-Round Stretch</h3>
+    <p>{{ best_stretch[1] }} to {{ best_stretch[2] }} &mdash; avg diff {{ best_stretch[0]|round(1) }}</p>
+</div>
+{% endif %}
+
+{% if biggest_improvement %}
+<div class="season-group">
+    <h3>Biggest Improvement</h3>
+    <p>{{ biggest_improvement[1].date }} at {{ biggest_improvement[1].course }} &mdash; beat HI by {{ biggest_improvement[0]|round(1) }}</p>
+</div>
+{% endif %}
+
+{% if walking_miles is not none or riding_miles is not none %}
+<div class="season-group">
+    <h3>Mileage</h3>
+    {% if walking_miles is not none %}<p>Walked: {{ walking_miles|round(1) }} miles</p>{% endif %}
+    {% if riding_miles is not none %}<p>Ridden: {{ riding_miles|round(1) }} miles</p>{% endif %}
+</div>
+{% endif %}
+
+{% if first_score_ms %}
+<div class="season-group">
+    <h3>First Time Breaking {{ first_score_ms[0] }}</h3>
+    <p>{{ first_score_ms[1].date }} at {{ first_score_ms[1].course }} &mdash; {{ first_score_ms[1].total_gross }}</p>
+</div>
+{% endif %}
+
+{% if first_hi_ms %}
+<div class="season-group">
+    <h3>First Time HI Below {{ first_hi_ms[0] }}</h3>
+    <p>{{ first_hi_ms[1].date }} at {{ first_hi_ms[1].course }}</p>
+</div>
+{% endif %}
+
+{% if penalty_free > 0 %}
+<div class="season-group">
+    <h3>Penalty-Free Rounds</h3>
+    <p>{{ penalty_free }}</p>
+</div>
+{% endif %}
+
+{% if hole_in_ones > 0 %}
+<div class="season-group">
+    <h3>Hole-in-Ones</h3>
+    <p>{{ hole_in_ones }}</p>
+</div>
+{% endif %}
+
+{% if best_gir %}
+<div class="season-group">
+    <h3>Best GIR Round</h3>
+    <p>{{ best_gir[0].date }} at {{ best_gir[0].course }} &mdash; {{ best_gir[1] }} greens</p>
+</div>
+{% endif %}
+
+{% if best_fir %}
+<div class="season-group">
+    <h3>Best FIR Round</h3>
+    <p>{{ best_fir[0].date }} at {{ best_fir[0].course }} &mdash; {{ best_fir[1] }} fairways</p>
+</div>
+{% endif %}
+{% endblock %}
