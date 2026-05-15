@@ -1,14 +1,14 @@
 # Handoff
 
-**Last updated**: 2026-05-15 14:00 UTC
+**Last updated**: 2026-05-15 21:40 UTC
 
 ## Current state
-Phase 1 (Foundation) complete and committed. Full design spec and implementation plan written. Code restructured into `source/` directory matching original pinsheet layout. Repo renamed to `pinsheet-modern` and pushed to Gitea.
+All 6 phases complete and pushed. PinSheet Modern is a fully functional Flask + waitress golf stats tracker with dashboard, round entry wizard (progressive disclosure + draft save), scorecard detail, report cards, course management, 9-section stats screen, settings with 12 themes, welcome screen, season summary, and distribution launcher scripts. GHIN export was cut intentionally.
 
-## Next actions (`[P0]`)
-1. **Task 2.1 — Complete dashboard** — rounds table, "this time last year" HI, handicap-used round highlighting, click-to-navigate rows
-2. **Task 2.2 — Round entry wizard shell** — progressive disclosure form with course/tee dropdowns, draft save/resume
-3. **Task 2.3 — Scorecard grid and submit** — hole-by-hole input grid, totals auto-update, POST /api/rounds → redirect
+## Next actions
+1. **Smoke test** — run `python source/main.py`, enter a sample round end-to-end (dashboard → new round → scorecard → detail → report card), verify stat panels update
+2. **Course entry test** — add a real course with multiple tee sets from the wizard, verify course detail renders correctly
+3. **Edge case hardening** — empty states (no rounds, no courses), 9-hole round handling, score-only mode, draft resume after browser close
 
 ## Blockers
 None.

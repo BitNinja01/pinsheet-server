@@ -74,3 +74,23 @@
 - `docs/SESSION_LOG.md` — this entry
 
 **Next**: Task 2.1 — complete dashboard with rounds table and last-year HI
+
+## 2026-05-15 21:40 UTC — Session end
+
+**What was done**:
+- Implemented Phase 2 (Rounds): completed dashboard with rounds table + handicap highlighting + click-to-navigate, round entry wizard with progressive disclosure + 500ms debounced draft save/resume, dynamic scorecard grid with auto-updating totals + POST /api/rounds, round detail scorecard with color-coded cells + OUT/IN/TOT subtotals + delete, report card with this-round vs L20 avg comparison tables and delta arrows
+- Implemented Phase 3 (Courses): course list table with play counts, course detail page with tees + holes tables + history, course entry wizard with dynamic tee set addition and hole grid
+- Implemented Phase 4 (Stats): 9-section stats screen (Scoring, Penalties, Fairways, Greens, Putting, Short Game, Momentum, Bests, Trends) with sticky sidebar nav, Best 8 / Last 5 / Last 10 / Last 20 columns
+- Implemented Phase 5 (Settings & Polish): settings page with 12 theme swatches + auto-save toggles, welcome screen gate on dashboard, season summary page with handicap journey/score breakdown/milestones/mileage
+- Implemented Phase 6 (Distribution): launch.sh (Linux/macOS), launch.bat (Windows), dist.sh packaging script
+- GHIN export intentionally cut per user request
+- All code passes `py_compile` and `node --check`
+
+**Files touched**:
+- `source/main.py` — grew from 98 to 750 lines; all route handlers, helpers, calc imports
+- `source/web/static/app.js` — 277 lines; click-to-navigate, wizard progressive disclosure, draft save/resume, scorecard grid builder, totals updater, submit handler, settings auto-save
+- `source/web/static/app.css` — grew from 119 to 581 lines; data tables, wizard, scorecard, scorecard view, report card, stats layout, settings, welcome, season, 12 theme overrides + swatches
+- `source/web/templates/` — 12 templates: base, dashboard, round_entry, round_detail, report_card, courses, course_detail, course_entry, stats, settings, welcome, season_summary
+- `scripts/launchers/launch.sh`, `scripts/launchers/launch.bat`, `scripts/dist.sh` — distribution scripts
+
+**Next**: Smoke test the app end-to-end, course entry test, edge case hardening
