@@ -1,0 +1,26 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Virtual env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# User data (created at runtime)
+data/
+
+# Artifacts from other tools
+.claude/
+CLAUDE.md
+.aider*
+.superpowers/
+PICKUP_PROMPT.md

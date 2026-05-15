@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stat-panels">
+    {% for key, p in panels.items() %}
+    <div class="stat-panel" style="--accent: {{ p.color }}">
+        <div class="stat-label">{{ p.label }}</div>
+        <div class="stat-value">
+            {% if p.value == "--" %}
+                <span class="stat-blank">{{ p.blank_text }}</span>
+            {% else %}
+                {{ p.value }}
+            {% endif %}
+        </div>
+        <div class="stat-secondary">L20: {{ p.secondary }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<section class="recent-rounds">
+    <h2>Recent Rounds</h2>
+    <p class="placeholder">Round history coming soon.</p>
+</section>
+{% endblock %}
