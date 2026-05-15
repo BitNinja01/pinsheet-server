@@ -1,22 +1,14 @@
 # Handoff
 
-**Last updated**: 2026-05-15 00:00 UTC
+**Last updated**: 2026-05-15 01:00 UTC
 
 ## Current state
-Project scaffolded. Flask + waitress web app foundation in place:
-- All calc functions ported 1:1 from original Python pinsheet (handicap, scoring, approach, putting)
-- Store layer (JSON file I/O) ported from original `data.py`
-- Minimal Flask server with dashboard route (stat panels rendering with real data)
-- `base.html` shell template with navigation, `dashboard.html` with stat panel grid
-- `app.css` with dark theme, custom properties, stat panel layout
-- AGENTS.md, docs/ session memory files in place
-
-No real `data/` directory yet — needs to be populated from the original pinsheet data for testing.
+Phase 1 (Foundation) complete and committed. Flask + waitress server, all calc functions ported 1:1, store layer ported, dashboard route renders 6 stat panels with real data from the copied `data/` directory. All other nav links return 404 — routes not yet implemented.
 
 ## Next actions (`[P0]`)
-1. **Copy data from pinsheet** — `cp -r ../pinsheet/data data/` for development
-2. **Dashboard backend** — complete the dashboard route with rounds table and trend data
-3. **Dashboard frontend** — recent rounds table, trend graphs (Chart.js), "this time last year" HI
+1. **Complete dashboard route** — add recent rounds table (last 20, sorted newest first) and trend data (6 metrics as time-series) to the dashboard handler and template
+2. **Round entry wizard** — multi-step form: date → course → tee → holes → transport → entry mode → hole detail (5-token shorthand)
+3. **Round detail / scorecard** — full hole-by-hole view for any saved round, color-coded cells (birdies, bogeys, putts)
 
 ## Blockers
 None.
