@@ -403,3 +403,46 @@ select.hole-input {
     color: var(--text);
     font-size: 0.8rem;
 }
+
+.stats-layout {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+.stats-nav {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.stats-nav-link {
+    padding: 0.4rem 0.75rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    transition: background 0.1s, color 0.1s;
+}
+.stats-nav-link:hover {
+    background: var(--surface);
+    color: var(--text);
+}
+.stats-content {
+    min-width: 0;
+}
+.stats-section {
+    margin-bottom: 2.5rem;
+}
+.stats-section-title {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+}
+.stats-headline {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 0.75rem;
+}

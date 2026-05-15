@@ -20,13 +20,18 @@ from calc.handicap import (
     calc_expected_9hole_dif, get_best_n_rounds,
 )
 from calc.approach import (
-    calc_fir_percent, calc_gir_percent, calc_scramble_percent,
+    calc_fir_percent, calc_fir_miss_tendency, calc_scoring_by_fairway,
+    calc_gir_percent, calc_gir_miss_direction, calc_scoring_by_gir,
+    calc_scramble_percent, calc_scramble_by_miss_direction,
 )
 from calc.putting import (
-    calc_putts_per_round, calc_one_putt_percent, calc_two_putt_percent, calc_three_putt_percent,
+    calc_putts_per_round, calc_putts_per_gir,
+    calc_one_putt_percent, calc_two_putt_percent, calc_three_putt_percent,
 )
 from calc.scoring import (
     calc_scoring_average, calc_par_or_better_percent, calc_big_number_rate, calc_scoring_avg_by_par_type,
+    calc_clean_card_percent, calc_scoring_consistency, calc_penalty_stats,
+    calc_momentum_recovery, calc_personal_bests,
     STAT_CATALOG, DEFAULT_DASHBOARD_STATS,
 )
 
@@ -493,6 +498,151 @@ def api_courses_post():
 def api_courses_delete(name):
     delete_course(name)
     return jsonify({"ok": True})
+
+
+@app.route("/stats")
+def stats():
+    settings = load_settings()
+    courses = get_courses()
+    all_rounds = get_all_rounds()
+    include_9hole = settings.get("include_9hole", True)
+
+    b8 = _best_n_rounds(all_rounds, courses, 8)
+    l5 = _last_n_rounds(all_rounds, courses, 5)
+    l10 = _last_n_rounds(all_rounds, courses, 10)
+    l20 = _last_n_rounds(all_rounds, courses, 20)
+
+    hi = calc_handicap_index(l20, include_9hole)
+    benchmarks = get_handicap_benchmarks(hi) if hi is not None else None
+
+    def fmt(val, suffix="", precision=1):
+        if val is None:
+            return "\u2014"
+        return f"{val:.{precision}f}{suffix}"
+
+    def fmt_pct(val):
+        if val is None:
+            return "\u2014"
+        return f"{val:.1f}%"
+
+    sections = {}
+
+    # 1. Scoring
+    scoring_rows = []
+    scoring_rows.append(("Scoring Avg", [fmt(calc_scoring_average(b8)), fmt(calc_scoring_average(l5)), fmt(calc_scoring_average(l10)), fmt(calc_scoring_average(l20))]))
+    scoring_rows.append(("Par or Better %", [fmt_pct(calc_par_or_better_percent(b8, courses)), fmt_pct(calc_par_or_better_percent(l5, courses)), fmt_pct(calc_par_or_better_percent(l10, courses)), fmt_pct(calc_par_or_better_percent(l20, courses))]))
+    scoring_rows.append(("Blow-up %", [fmt_pct(calc_big_number_rate(b8, courses)), fmt_pct(calc_big_number_rate(l5, courses)), fmt_pct(calc_big_number_rate(l10, courses)), fmt_pct(calc_big_number_rate(l20, courses))]))
+    scoring_rows.append(("Clean Card %", [fmt_pct(calc_clean_card_percent(b8, courses)), fmt_pct(calc_clean_card_percent(l5, courses)), fmt_pct(calc_clean_card_percent(l10, courses)), fmt_pct(calc_clean_card_percent(l20, courses))]))
+    scoring_rows.append(("Consistency", [fmt(calc_scoring_consistency(b8, courses)), fmt(calc_scoring_consistency(l5, courses)), fmt(calc_scoring_consistency(l10, courses)), fmt(calc_scoring_consistency(l20, courses))]))
+    sections["scoring"] = {"label": "Scoring", "headline": "Your scoring average and consistency across recent rounds.", "rows": scoring_rows}
+
+    # 2. Penalties
+    pen_b8 = calc_penalty_stats(b8, courses)
+    pen_l5 = calc_penalty_stats(l5, courses)
+    pen_l10 = calc_penalty_stats(l10, courses)
+    pen_l20 = calc_penalty_stats(l20, courses)
+    penalty_rows = []
+    penalty_rows.append(("Per Round", [fmt(pen_b8.get("rate_per_round")), fmt(pen_l5.get("rate_per_round")), fmt(pen_l10.get("rate_per_round")), fmt(pen_l20.get("rate_per_round"))]))
+    penalty_rows.append(("Penalty Avg vs Par", [fmt(pen_b8.get("penalty_avg_vs_par")), fmt(pen_l5.get("penalty_avg_vs_par")), fmt(pen_l10.get("penalty_avg_vs_par")), fmt(pen_l20.get("penalty_avg_vs_par"))]))
+    penalty_rows.append(("Clean Avg vs Par", [fmt(pen_b8.get("clean_avg_vs_par")), fmt(pen_l5.get("clean_avg_vs_par")), fmt(pen_l10.get("clean_avg_vs_par")), fmt(pen_l20.get("clean_avg_vs_par"))]))
+    sections["penalties"] = {"label": "Penalties", "headline": "How penalties affect your scoring.", "rows": penalty_rows}
+
+    # 3. Fairways
+    fir_rows = []
+    fir_rows.append(("FIR %", [fmt_pct(calc_fir_percent(b8, courses)), fmt_pct(calc_fir_percent(l5, courses)), fmt_pct(calc_fir_percent(l10, courses)), fmt_pct(calc_fir_percent(l20, courses))]))
+    fw_b8 = calc_scoring_by_fairway(b8, courses)
+    fw_l5 = calc_scoring_by_fairway(l5, courses)
+    fw_l10 = calc_scoring_by_fairway(l10, courses)
+    fw_l20 = calc_scoring_by_fairway(l20, courses)
+    fir_rows.append(("Hit Avg vs Par", [fmt(fw_b8.get("hit")), fmt(fw_l5.get("hit")), fmt(fw_l10.get("hit")), fmt(fw_l20.get("hit"))]))
+    fir_rows.append(("Miss Avg vs Par", [fmt(fw_b8.get("missed")), fmt(fw_l5.get("missed")), fmt(fw_l10.get("missed")), fmt(fw_l20.get("missed"))]))
+    miss_b8 = calc_fir_miss_tendency(b8, courses)
+    miss_l20 = calc_fir_miss_tendency(l20, courses)
+    fir_rows.append(("Miss Left %", [fmt_pct(miss_b8.get("left")), "\u2014", "\u2014", fmt_pct(miss_l20.get("left"))]))
+    fir_rows.append(("Miss Right %", [fmt_pct(miss_b8.get("right")), "\u2014", "\u2014", fmt_pct(miss_l20.get("right"))]))
+    sections["fairways"] = {"label": "Fairways", "headline": "Fairway accuracy and scoring impact.", "rows": fir_rows}
+
+    # 4. Greens
+    gir_rows = []
+    gir_rows.append(("GIR %", [fmt_pct(calc_gir_percent(b8)), fmt_pct(calc_gir_percent(l5)), fmt_pct(calc_gir_percent(l10)), fmt_pct(calc_gir_percent(l20))]))
+    gb8 = calc_scoring_by_gir(b8, courses)
+    gl5 = calc_scoring_by_gir(l5, courses)
+    gl10 = calc_scoring_by_gir(l10, courses)
+    gl20 = calc_scoring_by_gir(l20, courses)
+    gir_rows.append(("Hit Avg vs Par", [fmt(gb8.get("hit")), fmt(gl5.get("hit")), fmt(gl10.get("hit")), fmt(gl20.get("hit"))]))
+    gir_rows.append(("Miss Avg vs Par", [fmt(gb8.get("missed")), fmt(gl5.get("missed")), fmt(gl10.get("missed")), fmt(gl20.get("missed"))]))
+    gmiss_b8 = calc_gir_miss_direction(b8)
+    gmiss_l20 = calc_gir_miss_direction(l20)
+    gir_rows.append(("Miss Short %", [fmt_pct(gmiss_b8.get("S")), "\u2014", "\u2014", fmt_pct(gmiss_l20.get("S"))]))
+    gir_rows.append(("Miss Long %", [fmt_pct(gmiss_b8.get("LO")), "\u2014", "\u2014", fmt_pct(gmiss_l20.get("LO"))]))
+    gir_rows.append(("Miss Left %", [fmt_pct(gmiss_b8.get("L")), "\u2014", "\u2014", fmt_pct(gmiss_l20.get("L"))]))
+    gir_rows.append(("Miss Right %", [fmt_pct(gmiss_b8.get("R")), "\u2014", "\u2014", fmt_pct(gmiss_l20.get("R"))]))
+    sections["greens"] = {"label": "Greens", "headline": "Greens in regulation and scoring impact.", "rows": gir_rows}
+
+    # 5. Putting
+    putting_rows = []
+    putting_rows.append(("Putts / Rnd", [fmt(calc_putts_per_round(b8)), fmt(calc_putts_per_round(l5)), fmt(calc_putts_per_round(l10)), fmt(calc_putts_per_round(l20))]))
+    putting_rows.append(("Putts / GIR", [fmt(calc_putts_per_gir(b8)), fmt(calc_putts_per_gir(l5)), fmt(calc_putts_per_gir(l10)), fmt(calc_putts_per_gir(l20))]))
+    putting_rows.append(("1-Putt %", [fmt_pct(calc_one_putt_percent(b8)), fmt_pct(calc_one_putt_percent(l5)), fmt_pct(calc_one_putt_percent(l10)), fmt_pct(calc_one_putt_percent(l20))]))
+    putting_rows.append(("2-Putt %", [fmt_pct(calc_two_putt_percent(b8)), fmt_pct(calc_two_putt_percent(l5)), fmt_pct(calc_two_putt_percent(l10)), fmt_pct(calc_two_putt_percent(l20))]))
+    putting_rows.append(("3-Putt %", [fmt_pct(calc_three_putt_percent(b8)), fmt_pct(calc_three_putt_percent(l5)), fmt_pct(calc_three_putt_percent(l10)), fmt_pct(calc_three_putt_percent(l20))]))
+    sections["putting"] = {"label": "Putting", "headline": "Putting performance across recent rounds.", "rows": putting_rows}
+
+    # 6. Short Game
+    short_rows = []
+    short_rows.append(("Scramble %", [fmt_pct(calc_scramble_percent(b8, courses)), fmt_pct(calc_scramble_percent(l5, courses)), fmt_pct(calc_scramble_percent(l10, courses)), fmt_pct(calc_scramble_percent(l20, courses))]))
+    scr_b8 = calc_scramble_by_miss_direction(b8, courses)
+    scr_l20 = calc_scramble_by_miss_direction(l20, courses)
+    short_rows.append(("Scramble Short %", [fmt_pct(scr_b8.get("S")), "\u2014", "\u2014", fmt_pct(scr_l20.get("S"))]))
+    short_rows.append(("Scramble Long %", [fmt_pct(scr_b8.get("LO")), "\u2014", "\u2014", fmt_pct(scr_l20.get("LO"))]))
+    short_rows.append(("Scramble Left %", [fmt_pct(scr_b8.get("L")), "\u2014", "\u2014", fmt_pct(scr_l20.get("L"))]))
+    short_rows.append(("Scramble Right %", [fmt_pct(scr_b8.get("R")), "\u2014", "\u2014", fmt_pct(scr_l20.get("R"))]))
+    sections["shortgame"] = {"label": "Short Game", "headline": "Up-and-down scrambling performance.", "rows": short_rows}
+
+    # 7. Momentum
+    mom_b8 = calc_momentum_recovery(b8, courses)
+    mom_l20 = calc_momentum_recovery(l20, courses)
+    momentum_rows = []
+    momentum_rows.append(("After Bogey Avg", [fmt(mom_b8.get("after_bogey_avg")), "\u2014", "\u2014", fmt(mom_l20.get("after_bogey_avg"))]))
+    momentum_rows.append(("Recovery Rate %", [fmt_pct(mom_b8.get("recovery_rate")), "\u2014", "\u2014", fmt_pct(mom_l20.get("recovery_rate"))]))
+    sections["momentum"] = {"label": "Momentum", "headline": "How you respond after bad holes.", "rows": momentum_rows}
+
+    # 8. Bests
+    bests = calc_personal_bests(all_rounds, courses)
+    bests_data = [
+        ("Lowest Gross", bests.get("best_gross"), bests.get("best_gross_date")),
+        ("Lowest Diff", bests.get("best_diff"), bests.get("best_diff_date")),
+        ("Most FIR", bests.get("most_fir"), bests.get("most_fir_date")),
+        ("Most GIR", bests.get("most_gir"), bests.get("most_gir_date")),
+        ("Fewest Putts", bests.get("fewest_putts"), bests.get("fewest_putts_date")),
+    ]
+    sections["bests"] = {"label": "Bests", "headline": "Your personal best performances.", "bests": bests_data}
+
+    # 9. Trends
+    chronological = list(reversed(all_rounds))
+    trend_rows = []
+    for r in chronological:
+        d = r.get("date", "")
+        if not r.get("total_gross") or r["total_gross"] == "0":
+            continue
+        if r.get("holes_selection", "all") != "all":
+            continue
+        course = courses.get(r.get("course", ""), {})
+        par = int(course.get("par", 0))
+        gross = int(r.get("total_gross", 0))
+        trend_rows.append({
+            "date": d,
+            "course": r.get("course", ""),
+            "score": gross,
+            "vs_par": gross - par if par else None,
+            "diff": r.get("differential", ""),
+            "fir": fmt_pct(calc_fir_percent([r], courses)),
+            "gir": fmt_pct(calc_gir_percent([r])),
+            "putts": str(sum(int(h.get("putts", 0)) for h in r.get("holes", {}).values() if h.get("putts"))) if r.get("holes") else "\u2014",
+        })
+    sections["trends"] = {"label": "Trends", "headline": "Round-by-round performance history.", "trends": trend_rows}
+
+    return render_template("stats.html", sections=sections, settings=settings)
 
 
 def main():
