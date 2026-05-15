@@ -4,7 +4,7 @@
 
 **Run the app:**
 ```bash
-python main.py
+python source/main.py
 ```
 
 **Install dependencies:**

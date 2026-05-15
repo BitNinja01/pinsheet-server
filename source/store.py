@@ -4,7 +4,7 @@ from pathlib import Path
 
 _log = logging.getLogger("pinsheet")
 
-_DATA_DIR = Path(__file__).parent / "data"
+_DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def init_data_dir() -> None:

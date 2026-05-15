@@ -41,7 +41,7 @@ After writing any `.py` file, run `python -m py_compile` on it. Check that templ
 
 **Run the app (development):**
 ```bash
-python main.py
+python source/main.py
 ```
 
 **Install dependencies:**
