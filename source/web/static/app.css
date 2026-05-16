@@ -24,7 +24,10 @@
 
 body {
     font-family: var(--font);
-    background: var(--bg);
+    background-color: var(--bg);
+    background-image: radial-gradient(circle, var(--grid-minor-dot) 0.5px, transparent 0.5px);
+    background-size: var(--grid-minor-size) var(--grid-minor-size);
+    background-position: 4px 4px;
     color: var(--text);
     min-height: 100vh;
 }
