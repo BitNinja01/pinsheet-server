@@ -115,3 +115,25 @@
 - `source/web/templates/round_detail.html` — score-only conditional panel
 - `source/web/templates/dashboard.html` — "Add Round" button for empty state
 - `docs/test-data.md` — Druids Glen course + round reference data
+
+## 2026-05-15 23:55 UTC — Session end
+
+**What was done**:
+- Ran full brainstorming → design spec → implementation plan workflow for dashboard visual theme
+- Used visual companion (browser-based mockup tool) to iterate on grid styles, color palettes, and typography
+- Locked in "Dark Engineering Grid" direction: Cool Teal palette (`#0d1114`/`#181e22`/`#50c8d2`), full monospace, adaptive grid with crosshair dots, dashed borders
+- Wrote design spec (`docs/superpowers/specs/2026-05-15-dashboard-theme-design.md`) and implementation plan (`docs/superpowers/plans/2026-05-15-dashboard-theme-plan.md`)
+- Executed plan via subagent-driven development: 8 tasks, each with spec compliance + code quality review gates
+- Replaced `:root` CSS custom properties (Task 1), added 8px dot grid background texture (Task 2), updated header/nav to dashed borders/monospace sizing (Task 3), restyled stat panels to 6-column row + rounds table with teal accents (Task 4), created `grid.js` adaptive grid overlay module (Task 5), wired templates with `data-grid-region`/`data-grid-panel` attributes (Task 6)
+- Smoke tested: 15 checks passed (all pages 200, static files served, 6 grid-panel elements detected, no Flask errors)
+- Dashboard only — other pages adopt new `:root` tokens but layouts unchanged
+
+**Files touched**:
+- `source/web/static/app.css` — `:root` tokens replaced, body dot grid, header/nav, stat panels (3col→6col), rounds table, theme swatch
+- `source/web/static/grid.js` — new 91-line vanilla JS adaptive grid overlay module
+- `source/web/templates/base.html` — added `data-grid-region` + `grid.js` script include
+- `source/web/templates/dashboard.html` — added `data-grid-panel` attribute to stat panels
+- `docs/superpowers/specs/2026-05-15-dashboard-theme-design.md` — design spec
+- `docs/superpowers/plans/2026-05-15-dashboard-theme-plan.md` — implementation plan
+
+**Next**: Continue theme rollout to other pages, refine scorecard grid visuals, tweak dashboard details

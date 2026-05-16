@@ -1,14 +1,14 @@
 # Handoff
 
-**Last updated**: 2026-05-15 23:00 UTC
+**Last updated**: 2026-05-15 23:55 UTC
 
 ## Current state
-Course entry and round entry wizards fully functional with auto-advance, draft save/resume, and all fields from the original terminal version (7 tee fields, structured location, 5-token shorthand scorecard). Edge cases hardened: no-courses guard, empty states, 9-hole switching, score-only round detail, course deletion guard. All functional work complete. Next phase is visual refinements.
+Dashboard restyled with "Dark Engineering Grid" theme: Cool Teal / Near-Black palette, full monospace typography, adaptive grid overlay (major lines snap to stat panel edges, 8px minor dot texture, crosshair dots at intersections), dashed borders throughout. New `grid.js` module handles adaptive grid rendering. Spec and implementation plan in docs/superpowers/. Other pages adopt the new tokens via `:root` but retain their original layouts — dashboard-only restyle so far.
 
 ## Next actions
-1. **Visual polish** — theme consistency audit, layout refinements, color scheme alignment with original terminal version
-2. **Scorecard grid visuals** — cell color coding, responsive layout, input styling
-3. **Course/round detail pages** — visual alignment with original terminal info/stats tabs
+1. **Continue theme rollout** — apply Dark Engineering Grid to round entry wizard, stats, courses, settings, season summary
+2. **Scorecard grid visuals** — cell color coding, responsive layout, input styling in the new theme
+3. **Tweak dashboard** — grid prominence, spacing refinements, active nav indicator styling
 
 ## Blockers
 None.
