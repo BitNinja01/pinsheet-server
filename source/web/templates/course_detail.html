@@ -98,7 +98,12 @@
 document.getElementById("btn-delete-course")?.addEventListener("click", function () {
     if (!confirm("Delete course &quot;{{ name }}&quot;? This cannot be undone.")) return;
     fetch("/api/courses/{{ name }}", { method: "DELETE" })
-        .then(function () { window.location.href = "/courses"; });
+        .then(function (r) {
+            if (r.status === 409) {
+                return r.json().then(function (data) { alert(data.error); throw new Error(data.error); });
+            }
+            window.location.href = "/courses";
+        });
 });
 </script>
 {% endblock %}

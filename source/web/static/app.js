@@ -354,3 +354,516 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 })();
+
+(function () {
+    var wizard = document.getElementById("round-wizard");
+    if (!wizard) return;
+
+    var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'notes'];
+    var draftTimer = null;
+    var scorecardData = {};
+
+    function showStep(step) {
+        var el = document.querySelector('.wizard-step[data-step="' + step + '"]');
+        if (el) el.style.display = 'block';
+    }
+
+    function populateTees(courseName) {
+        var course = window._courses[courseName];
+        if (!course) return;
+        var teeSelect = document.getElementById('round-tee');
+        teeSelect.innerHTML = '<option value="">Select tees...</option>';
+        (Object.keys(course.tees || {})).forEach(function (name) {
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            teeSelect.appendChild(opt);
+        });
+    }
+
+    function addGrossScoreInput() {
+        if (document.getElementById('gross-score')) return;
+        var area = document.getElementById('scorecard-area');
+        area.innerHTML = '<div><label class="step-label">Gross Score</label><input type="number" class="step-input" id="gross-score" placeholder="e.g. 87" min="1" max="200"></div>';
+    }
+
+    function getScorecardRange() {
+        var checked = document.querySelector('input[name="holes_played"]:checked');
+        var val = checked ? checked.value : '18';
+        if (val === 'front9') return [1,2,3,4,5,6,7,8,9];
+        if (val === 'back9') return [10,11,12,13,14,15,16,17,18];
+        return [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+    }
+
+    function _saveScorecardData() {
+        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
+            var num = row.dataset.hole;
+            var gross = row.querySelector('.score-gross');
+            var fwy = row.querySelector('.score-fwy');
+            var gir = row.querySelector('.score-gir');
+            var putts = row.querySelector('.score-putts');
+            var pen = row.querySelector('.score-pen');
+            if (!gross) return;
+            scorecardData[num] = {
+                gross: gross.value,
+                fairway: fwy ? fwy.value : '',
+                gir: gir ? gir.value : '',
+                putts: putts ? putts.value : '',
+                penalties: pen ? pen.value : '0',
+            };
+        });
+    }
+
+    function buildScorecardGrid() {
+        var holesRange = getScorecardRange();
+        var courseName = document.getElementById('round-course').value;
+        var course = window._courses[courseName];
+        var holesData = course ? course.holes || {} : {};
+
+        var html = '<table class="data-table scorecard-input"><thead><tr>' +
+            '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>Fairway</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
+            '</tr></thead><tbody>';
+
+        var holeRow = function (num) {
+            var hole = holesData[String(num)] || {};
+            var par = hole.par || '';
+            var saved = scorecardData[num] || {};
+            var r = '<tr data-hole="' + num + '">';
+            r += '<td>' + num + '</td>';
+            r += '<td class="hole-par">' + par + '</td>';
+            r += '<td>' + (hole.index || hole.hole_index || '') + '</td>';
+            r += '<td><input type="number" class="hole-input score-gross" min="1" max="20" value="' + (saved.gross || '') + '"></td>';
+            if (par === '3') {
+                r += '<td>\u2014</td>';
+            } else {
+                r += '<td><select class="hole-input score-fwy"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>OBL</option><option>OBR</option><option>N</option></select></td>';
+            }
+            r += '<td><select class="hole-input score-gir"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>S</option><option>LO</option><option>OBL</option><option>OBR</option><option>OBS</option><option>OBLO</option><option>N</option></select></td>';
+            r += '<td><input type="number" class="hole-input score-putts" min="0" max="10" value="' + (saved.putts || '') + '"></td>';
+            r += '<td><input type="number" class="hole-input score-pen" min="0" max="20" value="' + (saved.penalties || '0') + '"></td>';
+            r += '</tr>';
+            return r;
+        };
+
+        var outRow = function () {
+            return '<tr class="subtotal-row"><td>OUT</td><td></td><td></td><td class="subtotal" id="sub-gross-out">\u2014</td><td></td><td></td><td class="subtotal" id="sub-putts-out">\u2014</td><td class="subtotal" id="sub-pen-out">\u2014</td></tr>';
+        };
+        var inRow = function () {
+            return '<tr class="subtotal-row"><td>IN</td><td></td><td></td><td class="subtotal" id="sub-gross-in">\u2014</td><td></td><td></td><td class="subtotal" id="sub-putts-in">\u2014</td><td class="subtotal" id="sub-pen-in">\u2014</td></tr>';
+        };
+        var totRow = function () {
+            return '<tr class="subtotal-row"><td>TOT</td><td></td><td></td><td class="subtotal" id="sub-gross-tot">\u2014</td><td></td><td></td><td class="subtotal" id="sub-putts-tot">\u2014</td><td class="subtotal" id="sub-pen-tot">\u2014</td></tr>';
+        };
+
+        if (holesRange.length === 18) {
+            for (var i = 0; i < 18; i++) {
+                html += holeRow(holesRange[i]);
+                if (holesRange[i] === 9) html += outRow();
+            }
+            html += inRow();
+            html += totRow();
+        } else if (holesRange[0] === 1) {
+            holesRange.forEach(function (num) { html += holeRow(num); });
+            html += outRow();
+        } else {
+            holesRange.forEach(function (num) { html += holeRow(num); });
+            html += inRow();
+        }
+
+        html += '</tbody></table>';
+        document.getElementById('scorecard-area').innerHTML = html;
+
+        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
+            var grossInput = row.querySelector('.score-gross');
+            var parEl = row.querySelector('.hole-par');
+            if (grossInput && grossInput.value && parEl) {
+                var par = parseInt(parEl.textContent);
+                if (par) colorizeGross(grossInput, par);
+            }
+        });
+        updateSubtotals();
+    }
+
+    function colorizeGross(input, par) {
+        var val = parseInt(input.value);
+        if (!val || isNaN(val)) {
+            input.style.backgroundColor = '';
+            input.style.color = '';
+            input.style.fontWeight = '';
+            input.style.opacity = '';
+            return;
+        }
+        var diff = val - par;
+        input.style.color = '';
+        input.style.fontWeight = '';
+        input.style.backgroundColor = '';
+        input.style.opacity = '';
+        if (diff <= -2) {
+            input.style.color = '#ffd700';
+            input.style.fontWeight = 'bold';
+        } else if (diff === -1) {
+            input.style.color = '#90ee90';
+            input.style.fontWeight = 'bold';
+        } else if (diff === 1) {
+            input.style.color = '#aaaaaa';
+        } else if (diff >= 2) {
+            input.style.color = '#ff4444';
+            if (diff >= 3) {
+                input.style.fontWeight = 'bold';
+            }
+        }
+    }
+
+    function colorizePutts(input) {
+        var val = parseInt(input.value);
+        if (!val || isNaN(val)) {
+            input.style.color = '';
+            input.style.fontWeight = '';
+            return;
+        }
+        input.style.color = '';
+        input.style.fontWeight = '';
+        if (val === 1) {
+            input.style.color = '#90ee90';
+            input.style.fontWeight = 'bold';
+        } else if (val >= 3) {
+            input.style.color = '#ff4444';
+        }
+    }
+
+    function colorizePen(input) {
+        var val = parseInt(input.value);
+        if (!val || isNaN(val)) {
+            input.style.color = '';
+            return;
+        }
+        input.style.color = val > 0 ? '#ff4444' : '';
+    }
+
+    function updateSubtotals() {
+        var rows = document.querySelectorAll('#scorecard-area tr[data-hole]');
+        var outGross = 0, inGross = 0, outPutts = 0, inPutts = 0, outPen = 0, inPen = 0;
+        var hasOut = false, hasIn = false;
+
+        rows.forEach(function (row) {
+            var holeNum = parseInt(row.dataset.hole);
+            var gross = parseInt(row.querySelector('.score-gross').value);
+            var putts = parseInt(row.querySelector('.score-putts').value);
+            var pen = parseInt(row.querySelector('.score-pen').value);
+
+            if (gross && !isNaN(gross)) {
+                if (holeNum <= 9) { outGross += gross; hasOut = true; }
+                else { inGross += gross; hasIn = true; }
+            }
+            if (putts && !isNaN(putts)) {
+                if (holeNum <= 9) outPutts += putts;
+                else inPutts += putts;
+            }
+            if (pen && !isNaN(pen)) {
+                if (holeNum <= 9) outPen += pen;
+                else inPen += pen;
+            }
+        });
+
+        function setText(id, val, has) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = has ? String(val) : '\u2014';
+        }
+
+        setText('sub-gross-out', outGross, hasOut);
+        setText('sub-gross-in', inGross, hasIn);
+        setText('sub-gross-tot', outGross + inGross, hasOut || hasIn);
+        setText('sub-putts-out', outPutts, hasOut);
+        setText('sub-putts-in', inPutts, hasIn);
+        setText('sub-putts-tot', outPutts + inPutts, hasOut || hasIn);
+        setText('sub-pen-out', outPen, hasOut);
+        setText('sub-pen-in', inPen, hasIn);
+        setText('sub-pen-tot', outPen + inPen, hasOut || hasIn);
+    }
+
+    function isStepVisible(name) {
+        var step = document.querySelector('[data-step="' + name + '"]');
+        return step && step.style.display !== 'none' && step.offsetParent !== null;
+    }
+
+    function getDraft() {
+        var draft = {
+            date: document.getElementById('round-date').value,
+            course: document.getElementById('round-course').value,
+            tees: document.getElementById('round-tee').value,
+            notes: document.getElementById('round-notes').value,
+        };
+        if (isStepVisible('holes')) {
+            draft.holes_played = (document.querySelector('input[name="holes_played"]:checked') || {}).value || '';
+        }
+        if (isStepVisible('transport')) {
+            draft.transport = (document.querySelector('input[name="transport"]:checked') || {}).value || '';
+        }
+        if (isStepVisible('entry_mode')) {
+            draft.entry_mode = (document.querySelector('input[name="entry_mode"]:checked') || {}).value || '';
+        }
+        return draft;
+    }
+
+    function saveDraft() {
+        fetch('/api/drafts/round', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(getDraft()),
+        });
+    }
+
+    function getLastStep(draft) {
+        if (draft.notes) return 'notes';
+        if (draft.entry_mode) {
+            if (draft.entry_mode === 'score_only') return 'notes';
+            return 'holes_detail';
+        }
+        if (draft.transport !== undefined && draft.transport !== null && draft.transport !== '') return 'entry_mode';
+        if (draft.holes_played) return 'transport';
+        if (draft.tees) return 'holes';
+        if (draft.course) return 'tee';
+        if (draft.date) return 'course';
+        return 'date';
+    }
+
+    function resumeFromDraft(draft) {
+        if (draft.date) document.getElementById('round-date').value = draft.date;
+
+        if (draft.course) {
+            document.getElementById('round-course').value = draft.course;
+            populateTees(draft.course);
+        }
+
+        if (draft.tees) document.getElementById('round-tee').value = draft.tees;
+
+        if (draft.holes_played) {
+            var radio = document.querySelector('input[name="holes_played"][value="' + draft.holes_played + '"]');
+            if (radio) radio.checked = true;
+        }
+
+        if (draft.transport !== undefined && draft.transport !== null && draft.transport !== '') {
+            var tRadio = document.querySelector('input[name="transport"][value="' + draft.transport + '"]');
+            if (tRadio) tRadio.checked = true;
+        }
+
+        if (draft.entry_mode) {
+            var eRadio = document.querySelector('input[name="entry_mode"][value="' + draft.entry_mode + '"]');
+            if (eRadio) eRadio.checked = true;
+        }
+
+        if (draft.notes) document.getElementById('round-notes').value = draft.notes;
+
+        var lastStep = getLastStep(draft);
+        var idx = STEP_ORDER.indexOf(lastStep);
+        for (var i = 0; i <= idx; i++) {
+            showStep(STEP_ORDER[i]);
+        }
+
+        if (draft.entry_mode === 'detailed') {
+            buildScorecardGrid();
+        } else if (draft.entry_mode === 'score_only') {
+            addGrossScoreInput();
+        }
+    }
+
+    function submitRound() {
+        var date = document.getElementById('round-date').value;
+        var courseName = document.getElementById('round-course').value;
+        var teeName = document.getElementById('round-tee').value;
+
+        if (!date || !courseName || !teeName) {
+            alert('Please fill in date, course, and tees.');
+            return;
+        }
+
+        var holesPlayed = (document.querySelector('input[name="holes_played"]:checked') || {}).value || '18';
+        var transport = (document.querySelector('input[name="transport"]:checked') || {}).value || '';
+        var entryMode = (document.querySelector('input[name="entry_mode"]:checked') || {}).value || 'detailed';
+        var notes = document.getElementById('round-notes').value;
+
+        var payload = {
+            date: date,
+            course: courseName,
+            tees: teeName,
+            holes_played: holesPlayed,
+            transport: transport,
+            entry_mode: entryMode,
+            notes: notes,
+        };
+
+        if (entryMode === 'detailed') {
+            var holes = {};
+            var allFilled = true;
+            var total = 0;
+
+            document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
+                var holeNum = row.dataset.hole;
+                var gross = row.querySelector('.score-gross').value;
+                var fwyEl = row.querySelector('.score-fwy');
+                var girEl = row.querySelector('.score-gir');
+                var putts = row.querySelector('.score-putts').value;
+                var pen = row.querySelector('.score-pen').value;
+
+                if (!gross) allFilled = false;
+                total += parseInt(gross) || 0;
+
+                holes[holeNum] = {
+                    gross: gross || '',
+                    fairway: fwyEl ? fwyEl.value : '',
+                    gir: girEl ? girEl.value : '',
+                    putts: putts || '',
+                    penalties: pen || '0',
+                };
+            });
+
+            if (!allFilled) {
+                alert('Please enter a gross score for all holes.');
+                return;
+            }
+
+            payload.holes = holes;
+            payload.gross_total = String(total);
+        } else {
+            var grossScore = document.getElementById('gross-score').value;
+            if (!grossScore) {
+                alert('Please enter your gross score.');
+                return;
+            }
+            payload.gross_total = grossScore;
+        }
+
+        fetch('/api/rounds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            fetch('/api/drafts/round', { method: 'DELETE' }).then(function () {
+                window.location.href = '/rounds/' + data.date + '/' + data.index;
+            });
+        });
+    }
+
+    // --- Date step ---
+    document.getElementById('round-date').addEventListener('blur', function () {
+        if (this.value) showStep('course');
+    });
+
+    // --- Course step ---
+    document.getElementById('round-course').addEventListener('change', function () {
+        var val = this.value;
+        if (!val) return;
+        populateTees(val);
+        document.getElementById('round-tee').value = '';
+        showStep('tee');
+    });
+
+    // --- Tee step ---
+    document.getElementById('round-tee').addEventListener('change', function () {
+        if (this.value) showStep('holes');
+    });
+
+    // --- Holes played ---
+    document.querySelectorAll('input[name="holes_played"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            _saveScorecardData();
+            showStep('transport');
+        });
+    });
+
+    // --- Transport ---
+    document.querySelectorAll('input[name="transport"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            showStep('entry_mode');
+        });
+    });
+
+    // --- Entry mode ---
+    document.querySelectorAll('input[name="entry_mode"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            document.getElementById('scorecard-area').innerHTML = '';
+            if (this.value === 'detailed') {
+                buildScorecardGrid();
+                showStep('holes_detail');
+            } else {
+                addGrossScoreInput();
+                showStep('notes');
+            }
+        });
+    });
+
+    // --- Scorecard event delegation ---
+    document.getElementById('scorecard-area').addEventListener('input', function (e) {
+        if (e.target.classList.contains('score-gross')) {
+            var row = e.target.closest('tr');
+            var parEl = row ? row.querySelector('.hole-par') : null;
+            var par = parseInt(parEl ? parEl.textContent : '');
+            if (par) colorizeGross(e.target, par);
+            updateSubtotals();
+        } else if (e.target.classList.contains('score-putts')) {
+            colorizePutts(e.target);
+            updateSubtotals();
+        } else if (e.target.classList.contains('score-pen')) {
+            colorizePen(e.target);
+            updateSubtotals();
+        }
+        _saveScorecardData();
+    });
+
+    document.getElementById('scorecard-area').addEventListener('focusout', function (e) {
+        if (!e.target.classList.contains('score-gross')) return;
+        var allFilled = true;
+        var inputs = document.querySelectorAll('#scorecard-area .score-gross');
+        inputs.forEach(function (inp) {
+            if (!inp.value) allFilled = false;
+        });
+        if (allFilled && inputs.length > 0) {
+            showStep('notes');
+        }
+    });
+
+    // --- Draft save (debounced) ---
+    function debouncedDraftSave() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(saveDraft, 500);
+    }
+
+    wizard.addEventListener('change', debouncedDraftSave);
+    wizard.addEventListener('input', debouncedDraftSave);
+
+    // --- Submit ---
+    document.getElementById('submit-round').addEventListener('click', submitRound);
+
+    // --- Draft resume / discard ---
+    fetch('/api/drafts/round')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data && data.date) {
+                document.getElementById('draft-resume').style.display = 'block';
+                wizard.style.display = 'none';
+            }
+        });
+
+    document.getElementById('draft-resume-btn').addEventListener('click', function () {
+        document.getElementById('draft-resume').style.display = 'none';
+        wizard.style.display = 'block';
+        fetch('/api/drafts/round')
+            .then(function (r) { return r.json(); })
+            .then(function (draft) {
+                resumeFromDraft(draft);
+            });
+    });
+
+    document.getElementById('draft-discard-btn').addEventListener('click', function () {
+        fetch('/api/drafts/round', { method: 'DELETE' }).then(function () {
+            document.getElementById('draft-resume').style.display = 'none';
+            wizard.style.display = 'block';
+        });
+    });
+})();

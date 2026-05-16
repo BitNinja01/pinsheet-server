@@ -45,7 +45,10 @@
         </tbody>
     </table>
     {% else %}
-    <p class="placeholder">No rounds yet. <a href="/rounds/new">Enter your first round</a>.</p>
+    <div style="text-align:center;padding:2rem 0;">
+        <p class="placeholder">No rounds yet.</p>
+        <a href="/rounds/new" class="btn btn-accent" style="margin-top:1rem;display:inline-block">+ Add Round</a>
+    </div>
     {% endif %}
 </section>
 {% endblock %}

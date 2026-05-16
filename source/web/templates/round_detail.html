@@ -16,6 +16,12 @@
         <button class="btn" id="btn-delete">Delete</button>
     </div>
 
+    {% if entry_mode == "score_only" %}
+    <div class="stat-panel score-only-summary">
+        <div class="stat-value">{{ total.gross }}</div>
+        <div class="stat-label">Gross Score</div>
+    </div>
+    {% else %}
     <table class="data-table scorecard-view">
         <thead>
             <tr>
@@ -59,6 +65,7 @@
         </tr>
         </tbody>
     </table>
+    {% endif %}
 
     {% if round.notes %}
     <div class="round-notes">{{ round.notes }}</div>

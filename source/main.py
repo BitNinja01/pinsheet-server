@@ -205,7 +205,8 @@ def round_entry():
     settings = load_settings()
     courses = get_courses()
     today = date.today().isoformat()
-    return render_template("round_entry.html", settings=settings, courses=courses, today=today)
+    no_courses = len(courses) == 0
+    return render_template("round_entry.html", settings=settings, courses=courses, today=today, no_courses=no_courses)
 
 
 @app.route("/api/drafts/round", methods=["GET"])
@@ -319,6 +320,7 @@ def round_detail(date, index):
 
     course = courses.get(round_data.get("course", ""), {})
     course_holes = course.get("holes", {})
+    entry_mode = round_data.get("entry_mode", "detailed")
 
     holes = []
     front_gross = back_gross = front_par = back_par = 0
@@ -352,8 +354,12 @@ def round_detail(date, index):
     total_par = front_par + back_par
     total_gross = front_gross + back_gross
 
+    if entry_mode == "score_only":
+        total_gross = int(round_data.get("gross_total", 0)) if round_data.get("gross_total") else 0
+
     return render_template("round_detail.html",
         round=round_data, course=course, holes=holes,
+        entry_mode=entry_mode,
         front_nine={"gross": front_gross, "par": front_par, "putts": front_putts},
         back_nine={"gross": back_gross, "par": back_par, "putts": back_putts},
         total={"gross": total_gross, "par": total_par,
@@ -520,6 +526,10 @@ def api_courses_post():
 
 @app.route("/api/courses/<name>", methods=["DELETE"])
 def api_courses_delete(name):
+    all_rounds = get_all_rounds()
+    for r in all_rounds:
+        if r.get("course") == name:
+            return jsonify({"error": "Cannot delete course with existing rounds"}), 409
     delete_course(name)
     return jsonify({"ok": True})
 
