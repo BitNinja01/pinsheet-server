@@ -1,14 +1,14 @@
 # Handoff
 
-**Last updated**: 2026-05-15 23:55 UTC
+**Last updated**: 2026-05-16 22:30 UTC
 
 ## Current state
-Dashboard restyled with "Dark Engineering Grid" theme: Cool Teal / Near-Black palette, full monospace typography, adaptive grid overlay (major lines snap to stat panel edges, 8px minor dot texture, crosshair dots at intersections), dashed borders throughout. New `grid.js` module handles adaptive grid rendering. Spec and implementation plan in docs/superpowers/. Other pages adopt the new tokens via `:root` but retain their original layouts — dashboard-only restyle so far.
+Dashboard visual design complete: light monochromatic theme with orange accents, 3×2 stat panel grid (left) + rounds table (right), engineering grid lines + 20px dot grid, viewport-constrained layout (no scrollbars), full-height vertical lines for infinite canvas feel, bold nav with dividers, prominent drop shadows on cards.
 
 ## Next actions
-1. **Continue theme rollout** — apply Dark Engineering Grid to round entry wizard, stats, courses, settings, season summary
-2. **Scorecard grid visuals** — cell color coding, responsive layout, input styling in the new theme
-3. **Tweak dashboard** — grid prominence, spacing refinements, active nav indicator styling
+1. **Apply theme to other pages** — rounds entry wizard, stats page, courses, settings, season summary need the new visual system
+2. **Test with real data** — verify layout works with varying amounts of round history
+3. **Performance check** — confirm grid.js redraw performance on scroll/resize is acceptable
 
 ## Blockers
 None.

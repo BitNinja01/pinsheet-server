@@ -1,54 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stat-panels">
-    {% for key, p in panels.items() %}
-    <div class="stat-panel" data-grid-panel style="--accent: {{ p.color }}">
-        <div class="stat-label">{{ p.label }}</div>
-        <div class="stat-value">
-            {% if p.value == "--" %}
-                <span class="stat-blank">{{ p.blank_text }}</span>
-            {% else %}
-                {{ p.value }}
-            {% endif %}
+<div class="dashboard-grid">
+    <div class="stat-panels">
+        {% for key, p in panels.items() %}
+        <div class="stat-panel" data-grid-panel>
+            <div class="stat-label">{{ p.label }}</div>
+            <div class="stat-value">
+                {% if p.value == "--" %}
+                    <span class="stat-blank">{{ p.blank_text }}</span>
+                {% else %}
+                    {{ p.value }}
+                {% endif %}
+            </div>
+            <div class="stat-secondary">{% if p.subtitle %}{{ p.subtitle }}{% else %}L20: {{ p.secondary }}{% endif %}</div>
         </div>
-        <div class="stat-secondary">{% if p.subtitle %}{{ p.subtitle }}{% else %}L20: {{ p.secondary }}{% endif %}</div>
-    </div>
-    {% endfor %}
-</div>
-
-<section class="recent-rounds">
-    <h2>Recent Rounds</h2>
-    {% if rounds %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Course</th>
-                <th>Tees</th>
-                <th>Score</th>
-                <th>+/-</th>
-                <th>Diff</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for r in rounds %}
-            <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
-                class="clickable-row{% if r.in_handicap %} in-handicap{% endif %}">
-                <td>{{ r.date }}</td>
-                <td>{{ r.course }}</td>
-                <td>{{ r.tees }}</td>
-                <td>{{ r.total }}</td>
-                <td>{% if r.score_to_par is not none %}{{ '%+d'|format(r.score_to_par) }}{% else %}&mdash;{% endif %}</td>
-                <td>{{ r.differential }}</td>
-            </tr>
         {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div style="text-align:center;padding:2rem 0;">
-        <p class="placeholder">No rounds yet.</p>
-        <a href="/rounds/new" class="btn btn-accent" style="margin-top:1rem;display:inline-block">+ Add Round</a>
     </div>
-    {% endif %}
-</section>
+
+    <section class="recent-rounds">
+        <h2>Recent Rounds</h2>
+        {% if rounds %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Course</th>
+                    <th>Tees</th>
+                    <th>Score</th>
+                    <th>+/-</th>
+                    <th>Diff</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in rounds %}
+                <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
+                    class="clickable-row{% if r.in_handicap %} in-handicap{% endif %}">
+                    <td>{{ r.date }}</td>
+                    <td>{{ r.course }}</td>
+                    <td>{{ r.tees }}</td>
+                    <td>{{ r.total }}</td>
+                    <td>{% if r.score_to_par is not none %}{{ '%+d'|format(r.score_to_par) }}{% else %}&mdash;{% endif %}</td>
+                    <td>{{ r.differential }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center;padding:2rem 0;">
+            <p class="placeholder">No rounds yet.</p>
+            <a href="/rounds/new" class="btn btn-accent" style="margin-top:1rem;display:inline-block">+ Add Round</a>
+        </div>
+        {% endif %}
+    </section>
+</div>
 {% endblock %}
