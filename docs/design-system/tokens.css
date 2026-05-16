@@ -1,0 +1,97 @@
+/* PinSheet Design Tokens
+ * Single source of truth for the visual language. Import this file and
+ * apply the .ps-light / .ps-dark class to a wrapping element to opt in.
+ *
+ * Aesthetic: editorial / tour-pro — warm cream paper with mint accent,
+ * monospace data type, Barlow Condensed for display numerals. No
+ * gradients, no rounded corners, no shadows. Hairline 1px rules. */
+
+:root {
+  /* ── Type stacks ─────────────────────────────────────────────────── */
+  --ps-font-display: 'Barlow Condensed', 'Oswald', system-ui, sans-serif;
+  --ps-font-body:    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --ps-font-mono:    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ── Type scale (px) ─────────────────────────────────────────────── */
+  --ps-fs-eyebrow:   10px;   /* uppercase labels, 0.16em tracking */
+  --ps-fs-micro:     11px;   /* metadata, footnotes */
+  --ps-fs-body:      13px;   /* default reading size, table cells */
+  --ps-fs-body-lg:   14px;   /* secondary readable text */
+  --ps-fs-table-num: 16px;   /* course names, key tabular numerals */
+  --ps-fs-score:     22px;   /* tabular score numerals */
+  --ps-fs-h2:        18px;   /* card titles */
+  --ps-fs-h1:        32px;   /* page headlines */
+  --ps-fs-stat:      38px;   /* stat strip numerals */
+  --ps-fs-hero:      240px;  /* hero handicap numeral (Barlow Condensed 200) */
+
+  /* ── Font weights ────────────────────────────────────────────────── */
+  --ps-fw-display:   200;    /* hero numerals — Barlow Condensed thin */
+  --ps-fw-body:      400;
+  --ps-fw-label:     500;    /* eyebrows, chips, buttons */
+  --ps-fw-strong:    600;
+
+  /* ── Letter spacing ──────────────────────────────────────────────── */
+  --ps-tracking-tight:   -0.04em;  /* hero numerals */
+  --ps-tracking-display: -0.025em; /* h1 */
+  --ps-tracking-body:    0;
+  --ps-tracking-eyebrow: 0.16em;   /* uppercase eyebrows */
+  --ps-tracking-chip:    0.12em;
+  --ps-tracking-mono:    0.04em;   /* small mono metadata */
+
+  /* ── Line heights ────────────────────────────────────────────────── */
+  --ps-lh-hero: 0.82;
+  --ps-lh-tight: 1;
+  --ps-lh-body: 1.45;
+
+  /* ── Spacing scale (px) ──────────────────────────────────────────── */
+  --ps-sp-1: 4px;
+  --ps-sp-2: 8px;
+  --ps-sp-3: 12px;
+  --ps-sp-4: 16px;
+  --ps-sp-5: 20px;
+  --ps-sp-6: 24px;
+  --ps-sp-7: 28px;
+  --ps-sp-8: 32px;
+  --ps-sp-10: 40px;
+  --ps-sp-12: 48px;
+
+  /* ── Border weights ──────────────────────────────────────────────── */
+  --ps-rule:        1px;   /* hairline — all dividers and table rules */
+  --ps-rule-strong: 1px;   /* same weight, used on emphatic rules */
+  --ps-rule-display: 0.5px; /* sub-pixel for chart axis grid */
+
+  /* ── Radius ──────────────────────────────────────────────────────── */
+  --ps-radius: 0;          /* hard rectangles. Never round. */
+
+  /* ── Motion ──────────────────────────────────────────────────────── */
+  --ps-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ps-dur-quick:  120ms;
+  --ps-dur-base:   200ms;
+}
+
+/* ── Light mode ────────────────────────────────────────────────────── */
+.ps-light, :root {
+  --ps-paper:     #faf6ec;  /* warm cream — body background */
+  --ps-paper-2:   #f1ebda;  /* card / chart-card background */
+  --ps-ink:       #16110a;  /* primary text + emphatic rules */
+  --ps-ink-2:     #4a4239;  /* secondary text */
+  --ps-ink-3:     #8a8174;  /* tertiary text, eyebrows */
+  --ps-rule-c:    #d6cdb8;  /* hairline rule color */
+  --ps-accent:    #3d8a72;  /* mint — the only chromatic color */
+  --ps-accent-dim: rgba(61,138,114,0.12);
+  --ps-warn:      #b04848;  /* used sparingly for negative deltas */
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────── */
+.ps-dark {
+  --ps-paper:     #131312;  /* neutral near-black, NOT warm */
+  --ps-paper-2:   #1c1c1a;
+  --ps-ink:       #ecebe6;  /* crisp cool off-white */
+  --ps-ink-2:     #a8a59d;
+  --ps-ink-3:     #6c685f;
+  --ps-rule-c:    #2a2925;
+  --ps-accent:    #5db49a;  /* slightly brighter mint for dark bg */
+  --ps-accent-dim: rgba(93,180,154,0.16);
+  --ps-warn:      #d96a6a;
+}
+

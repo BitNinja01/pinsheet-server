@@ -18,6 +18,39 @@ Same philosophy as the original: self-contained app with no server dependency, n
 ### Claude memory files (ignore)
 This project may contain Claude Code artifacts (`CLAUDE.md`, `.claude/`). These are managed by a different tool. OpenCode must never read, write, or modify them — they do not exist as far as this agent is concerned.
 
+## Design Language
+
+The visual language for PinSheet is locked.
+
+**Before doing any design work, read [`design-system/README.md`](./design-system/README.md)
+and [`design-system/tokens.css`](./design-system/tokens.css).** Those
+two files are the contract. Don't re-derive the palette, type system,
+or component patterns from screenshots — use the tokens.
+
+### Quick rules
+
+- Mint (`--ps-accent`) is the only color.
+- Hairline 1px rules. No rounded corners. No shadows. No gradients.
+- Body / labels / table cells: IBM Plex Mono.
+- Display numerals (handicap, big stats): Barlow Condensed 200.
+- Eyebrows: 10px mono, 0.16em tracking, UPPERCASE, `--ps-ink-3`.
+- The integer of the handicap is ink; the fractional digit is mint.
+  Never italicize numerals.
+
+### Files
+
+- `PinSheet Dashboard.html` — the canonical screen
+- `dashboard.jsx` — the React component + sample data
+- `design-system/` — tokens.css + README.md (this is the system)
+- `wireframes/` — exploration archive, not production
+
+### When adding a new screen
+
+1. Import `design-system/tokens.css`.
+2. Apply `.ps-light` or `.ps-dark` to the wrapping element.
+3. Build with the component recipes in `design-system/README.md` §7.
+4. If you need a pattern that isn't there, propose it before adding it.
+
 ## Process rules
 
 These apply to every coding session, no exceptions.
