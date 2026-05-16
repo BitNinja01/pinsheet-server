@@ -157,3 +157,17 @@
 - `source/web/templates/base.html` — (grid.js script tag maintained)
 
 **Next**: See HANDOFF.md — apply visual system to other pages, test with real data, verify grid performance
+
+## 2026-05-16 08:23 UTC — Session end
+
+**What was done**:
+- Added `--start-maximized` flag to Chrome `--app` launch for fullscreen-on-start
+- Added `slideInLeft` CSS keyframe animation with staggered delays on dashboard stat panels (6 panels, 0.1s cascade) and `.recent-rounds` table (0.7s delay)
+- Fixed grid overlay positioning bug caused by animations: overlay now starts hidden (`opacity:0`), draws from final element positions on `animationend`, then fades in with 0.5s CSS transition
+
+**Files touched**:
+- `source/main.py` — added `--start-maximized` to Chrome subprocess launch args
+- `source/web/static/app.css` — `@keyframes slideInLeft`, staggered animation on `.stat-panel` (nth-child delays), animation on `.recent-rounds`
+- `source/web/static/grid.js` — overlay starts with `opacity:0` + `transition`, defers `drawGrid()` to `animationend` on `.recent-rounds`, fades in on complete
+
+**Next**: Apply visual theme to other pages, test with real data, verify grid performance
