@@ -1,3 +1,6 @@
+from calc.scoring import calc_trend
+
+
 def calc_putts_per_round(rounds) -> float | None:
     totals = []
     for r in rounds:
@@ -89,42 +92,16 @@ def calc_putts_by_par_type(rounds, courses) -> dict:
 
 
 def calc_putts_trend(all_rounds) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        if r.get("holes_selection", "all") != "all":
-            continue
-        val = calc_putts_per_round([r])
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_putts_per_round, filter_fn=lambda r: r.get("holes_selection", "all") == "all")
 
 
 def calc_one_putt_trend(all_rounds) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_one_putt_percent([r])
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_one_putt_percent)
 
 
 def calc_three_putt_trend(all_rounds) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_three_putt_percent([r])
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_three_putt_percent)
 
 
 def calc_putts_gir_trend(all_rounds) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_putts_per_gir([r])
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_putts_per_gir)

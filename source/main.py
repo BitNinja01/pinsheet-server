@@ -22,6 +22,8 @@ from store import (
 from calc import (
     DEFAULT_DASHBOARD_STATS,
     STAT_CATALOG,
+    calc_avg_vs_par,
+    calc_avg_vs_rating,
     calc_best_3round_stretch,
     calc_best_fir_round,
     calc_best_gir_round,
@@ -40,7 +42,9 @@ from calc import (
     calc_golfiest_month,
     calc_handicap_index,
     calc_hi_journey,
+    calc_historical_window,
     calc_hole_in_ones,
+    calc_last_year_handicap,
     calc_momentum_recovery,
     calc_most_common_day,
     calc_most_played_course,

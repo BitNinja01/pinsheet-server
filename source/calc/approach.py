@@ -1,3 +1,6 @@
+from calc.scoring import calc_trend
+
+
 def calc_fir_percent(rounds, courses) -> float | None:
     hits = 0
     eligible = 0
@@ -50,33 +53,15 @@ def calc_scramble_percent(rounds, courses) -> float | None:
 
 
 def calc_fir_trend(all_rounds, courses) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_fir_percent([r], courses)
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_fir_percent, courses)
 
 
 def calc_gir_trend(all_rounds) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_gir_percent([r])
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_gir_percent)
 
 
 def calc_scramble_trend(all_rounds, courses) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_scramble_percent([r], courses)
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_scramble_percent, courses)
 
 
 def calc_fir_miss_tendency(rounds, courses) -> dict:

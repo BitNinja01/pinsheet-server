@@ -29,6 +29,15 @@ from calc.approach import (
     calc_scramble_by_par_type,
     calc_ob_stats,
 )
+from calc.context import (
+    calc_historical_window,
+    calc_last_year_handicap,
+    calc_round_vs_par,
+    calc_avg_vs_par,
+    calc_round_vs_rating,
+    calc_avg_vs_rating,
+    calc_penalties_per_round,
+)
 from calc.putting import (
     calc_putts_per_round,
     calc_putts_per_gir,
@@ -43,6 +52,7 @@ from calc.putting import (
     calc_putts_gir_trend,
 )
 from calc.scoring import (
+    calc_trend,
     calc_scoring_average,
     calc_scoring_trend,
     calc_scoring_avg_by_par_type,

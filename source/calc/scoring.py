@@ -7,6 +7,18 @@ from calc.approach import calc_fir_percent, calc_fir_trend, calc_gir_percent, ca
 from calc.putting import calc_putts_per_round, calc_putts_trend, calc_one_putt_percent, calc_one_putt_trend, calc_three_putt_percent, calc_three_putt_trend, calc_putts_per_gir, calc_putts_gir_trend
 
 
+def calc_trend(all_rounds: list, calc_fn, *args, filter_fn=None) -> list:
+    chronological = list(reversed(all_rounds))
+    result = []
+    for r in chronological:
+        if filter_fn and not filter_fn(r):
+            continue
+        val = calc_fn([r], *args)
+        if val is not None:
+            result.append((r.get("date", ""), val))
+    return result
+
+
 def calc_scoring_average(rounds) -> float | None:
     scores = [int(r["total_gross"]) for r in rounds
               if r.get("total_gross") and r["total_gross"] != "0"
@@ -312,33 +324,15 @@ def calc_nemesis_best_holes(rounds, courses) -> tuple:
 
 
 def calc_pob_trend(all_rounds, courses) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_par_or_better_percent([r], courses)
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_par_or_better_percent, courses)
 
 
 def calc_clean_card_trend(all_rounds, courses) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_clean_card_percent([r], courses)
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_clean_card_percent, courses)
 
 
 def calc_big_number_trend(all_rounds, courses) -> list:
-    chronological = list(reversed(all_rounds))
-    result = []
-    for r in chronological:
-        val = calc_big_number_rate([r], courses)
-        if val is not None:
-            result.append((r.get("date", ""), val))
-    return result
+    return calc_trend(all_rounds, calc_big_number_rate, courses)
 
 
 STAT_CATALOG: list = [
