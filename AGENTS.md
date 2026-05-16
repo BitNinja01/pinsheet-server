@@ -49,6 +49,11 @@ python source/main.py
 pip install -r requirements.txt
 ```
 
+**Push to remote:**
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/GITEAKEY02 -o StrictHostKeyChecking=no" git push
+```
+
 There are no tests and no linter configured yet.
 
 ## Architecture
