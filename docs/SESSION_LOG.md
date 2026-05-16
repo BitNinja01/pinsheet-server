@@ -94,3 +94,24 @@
 - `scripts/launchers/launch.sh`, `scripts/launchers/launch.bat`, `scripts/dist.sh` — distribution scripts
 
 **Next**: Smoke test the app end-to-end, course entry test, edge case hardening
+
+## 2026-05-15 23:00 UTC — Session end
+
+**What was done**:
+- Completed course entry wizard: structured location (city/state/country), 7 tee fields (yardage/rating/slope + front/back rating + front/back slope), DOM-driven tee set management with holes-preserving grid rebuild, draft resume with proper tee restoration
+- Added Chrome `--app` mode with auto-shutdown on window close
+- Built round entry wizard from scratch: auto-advance progressive disclosure, course→tee filtering, dynamic scorecard grid with OUT/IN/TOT subtotals, text-based color coding (eagle/birdie/bogey/double), draft save/resume with step routing, score-only mode
+- Fixed 6 edge cases: no-courses guard on round entry, removed placeholder text, front 9/back 9 switching preserves data, score-only round detail shows gross panel, course deletion blocked when rounds exist, radio buttons start unselected
+- Manual smoke testing throughout — course entry flow verified, round entry flow verified
+
+**Files touched**:
+- `source/main.py` — round entry route, score-only round detail, course deletion guard
+- `source/web/static/app.js` — grew ~500 lines: course wizard rewrite (7 fields, DOM-driven, draft resume), round wizard (auto-advance, scorecard grid, subtotals, color coding, draft save/resume, submit), scorecardData persistence
+- `source/web/static/app.css` — location-row, tee-numbers 7-field layout
+- `source/web/templates/course_detail.html` — conditional front/back columns, structured location
+- `source/web/templates/course_entry.html` — structured location fields
+- `source/web/templates/courses.html` — structured location display, removed placeholder
+- `source/web/templates/round_entry.html` — no-courses guard, radio buttons unselected
+- `source/web/templates/round_detail.html` — score-only conditional panel
+- `source/web/templates/dashboard.html` — "Add Round" button for empty state
+- `docs/test-data.md` — Druids Glen course + round reference data
