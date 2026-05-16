@@ -37,14 +37,15 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 1rem 2rem;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background: transparent;
+    border-bottom: 1px var(--border-style) var(--border);
 }
 
 .app-title {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: bold;
     color: var(--accent);
+    letter-spacing: 3px;
 }
 
 .app-nav {
@@ -55,7 +56,7 @@ body {
 .app-nav a {
     color: var(--text-muted);
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: 11px;
     transition: color 0.15s;
 }
 
