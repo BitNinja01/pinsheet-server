@@ -29,6 +29,15 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    cursor: auto;
+}
+
+a, button, select, .clickable-row, .btn, .theme-swatch, .settings-toggle, .radio-group label {
+    cursor: pointer;
+}
+
+input[type="text"], input[type="number"], input[type="date"], textarea, .step-input, .hole-input {
+    cursor: text;
 }
 
 .app-header {
@@ -230,10 +239,6 @@ body {
     background: rgba(125, 211, 33, 0.08);
 }
 
-.clickable-row {
-    cursor: pointer;
-}
-
 .in-handicap td:first-child {
     border-left: 6px solid var(--accent);
 }
@@ -289,7 +294,6 @@ textarea.step-input {
 .radio-group label {
     font-size: 0.875rem;
     color: var(--text);
-    cursor: pointer;
 }
 .radio-group input[type="radio"] {
     margin-right: 0.25rem;
@@ -297,7 +301,6 @@ textarea.step-input {
 }
 select.step-input {
     appearance: none;
-    cursor: pointer;
 }
 .location-row {
     display: flex;
@@ -314,7 +317,6 @@ select.step-input {
     background: var(--surface);
     color: var(--text);
     font-size: 0.875rem;
-    cursor: pointer;
 }
 .btn-accent {
     background: var(--accent);
@@ -361,7 +363,6 @@ select.step-input {
 }
 select.hole-input {
     width: 3rem;
-    cursor: pointer;
     appearance: none;
 }
 .totals-row td {
@@ -572,7 +573,6 @@ select.hole-input {
     gap: 0.5rem;
     padding: 0.5rem 0;
     font-size: 0.875rem;
-    cursor: pointer;
 }
 .settings-toggle input[type="checkbox"] {
     accent-color: var(--accent);
@@ -601,7 +601,6 @@ select.hole-input {
     height: 32px;
     border-radius: 50%;
     border: 2px solid transparent;
-    cursor: pointer;
     transition: border-color 0.15s;
 }
 .theme-swatch:hover {
