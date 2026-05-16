@@ -69,8 +69,6 @@ from calc.scoring import (
     calc_pob_trend,
     calc_clean_card_trend,
     calc_big_number_trend,
-    STAT_CATALOG,
-    DEFAULT_DASHBOARD_STATS,
     calc_rounds_this_year,
     calc_rounds_total,
     calc_golfiest_month,

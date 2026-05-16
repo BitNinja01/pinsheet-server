@@ -19,9 +19,8 @@ from store import (
     load_course_draft, save_course_draft, clear_course_draft,
     get_handicap_benchmarks,
 )
+from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 from calc import (
-    DEFAULT_DASHBOARD_STATS,
-    STAT_CATALOG,
     calc_avg_vs_par,
     calc_avg_vs_rating,
     calc_best_3round_stretch,
