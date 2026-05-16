@@ -736,7 +736,13 @@ def main():
     chrome = _find_chrome()
     chrome_proc = None
     if chrome:
-        chrome_proc = subprocess.Popen([chrome, f"--app={url}", "--start-maximized"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=os.environ.copy())
+        env = os.environ.copy()
+        if sys.platform not in ("darwin", "win32"):
+            env["GDK_BACKEND"] = "x11"
+        chrome_proc = subprocess.Popen(
+            [chrome, f"--app={url}", "--start-maximized", "--ozone-platform=x11"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
+        )
     else:
         webbrowser.open(url)
 
