@@ -2,7 +2,7 @@
 {% block content %}
 <div class="stat-panels">
     {% for key, p in panels.items() %}
-    <div class="stat-panel" style="--accent: {{ p.color }}">
+    <div class="stat-panel" data-grid-panel style="--accent: {{ p.color }}">
         <div class="stat-label">{{ p.label }}</div>
         <div class="stat-value">
             {% if p.value == "--" %}
