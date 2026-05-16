@@ -5,13 +5,21 @@
 }
 
 :root {
-    --bg: #111;
-    --surface: #1a1a2e;
-    --text: #e0e0e0;
-    --text-muted: #888;
-    --accent: #00E676;
-    --border: #333;
-    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --bg: #0d1114;
+    --surface: #181e22;
+    --text: #d0dce0;
+    --text-muted: #90a0a4;
+    --accent: #50c8d2;
+    --border: #2a363a;
+    --border-style: dashed;
+    --border-width: 2px;
+    --border-radius: 2px;
+    --font: 'Courier New', Consolas, monospace;
+
+    --grid-minor-dot: rgba(100, 200, 210, 0.05);
+    --grid-minor-size: 8px;
+    --grid-major: rgba(80, 200, 210, 0.12);
+    --grid-crosshair: rgba(80, 200, 210, 0.22);
 }
 
 body {
