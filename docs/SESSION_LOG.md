@@ -171,3 +171,28 @@
 - `source/web/static/grid.js` — overlay starts with `opacity:0` + `transition`, defers `drawGrid()` to `animationend` on `.recent-rounds`, fades in on complete
 
 **Next**: Apply visual theme to other pages, test with real data, verify grid performance
+
+## 2026-05-16 18:51 UTC — Session end
+
+**What was done**:
+- Created `docs/CONTEXT.md` — domain glossary with 30+ golf/codebase terms, data model conventions, and calc function reference
+- Populated `calc/__init__.py` with package-level re-exports — single import seam for 75+ functions, replaced 4 import blocks in main.py with one `from calc import (...)`
+- Consolidated 10 duplicate trend functions into single generic `calc_trend(all_rounds, calc_fn, *args, filter_fn=None)` factory in `scoring.py` — removed ~70 lines of boilerplate across 3 files
+- Moved 7 business-logic helpers from `main.py` to new `calc/context.py` (calc_round_vs_par, calc_avg_vs_par, calc_round_vs_rating, calc_avg_vs_rating, calc_penalties_per_round, calc_historical_window, calc_last_year_handicap) — main.py dropped from 778 to ~756 lines
+- Moved `STAT_CATALOG` and `DEFAULT_DASHBOARD_STATS` from `calc/scoring.py` to new `web/catalog.py` — broke cross-calc import cycle, presentation concerns now in web layer
+- Added Flask `@app.before_request` hook pre-loading `g.settings`, `g.courses`, `g.all_rounds` — eliminated 30+ `load_settings()`/`get_courses()`/`get_all_rounds()` call sites across 13 route handlers
+- Consolidated cursor CSS from 7 scattered `cursor: pointer` declarations to 3 centralized rules (`body{cursor:default}`, interactive elements, text inputs)
+- Iterated on Chrome launch mode for system cursor support: tried `--app` + env vars, `--new-window` (reverted), X11 forcing — final: `--kiosk` mode for fullscreen immersive with system cursors
+
+**Files touched**:
+- `docs/CONTEXT.md` — new domain glossary (50 lines)
+- `source/calc/__init__.py` — new package interface re-exporting all public functions (91 lines)
+- `source/calc/scoring.py` — added `calc_trend`, removed duplicate trend functions + STAT_CATALOG + cross-module imports (~130 lines removed)
+- `source/calc/approach.py` — replaced 3 trend functions with `calc_trend` delegation
+- `source/calc/putting.py` — replaced 4 trend functions with `calc_trend` delegation (including filter_fn for putts_trend)
+- `source/calc/context.py` — new module with 7 business-logic helpers (61 lines)
+- `source/web/catalog.py` — new module with STAT_CATALOG + DEFAULT_DASHBOARD_STATS (163 lines)
+- `source/main.py` — before_request hook, consolidated calc imports, route handler simplification, Chrome launch mode changes
+- `source/web/static/app.css` — cursor consolidation, cursor:default on body
+
+**Next**: Apply visual theme to other pages, test kiosk mode on Pop!_OS, acceptance smoke test
