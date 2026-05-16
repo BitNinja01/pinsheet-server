@@ -6,7 +6,7 @@
         overlayEl = document.createElement("div");
         overlayEl.id = "grid-overlay";
         overlayEl.style.cssText =
-            "position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:-1;overflow:hidden;";
+            "position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:-1;overflow:hidden;opacity:0;transition:opacity 0.5s ease;";
         document.body.appendChild(overlayEl);
     }
 
@@ -73,7 +73,14 @@
     }
 
     createOverlay();
-    drawGrid();
+
+    var lastAnimated = document.querySelector(".recent-rounds");
+    if (lastAnimated) {
+        lastAnimated.addEventListener("animationend", function () {
+            drawGrid();
+            overlayEl.style.opacity = "1";
+        }, { once: true });
+    }
 
     var resizeTimer;
     window.addEventListener("resize", function () {

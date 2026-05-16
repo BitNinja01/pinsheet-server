@@ -80,6 +80,17 @@ body {
     overflow: auto;
 }
 
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 .dashboard-grid {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -104,7 +115,15 @@ body {
     transition: box-shadow 0.2s, transform 0.2s;
     position: relative;
     z-index: 1;
+    animation: slideInLeft 0.5s ease-out both;
 }
+
+.stat-panel:nth-child(1) { animation-delay: 0.05s; }
+.stat-panel:nth-child(2) { animation-delay: 0.15s; }
+.stat-panel:nth-child(3) { animation-delay: 0.25s; }
+.stat-panel:nth-child(4) { animation-delay: 0.35s; }
+.stat-panel:nth-child(5) { animation-delay: 0.45s; }
+.stat-panel:nth-child(6) { animation-delay: 0.55s; }
 
 .stat-panel:hover {
     box-shadow: var(--shadow-hover);
@@ -152,6 +171,8 @@ body {
     flex-direction: column;
     max-height: calc(100vh - 120px);
     margin-bottom: 0;
+    animation: slideInLeft 0.6s ease-out both;
+    animation-delay: 0.7s;
 }
 
 .recent-rounds h2 {
