@@ -68,34 +68,35 @@ body {
     max-width: 960px;
     margin: 2rem auto;
     padding: 0 1.5rem;
+    position: relative;
 }
 
 .stat-panels {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
     margin-bottom: 2rem;
 }
 
 .stat-panel {
     background: var(--surface);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 1.25rem;
+    border: var(--border-width) var(--border-style) var(--border);
+    border-radius: var(--border-radius);
+    padding: 0.75rem 0.5rem;
     text-align: center;
 }
 
 .stat-label {
-    font-size: 0.75rem;
+    font-size: 9px;
     color: var(--accent);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
+    letter-spacing: 1px;
+    margin-bottom: 0.4rem;
 }
 
 .stat-value {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: bold;
     color: var(--text);
 }
 
@@ -107,22 +108,26 @@ body {
 }
 
 .stat-secondary {
-    font-size: 0.75rem;
+    font-size: 9px;
     color: var(--text-muted);
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
 }
 
 .recent-rounds {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.5rem;
+    border: var(--border-width) var(--border-style) var(--border);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
 }
 
 .recent-rounds h2 {
-    font-size: 1rem;
-    color: var(--text);
-    margin-bottom: 1rem;
+    font-size: 10px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px var(--border-style) var(--border);
 }
 
 .placeholder {
@@ -133,28 +138,33 @@ body {
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.875rem;
+    font-size: 11px;
 }
 .data-table th {
     text-align: left;
     color: var(--text-muted);
-    font-weight: 500;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
+    font-weight: normal;
+    font-size: 9px;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px var(--border-style) var(--border);
 }
 .data-table td {
     padding: 0.4rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px var(--border-style) rgba(42, 54, 58, 0.5);
 }
 .clickable-row {
     cursor: pointer;
     transition: background 0.1s;
 }
 .clickable-row:hover {
-    background: rgba(255,255,255,0.03);
+    background: rgba(80, 200, 210, 0.04);
 }
 .in-handicap {
-    background: rgba(0,230,118,0.06);
+    background: rgba(80, 200, 210, 0.06);
+}
+
+.data-table td:first-child {
+    color: var(--accent);
 }
 
 .wizard {
@@ -588,7 +598,7 @@ select.hole-input {
 .theme-lime { --accent: #C6FF00; }
 
 /* Theme swatch colors */
-.theme-swatch-green { background: #00E676; }
+.theme-swatch-green { background: #50c8d2; }
 .theme-swatch-ocean { background: #00BFFF; }
 .theme-swatch-amber { background: #FFB300; }
 .theme-swatch-sunset { background: #FF6E40; }
