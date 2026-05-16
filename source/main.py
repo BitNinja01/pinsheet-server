@@ -50,12 +50,15 @@ from calc import (
     calc_most_played_course,
     calc_one_putt_percent,
     calc_par_or_better_percent,
+    calc_penalties_per_round,
     calc_penalty_free_rounds,
     calc_penalty_stats,
     calc_personal_bests,
     calc_putts_per_gir,
     calc_putts_per_round,
     calc_round_dif,
+    calc_round_vs_par,
+    calc_round_vs_rating,
     calc_rounds_total,
     calc_scoring_average,
     calc_scoring_avg_by_par_type,
@@ -102,64 +105,6 @@ def _best_n_rounds(all_rounds, courses, n: int) -> list:
     return eligible[:min(n, len(eligible))]
 
 
-def _build_window(all_rounds, target_date):
-    return [r for r in all_rounds if r.get("date", "") <= target_date][:20]
-
-
-def _get_last_year_hi(all_rounds, include_9hole):
-    today = date.today()
-    target = today.replace(year=today.year - 1)
-    window_start = target - timedelta(days=60)
-    window_end = target + timedelta(days=60)
-    for r in all_rounds:
-        if not r.get("differential") or r["differential"] == "0":
-            continue
-        d = r.get("date", "")
-        if window_start.isoformat() <= d <= window_end.isoformat():
-            window = _build_window(all_rounds, d)
-            hi = calc_handicap_index(window, include_9hole)
-            if hi is not None:
-                return hi
-    return None
-
-
-def _round_vs_par(round_data, courses):
-    course = courses.get(round_data.get("course", ""), {})
-    par = int(course.get("par", 0))
-    total = int(round_data.get("total_gross", 0))
-    return total - par if par and total else None
-
-
-def _avg_vs_par(rounds, courses):
-    vals = [_round_vs_par(r, courses) for r in rounds]
-    vals = [v for v in vals if v is not None]
-    return sum(vals) / len(vals) if vals else None
-
-
-def _round_vs_rating(round_data, courses):
-    course = courses.get(round_data.get("course", ""), {})
-    tees = course.get("tees", {}).get(round_data.get("tees", ""), {})
-    rating = float(tees.get("rating", 72))
-    total = int(round_data.get("total_gross", 0))
-    return total - rating if total else None
-
-
-def _avg_vs_rating(rounds, courses):
-    vals = [_round_vs_rating(r, courses) for r in rounds]
-    vals = [v for v in vals if v is not None]
-    return sum(vals) / len(vals) if vals else None
-
-
-def _penalties_per_round(rounds):
-    totals = []
-    for r in rounds:
-        if not r.get("holes"):
-            continue
-        pen = sum(int(h.get("penalties", "0")) for h in r["holes"].values())
-        totals.append(pen)
-    return sum(totals) / len(totals) if totals else None
-
-
 @app.route("/")
 def dashboard():
     settings = load_settings()
@@ -188,7 +133,7 @@ def dashboard():
             "blank_text": stat_def["blank_text"],
         }
 
-    last_year_hi = _get_last_year_hi(all_rounds, include_9hole)
+    last_year_hi = calc_last_year_handicap(all_rounds, include_9hole)
     if last_year_hi is not None:
         panels["handicap"]["subtitle"] = f"1y {last_year_hi:.1f}"
 
@@ -414,8 +359,8 @@ def report_card(date, index):
         l20 = l20[:20]
 
     rows = [
-        ("Score vs Par", _round_vs_par(this_round, courses), _avg_vs_par(l20, courses), False, "", 1),
-        ("Score vs Rating", _round_vs_rating(this_round, courses), _avg_vs_rating(l20, courses), False, "", 1),
+        ("Score vs Par", calc_round_vs_par(this_round, courses), calc_avg_vs_par(l20, courses), False, "", 1),
+        ("Score vs Rating", calc_round_vs_rating(this_round, courses), calc_avg_vs_rating(l20, courses), False, "", 1),
         ("Par or Better %", calc_par_or_better_percent([this_round], courses), calc_par_or_better_percent(l20, courses), True, "%", 1),
         ("Blow-up Rate", calc_big_number_rate([this_round], courses), calc_big_number_rate(l20, courses), False, "%", 1),
         ("FIR %", calc_fir_percent([this_round], courses), calc_fir_percent(l20, courses), True, "%", 1),
@@ -437,7 +382,7 @@ def report_card(date, index):
             False, "", 2,
         ))
 
-    rows.append(("Penalties / Rnd", _penalties_per_round([this_round]), _penalties_per_round(l20), False, "", 1))
+    rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round]), calc_penalties_per_round(l20), False, "", 1))
 
     return render_template("report_card.html", rows=rows, round=this_round, settings=load_settings())
 
