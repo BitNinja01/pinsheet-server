@@ -20,7 +20,13 @@
     {% for c in courses %}
         <tr class="clickable-row" data-href="/courses/{{ c.name }}">
             <td>{{ c.name }}</td>
-            <td>{{ c.location or "&mdash;" }}</td>
+            <td>
+                {% if c.location is mapping %}
+                    {{ c.location.city }}, {{ c.location.get("state/province", "") }}
+                {% else %}
+                    {{ c.location or "&mdash;" }}
+                {% endif %}
+            </td>
             <td>{{ c.play_count }}</td>
             <td>{{ c.last_played or "&mdash;" }}</td>
         </tr>

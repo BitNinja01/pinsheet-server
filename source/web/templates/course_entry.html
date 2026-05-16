@@ -15,14 +15,18 @@
     </div>
 
     <div class="wizard-step" data-step="location">
-        <label class="step-label">Location (optional)</label>
-        <input type="text" class="step-input" id="course-location" placeholder="City, State">
+        <label class="step-label">Location</label>
+        <input type="text" class="step-input" id="course-city" placeholder="City" required>
+        <div class="location-row">
+            <input type="text" class="step-input" id="course-state" placeholder="State / Province" required>
+            <input type="text" class="step-input" id="course-country" placeholder="Country" required>
+        </div>
     </div>
 
     <div class="wizard-step" data-step="tees">
         <label class="step-label">Tee Sets</label>
         <div id="tees-container"></div>
-        <button class="btn" id="btn-add-tee" style="margin-top:0.5rem">+ Add Tee</button>
+        <button type="button" class="btn" id="btn-add-tee" style="margin-top:0.5rem">+ Add Tee</button>
     </div>
 
     <div class="wizard-step" data-step="holes">

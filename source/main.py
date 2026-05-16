@@ -1,6 +1,10 @@
 import os
 import json
 import logging
+import shutil
+import subprocess
+import sys
+import threading
 import webbrowser
 from pathlib import Path
 from datetime import date, timedelta
@@ -499,8 +503,12 @@ def api_courses_post():
     if not name:
         return jsonify({"error": "Name is required"}), 400
 
+    location = data.get("location", {})
+    if not isinstance(location, dict) or not location.get("city") or not location.get("state/province") or not location.get("country"):
+        return jsonify({"error": "City, state/province, and country are required"}), 400
+
     course = {
-        "location": data.get("location", ""),
+        "location": location,
         "tees": data.get("tees", {}),
         "holes": data.get("holes", {}),
         "par": data.get("par", 0),
@@ -734,12 +742,51 @@ def season_summary():
     )
 
 
+def _find_chrome() -> str | None:
+    if sys.platform == "darwin":
+        paths = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        ]
+    elif sys.platform == "win32":
+        paths = [
+            os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+        ]
+    else:
+        paths = [
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+        ]
+
+    for p in paths:
+        if os.path.isfile(p):
+            return p
+
+    found = shutil.which("google-chrome-stable") or shutil.which("google-chrome") or shutil.which("chromium-browser") or shutil.which("chromium") or shutil.which("chrome")
+    return found
+
+
 def main():
     init_data_dir()
     port = find_free_port()
     url = f"http://127.0.0.1:{port}"
 
-    webbrowser.open(url)
+    chrome = _find_chrome()
+    chrome_proc = None
+    if chrome:
+        chrome_proc = subprocess.Popen([chrome, f"--app={url}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        webbrowser.open(url)
+
+    if chrome_proc:
+        def _watch_chrome():
+            chrome_proc.wait()
+            _log.info("Chrome window closed — shutting down")
+            os._exit(0)
+        threading.Thread(target=_watch_chrome, daemon=True).start()
 
     from waitress import serve
     print(f"PinSheet → {url}")

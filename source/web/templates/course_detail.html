@@ -3,7 +3,13 @@
 <div class="course-detail">
     <h2>{{ name }}</h2>
     {% if course.location %}
-    <p class="course-location">{{ course.location }}</p>
+    <p class="course-location">
+        {% if course.location is mapping %}
+            {{ course.location.city }}, {{ course.location.get("state/province", "") }}, {{ course.location.country }}
+        {% else %}
+            {{ course.location }}
+        {% endif %}
+    </p>
     {% endif %}
 
     <div class="course-meta">
@@ -26,18 +32,33 @@
         <thead>
             <tr>
                 <th>Tee</th>
+                <th>Yardage</th>
                 <th>Rating</th>
                 <th>Slope</th>
-                <th>Yardage</th>
+                {% set ns = namespace(has_front_rating=false, has_front_slope=false, has_back_rating=false, has_back_slope=false) %}
+                {% for t in tees.values() %}
+                {% if t.get("front_rating") %}{% set ns.has_front_rating = true %}{% endif %}
+                {% if t.get("front_slope") %}{% set ns.has_front_slope = true %}{% endif %}
+                {% if t.get("back_rating") %}{% set ns.has_back_rating = true %}{% endif %}
+                {% if t.get("back_slope") %}{% set ns.has_back_slope = true %}{% endif %}
+                {% endfor %}
+                {% if ns.has_front_rating %}<th>Front Rating</th>{% endif %}
+                {% if ns.has_front_slope %}<th>Front Slope</th>{% endif %}
+                {% if ns.has_back_rating %}<th>Back Rating</th>{% endif %}
+                {% if ns.has_back_slope %}<th>Back Slope</th>{% endif %}
             </tr>
         </thead>
         <tbody>
         {% for tee_name, t in tees.items() %}
             <tr>
                 <td>{{ tee_name }}</td>
+                <td>{{ t.get("yardage", "&mdash;") }}</td>
                 <td>{{ t.get("rating", "&mdash;") }}</td>
                 <td>{{ t.get("slope", "&mdash;") }}</td>
-                <td>{{ t.get("yardage", "&mdash;") }}</td>
+                {% if ns.has_front_rating %}<td>{{ t.get("front_rating", "&mdash;") }}</td>{% endif %}
+                {% if ns.has_front_slope %}<td>{{ t.get("front_slope", "&mdash;") }}</td>{% endif %}
+                {% if ns.has_back_rating %}<td>{{ t.get("back_rating", "&mdash;") }}</td>{% endif %}
+                {% if ns.has_back_slope %}<td>{{ t.get("back_slope", "&mdash;") }}</td>{% endif %}
             </tr>
         {% endfor %}
         </tbody>
