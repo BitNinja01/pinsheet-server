@@ -29,7 +29,7 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    cursor: auto;
+    cursor: default;
 }
 
 a, button, select, .clickable-row, .btn, .theme-swatch, .settings-toggle, .radio-group label {

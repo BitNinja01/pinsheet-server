@@ -736,7 +736,7 @@ def main():
     chrome = _find_chrome()
     chrome_proc = None
     if chrome:
-        chrome_proc = subprocess.Popen([chrome, url, "--new-window", "--start-maximized"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        chrome_proc = subprocess.Popen([chrome, f"--app={url}", "--start-maximized"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         webbrowser.open(url)
 
