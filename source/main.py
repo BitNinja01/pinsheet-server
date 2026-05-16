@@ -737,7 +737,7 @@ def main():
     chrome_proc = None
     if chrome:
         chrome_proc = subprocess.Popen(
-            [chrome, f"--kiosk", url],
+            [chrome, f"--app={url}", "--start-maximized"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     else:
