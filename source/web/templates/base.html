@@ -6,22 +6,30 @@
     <title>PinSheet</title>
     <link rel="stylesheet" href="/static/app.css">
 </head>
-<body class="theme-{{ settings.get('theme', 'green') }}">
-    <header class="app-header">
-        <h1 class="app-title">PinSheet</h1>
-        <nav class="app-nav">
-            <a href="/">Dashboard</a>
-            <a href="/rounds/new">New Round</a>
-            <a href="/courses">Courses</a>
-            <a href="/stats">Stats</a>
-            <a href="/season">Season</a>
-            <a href="/settings">Settings</a>
-        </nav>
-    </header>
-    <main class="app-main" data-grid-region>
-        {% block content %}{% endblock %}
-    </main>
+<body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
+    <div class="ps-layout">
+        <aside class="ps-sidebar">
+            <div class="ps-logo">PinSheet</div>
+            <div>
+                <div class="ps-eyebrow" style="margin-bottom: 6px;">Player</div>
+                <div class="ps-serif" style="font-size: 20px; line-height: 1.1;">Golfer</div>
+                <div style="font-size: 12px; color: var(--ps-ink-3); margin-top: 2px;">PinSheet</div>
+            </div>
+            <nav class="ps-nav">
+                <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
+                <a href="/rounds/new" class="{% if current_page == 'round_entry' %}is-active{% endif %}">Rounds</a>
+                <a href="/stats" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
+                <a href="#" style="color: var(--ps-ink-3); cursor: default;">Goals</a>
+                <a href="#" style="color: var(--ps-ink-3); cursor: default;">Bag</a>
+                <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
+                <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
+                <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
+            </nav>
+        </aside>
+        <main class="ps-main">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
     <script src="/static/app.js"></script>
-    <script src="/static/grid.js"></script>
 </body>
 </html>

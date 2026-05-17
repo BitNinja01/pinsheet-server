@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!form) return;
 
     function saveSettings() {
-        var theme = document.querySelector(".theme-swatch[data-active]")?.dataset?.theme || "green";
+        var theme = document.querySelector(".theme-swatch[data-active]")?.dataset?.theme || "dark";
         var seasonStart = (document.getElementById("season-start")?.value || "01-01").split("-");
         var seasonEnd = (document.getElementById("season-end")?.value || "12-28").split("-");
         var data = {
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 s.removeAttribute("data-active");
             });
             this.setAttribute("data-active", "true");
-            document.body.className = "theme-" + this.dataset.theme;
+            document.body.className = "ps-" + this.dataset.theme;
             saveSettings();
         });
     });
@@ -867,3 +867,71 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 })();
+
+// Chart filter chip interactivity
+document.addEventListener('DOMContentLoaded', function() {
+    var chartCard = document.querySelector('.ps-chart-card');
+    if (!chartCard) return;
+
+    var chips = chartCard.querySelectorAll('.ps-chip');
+    var svg = chartCard.querySelector('svg');
+    var allData = JSON.parse(chartCard.dataset.chartData || '{}');
+    var tip = document.getElementById('chart-tip');
+
+    if (!allData || !svg) return;
+
+    function showTip(evt, value) {
+        if (!tip) return;
+        tip.textContent = value;
+        tip.style.opacity = '1';
+        var rect = chartCard.getBoundingClientRect();
+        tip.style.left = (evt.clientX - rect.left + 12) + 'px';
+        tip.style.top = (evt.clientY - rect.top - 28) + 'px';
+    }
+
+    function hideTip() {
+        if (!tip) return;
+        tip.style.opacity = '0';
+    }
+
+    function bindDataPoints() {
+        var circles = svg.querySelectorAll('.ps-chart-dot, .ps-chart-dot-last');
+        circles.forEach(function(c) {
+            c.addEventListener('mouseenter', function(e) {
+                showTip(e, this.dataset.value);
+            });
+            c.addEventListener('mouseleave', hideTip);
+        });
+    }
+
+    function renderChart(data) {
+        if (!data || !data.path) return;
+        var parts = [];
+        parts.push('<path d="' + data.area + '" fill="var(--ps-accent-dim)" />');
+        parts.push('<path d="' + data.path + '" stroke="var(--ps-accent)" stroke-width="1.5" fill="none" />');
+        data.points.forEach(function(pt) {
+            parts.push('<circle class="ps-chart-dot" cx="' + pt.x + '" cy="' + pt.y + '" r="10" fill="transparent" style="pointer-events: all;" data-value="' + pt.v + '" />');
+            parts.push('<circle cx="' + pt.x + '" cy="' + pt.y + '" r="2.4" fill="var(--ps-paper-2)" stroke="var(--ps-accent)" stroke-width="1.2" pointer-events="none" />');
+        });
+        var last = data.points[data.points.length - 1];
+        var lastVal = data.hero_value || last.v;
+        parts.push('<circle class="ps-chart-dot-last" cx="' + last.x + '" cy="' + last.y + '" r="10" fill="transparent" style="pointer-events: all;" data-value="' + lastVal + '" />');
+        parts.push('<circle cx="' + last.x + '" cy="' + last.y + '" r="5.5" fill="var(--ps-accent)" pointer-events="none" />');
+        var labelValue = data.hero_value || data.label_v;
+        parts.push('<text x="' + data.label_x + '" y="' + data.label_y + '" font-family="JetBrains Mono, monospace" font-size="18" fill="var(--ps-accent)" text-anchor="end" font-weight="400">' + labelValue + '</text>');
+        svg.innerHTML = parts.join('');
+        bindDataPoints();
+    }
+
+    bindDataPoints();
+
+    chips.forEach(function(chip) {
+        chip.style.cursor = 'pointer';
+        chip.addEventListener('click', function() {
+            var range = this.dataset.range;
+            chips.forEach(function(c) { c.classList.remove('is-on'); });
+            this.classList.add('is-on');
+            renderChart(allData[range] || {});
+        });
+    });
+});

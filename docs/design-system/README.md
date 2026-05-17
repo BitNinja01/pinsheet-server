@@ -21,9 +21,9 @@ to a fitness app. Three principles drive every decision:
 2. **Hairlines, never rounded corners.** All structure is built from
    1px rules and hard rectangles. Cards have flat backgrounds and a
    1px border. No shadows, no gradients, no glassmorphism.
-3. **Monospace by default, condensed sans for display.** Body, labels,
-   table cells, axis ticks — all IBM Plex Mono. Display headlines
-   (handicap, large stats) — Barlow Condensed at weight 200.
+3. **Monospace throughout.** Body, labels, table cells, axis ticks —
+   and the hero numeral — all JetBrains Mono (self-hosted, NerdFont
+   NL monospaced). No serif, no sans-serif, no condensed.
 
 If a design choice doesn't reinforce one of these, drop it.
 
@@ -64,26 +64,28 @@ root of the screen.
 ### Stacks
 
 ```
-display: 'Barlow Condensed', 'Oswald', system-ui, sans-serif;
-body:    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+display: 'JetBrains Mono', ui-monospace, monospace;
+body:    'JetBrains Mono', ui-monospace, monospace;
+mono:    'JetBrains Mono', ui-monospace, monospace;
 ```
 
-Load Barlow Condensed (200, 300) and IBM Plex Mono (400, 500, 600, 700)
-from Google Fonts.
+JetBrains Mono is self-hosted as TTF files in `source/web/static/fonts/JetBrainsMono/`.
+Weights loaded: 200 (ExtraLight), 400 (Regular), 500 (Medium), 600 (SemiBold), 700 (Bold).
+All are NerdFont NL (no-ligature) monospaced variants. No external font requests.
 
 ### When to use which
 
 | Element                              | Family             | Size  | Weight |
 | ------------------------------------ | ------------------ | ----- | ------ |
-| Hero numeral (handicap, big stat)    | Barlow Condensed   | 240px | 200    |
-| Stat-strip numerals                  | IBM Plex Mono      | 38px  | 300    |
-| Page H1                              | IBM Plex Mono      | 32px  | 400    |
-| Card title (H2)                      | IBM Plex Mono      | 18px  | 400    |
-| Course name / score in table         | IBM Plex Mono      | 16-22 | 400    |
-| Body / table cell                    | IBM Plex Mono      | 13px  | 400    |
-| Secondary body                       | IBM Plex Mono      | 14px  | 400    |
-| Eyebrow / chip / button label        | IBM Plex Mono      | 10px  | 500    |
-| Metadata, footnote                   | IBM Plex Mono      | 11px  | 400    |
+| Hero numeral (handicap, big stat)    | JetBrains Mono     | 200px | 400    |
+| Stat-strip numerals                  | JetBrains Mono     | 38px  | 400    |
+| Page H1                              | JetBrains Mono     | 32px  | 400    |
+| Card title (H2)                      | JetBrains Mono     | 18px  | 400    |
+| Course name / score in table         | JetBrains Mono     | 16-22 | 400    |
+| Body / table cell                    | JetBrains Mono     | 13px  | 400    |
+| Secondary body                       | JetBrains Mono     | 14px  | 400    |
+| Eyebrow / chip / button label        | JetBrains Mono     | 10px  | 500    |
+| Metadata, footnote                   | JetBrains Mono     | 11px  | 400    |
 
 ### Tracking
 
@@ -91,8 +93,7 @@ from Google Fonts.
   editorial signature.
 - **Chips / buttons**: `0.12em` tracking, ALL CAPS.
 - **Display headlines (H1)**: `-0.025em` tracking.
-- **Hero numerals**: `-0.04em` tracking + `0.82` line-height. Condensed
-  fonts at scale need both.
+- **Hero numerals**: `-0.04em` tracking + `0.82` line-height.
 - **Body**: `0` tracking.
 
 ### Italics
@@ -151,6 +152,7 @@ Page padding on 1920×1080 surfaces: `28px 48px 32px`.
 - Cards: `1px solid var(--ps-rule-c)` border + `var(--ps-paper-2)`
   background. No shadow, no radius.
 - **Never** `border-radius` anything. Hard corners.
+  The sole exception is the logo dot (8×8 solid circle) in the sidebar.
 
 ---
 
@@ -172,7 +174,7 @@ The signature uppercase label that introduces every block.
 ### Hero numeral
 
 ```html
-<div style="font: 200 240px/0.82 var(--ps-font-display);
+<div style="font: 400 200px/0.82 var(--ps-font-display);
             letter-spacing: -0.04em;">
   6<span style="color: var(--ps-ink-3);">.</span><span style="color: var(--ps-accent);">8</span>
 </div>
@@ -186,7 +188,7 @@ in mint.
 ```html
 <div>
   <div class="eyebrow">Scoring avg</div>
-  <div style="font: 300 38px/1 var(--ps-font-body);
+  <div style="font: 400 38px/1 var(--ps-font-body);
               letter-spacing: -0.03em;
               margin-top: 4px;">72.4</div>
   <div style="font-size: 12px; color: var(--ps-accent); margin-top: 4px;

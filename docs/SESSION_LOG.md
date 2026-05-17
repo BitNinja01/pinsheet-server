@@ -196,3 +196,77 @@
 - `source/web/static/app.css` — cursor consolidation, cursor:default on body
 
 **Next**: Apply visual theme to other pages, test kiosk mode on Pop!_OS, acceptance smoke test
+
+## 2026-05-16 23:00 UTC — Session end
+
+**What was done**:
+- Full dashboard redesign to match design system (`docs/design-system/README.md`):
+  - Replaced `app.css` (687→895 lines) — all design tokens inlined, `.ps-dark`/`.ps-light` themes, warm cream paper / cool near-black, mint-only accent
+  - IBM Plex Mono (body/labels/table) + Barlow Condensed 200 (display) loaded from Google Fonts
+  - Hard rectangles: no `border-radius`, no `box-shadow`, no gradients, 1px hairline rules
+  - Layout: 200px fixed sidebar (`.ps-nav` with accent left-border active state, mint-dot `.ps-logo`) + flexible main column
+  - Hero numeral: 240px Barlow Condensed 200 with ink-integer, dimmed decimal, mint-fraction pattern
+  - 6-column stat strip: `grid-template-columns: repeat(6, 1fr)`, border-top/bottom hairlines, internal dividers via `border-right` on all but last `.ps-stat`
+  - Score-pill table: `.ps-score` at 22px, `.ps-topar` at 11px, under-par in mint, handicap rows with accent left-border
+  - `grid.js` removed — structural 1px rules replace programmatic overlay
+  - Theme system: 12 color themes → light/dark toggle (`.ps-dark` default)
+  - Legacy class mappings (`.data-table`, `.btn-accent`, `.stat-panel`, `.btn`, `.stat-value`, `.stat-label`) preserved so non-dashboard pages still function
+- Updated `base.html`: Google Fonts preconnect+stylesheet, `ps-dark`/`ps-light` body class, sidebar+main grid layout, removed `grid.js`, `current_page` variable for nav active state
+- Updated `settings.html` + `app.js`: light/dark swatches (`theme-swatch-dark`/`theme-swatch-light`), `ps-` body class prefix
+- Updated `settings_page()` route: reduced themes list from 12 colors to `["dark", "light"]`, added `current_page`
+- Added `current_page="dashboard"` to dashboard route handler
+- Verified: 10 routes all return 200, 9 design system checks pass (ps-layout, ps-hero-numeral, ps-stat-strip, ps-table, ps-nav, ps-logo, ps-eyebrow, Google Fonts, no grid.js), no old artifacts detected
+
+**Files touched**:
+- `source/web/static/app.css` — complete rewrite (687→895 lines)
+- `source/web/static/app.js` — theme swatch default "dark", body class `ps-` prefix
+- `source/web/static/grid.js` — deleted
+- `source/web/templates/base.html` — Google Fonts, sidebar layout, ps-dark/ps-light theme, nav with current_page
+- `source/web/templates/dashboard.html` — hero numeral + 6-col stat strip + score-pill table
+- `source/web/templates/settings.html` — light/dark swatches
+- `source/main.py` — dashboard route `current_page`, settings route themes→dark/light
+- `docs/HANDOFF.md` — updated state/next actions
+- `docs/SESSION_LOG.md` — this entry
+
+**Next**: Apply design system to remaining pages (wizards, round detail, courses, stats, settings, season summary)
+
+## 2026-05-17 00:00 UTC — Session end
+
+**What was done**:
+- Ran full audit against canonical dashboard example — identified 28 gaps, triaged into P0-P4
+- Executed 4 workstreams via subagent-driven-development (writer + critic/spec-review per task):
+  - WS1: CSS foundation — layout spacing, token fixes, utility classes (BK-01-04,14,17-19,21-22)
+  - WS2: Dashboard template — topbar, player info, hero delta/description, table header, nav items (BK-05,07-11,15,16,20)
+  - WS3: Hero chart + sparklines — SVG trajectory chart in hero grid, per-row By-hole sparklines (BK-06,13)
+  - WS4: Table columns — 10-column canonical layout with FIR/GIR/Putt/Scr/SG·T (BK-12)
+- Fixed WS2 spec review issues: missing route variables for `hi_movement`/`career_low`/`hi_insight`, broken `current_page` on round_entry
+- Added JS tooltip to chart dots (native SVG `<title>` unreliable), chart filter chips functional
+- Fixed hi_insight to count best-N rounds (not all non-excluded), chart label_v overridden to hero handicap
+- Swapped fonts: IBM Plex Mono + Barlow Condensed → JetBrains Mono (self-hosted TTF, NerdFont NL, weights 200/400/500/600/700)
+- Removed all Google Fonts CDN links
+- Hero numeral: 200px weight 400, decimal dot 50% baseline-aligned
+- Updated design system docs (README.md, tokens.css) to reflect JetBrains Mono as source of truth
+- Updated BACKLOG.md — 1 deferred item remaining (BK-15 delta arrows)
+- Updated HANDOFF.md current state
+
+**Design decisions**:
+- Single monospace family (JetBrains Mono) replaces dual display/body font strategy
+- Self-hosted fonts (zero external requests) — TTF format, NerdFont NL no-ligature variants
+- Hero numeral weight 200→400 for legibility in monospace at large scale
+- SVG `<title>` tooltips abandoned for JS-driven tooltip (cross-browser reliability)
+- Logo dot `border-radius: 50%` is the sole documented exception to the no-border-radius rule
+
+**Files touched**:
+- `source/web/static/app.css` — +100 lines; layout spacing, hero/chart-card CSS, utilities, @font-face declarations, token updates
+- `source/web/templates/dashboard.html` — restructured: topbar, hero grid, SVG chart, 10-col table, filter chips, tooltip div
+- `source/web/templates/base.html` — player info block, nav item rename, Google Fonts removed
+- `source/main.py` — chart trajectory data (4 ranges), sparkline data, FIR/GIR/Scr computation, season label, hi_movement/career_low/hi_insight
+- `source/web/static/app.js` — chart filter interactivity, JS tooltip on hover, SVG re-render
+- `docs/BACKLOG.md` — new, audit backlog tracker
+- `docs/design-system/README.md` — updated font stacks, sizes, weights, border-radius exception
+- `docs/design-system/tokens.css` — updated font stacks, weights, hero size, brass token, accent-dim
+- `source/web/static/fonts/JetBrainsMono/` — 5 TTF files (200,400,500,600,700)
+- `docs/HANDOFF.md` — updated state/next actions
+- `docs/SESSION_LOG.md` — this entry
+
+**Next**: Test kiosk mode, acceptance smoke test, apply design system to remaining pages

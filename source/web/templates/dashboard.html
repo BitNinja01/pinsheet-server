@@ -1,56 +1,178 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="dashboard-grid">
-    <div class="stat-panels">
-        {% for key, p in panels.items() %}
-        <div class="stat-panel" data-grid-panel>
-            <div class="stat-label">{{ p.label }}</div>
-            <div class="stat-value">
-                {% if p.value == "--" %}
-                    <span class="stat-blank">{{ p.blank_text }}</span>
-                {% else %}
-                    {{ p.value }}
-                {% endif %}
-            </div>
-            <div class="stat-secondary">{% if p.subtitle %}{{ p.subtitle }}{% else %}L20: {{ p.secondary }}{% endif %}</div>
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">{{ season_label }}</div>
+        <h1 class="ps-h1">Trending in the <em>right direction</em>.</h1>
+    </div>
+    <div class="ps-row">
+        <button class="ps-btn ps-btn--ghost">Search</button>
+        <a href="/rounds/new" class="ps-btn">+ Log round</a>
+    </div>
+</div>
+
+{% set handicap_panel = panels.get("handicap", {}) %}
+{% set handicap_value = handicap_panel.value if handicap_panel.value != "--" else None %}
+
+<div class="ps-hero">
+    <div>
+        <div class="ps-eyebrow" style="margin-bottom: 4px;">Handicap Index · USGA</div>
+        <div class="ps-hero-numeral">
+    {% if handicap_value is not none %}
+                {% set hi_parts = handicap_value.split('.') %}
+                {{ hi_parts[0] }}<span class="ps-decimal">.</span><span class="ps-frac">{{ hi_parts[1][0] if hi_parts|length > 1 else "0" }}</span>
+            {% else %}
+                <span>--</span>
+            {% endif %}
         </div>
-        {% endfor %}
+
+        <div class="ps-row" style="gap: 16px; margin-top: 8px; align-items: baseline;">
+            {% if hi_movement is not none %}
+                <span style="color: var(--ps-accent); font-size: 14px; font-weight: 500;">{{ hi_movement }}</span>
+            {% endif %}
+            {% if career_low is not none %}
+                <span style="color: var(--ps-ink-3); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">Career low · {{ career_low }}</span>
+            {% endif %}
+        </div>
+
+        {% if hi_insight %}
+            <p class="ps-serif" style="font-size: 18px; line-height: 1.4; margin-top: 18px; color: var(--ps-ink-2); max-width: 380px; font-weight: 400;">
+                {{ hi_insight }}
+            </p>
+        {% endif %}
     </div>
 
-    <section class="recent-rounds">
-        <h2>Recent Rounds</h2>
-        {% if rounds %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Course</th>
-                    <th>Tees</th>
-                    <th>Score</th>
-                    <th>+/-</th>
-                    <th>Diff</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for r in rounds %}
-                <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
-                    class="clickable-row{% if r.in_handicap %} in-handicap{% endif %}">
-                    <td>{{ r.date }}</td>
-                    <td>{{ r.course }}</td>
-                    <td>{{ r.tees }}</td>
-                    <td>{{ r.total }}</td>
-                    <td>{% if r.score_to_par is not none %}{{ '%+d'|format(r.score_to_par) }}{% else %}&mdash;{% endif %}</td>
-                    <td>{{ r.differential }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div style="text-align:center;padding:2rem 0;">
-            <p class="placeholder">No rounds yet.</p>
-            <a href="/rounds/new" class="btn btn-accent" style="margin-top:1rem;display:inline-block">+ Add Round</a>
+        <div class="ps-chart-card" data-chart-data='{{ chart_data_json | safe }}' data-hero-value="{{ handicap_value }}">
+            <div class="ps-chart-tip" id="chart-tip"></div>
+        <div class="ps-row ps-between" style="margin-bottom: 14px;">
+            <div>
+                <div class="ps-eyebrow">12-month trajectory</div>
+                <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Handicap movement</div>
+            </div>
+            <div class="ps-filters">
+                <span class="ps-chip" data-range="3M">3M</span>
+                <span class="ps-chip is-on" data-range="12M">12M</span>
+                <span class="ps-chip" data-range="2Y">2Y</span>
+                <span class="ps-chip" data-range="All">All</span>
+            </div>
         </div>
-        {% endif %}
-    </section>
+        <svg viewBox="0 0 1000 230" data-chart-svg style="display: block; max-width: 100%; height: auto;">
+            {% if chart.path %}
+            <path d="{{ chart.area }}" fill="var(--ps-accent-dim)" />
+            <path d="{{ chart.path }}" stroke="var(--ps-accent)" stroke-width="1.5" fill="none" />
+            {% for pt in chart.points %}
+            <circle class="ps-chart-dot" cx="{{ pt.x }}" cy="{{ pt.y }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ pt.v }}" />
+            <circle cx="{{ pt.x }}" cy="{{ pt.y }}" r="2.4" fill="var(--ps-paper-2)" stroke="var(--ps-accent)" stroke-width="1.2" pointer-events="none" />
+            {% endfor %}
+            {% set last_pt = chart.points | last %}
+            <circle class="ps-chart-dot-last" cx="{{ last_pt.x }}" cy="{{ last_pt.y }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ chart.hero_value or last_pt.v }}" />
+            <circle cx="{{ last_pt.x }}" cy="{{ last_pt.y }}" r="5.5" fill="var(--ps-accent)" pointer-events="none" />
+            <text x="{{ chart.label_x }}" y="{{ chart.label_y }}" font-family="JetBrains Mono, monospace" font-size="18" fill="var(--ps-accent)" text-anchor="end" font-weight="400">{{ chart.label_v }}</text>
+            {% endif %}
+        </svg>
+    </div>
 </div>
+
+<div class="ps-stat-strip">
+    {% for key in ['score', 'fir', 'gir', 'putts', 'scramble'] %}
+    {% set p = panels.get(key) %}
+    <div class="ps-stat">
+        <div class="ps-eyebrow">{{ p.label if p else key }}</div>
+        {% if p and p.value != "--" %}
+            <div class="ps-stat-v">{{ p.value }}</div>
+            {% if p.secondary and p.secondary != "--" %}
+                <div class="ps-stat-delta">L20 {{ p.secondary }}</div>
+            {% endif %}
+        {% else %}
+            <div class="ps-stat-blank">{{ p.blank_text if p else "No data" }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Handicap</div>
+        {% if handicap_value %}
+            <div class="ps-stat-v">{{ handicap_value }}</div>
+            {% if last_year_hi is not none %}
+                <div class="ps-stat-delta">1y {{ last_year_hi }}</div>
+            {% endif %}
+        {% else %}
+            <div class="ps-stat-blank">Play 3+ rounds</div>
+        {% endif %}
+    </div>
+</div>
+
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 14px;">
+        <div>
+            <div class="ps-eyebrow">The card</div>
+            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">Recent rounds</div>
+        </div>
+        <div class="ps-filters">
+            <span class="ps-chip is-on">All</span>
+            <span class="ps-chip">Normal</span>
+            <span class="ps-chip">Tournament</span>
+            <span class="ps-chip">Qualifying</span>
+            <span class="ps-chip">Practice</span>
+        </div>
+    </div>
+    {% if rounds %}
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th>Tees</th>
+                <th class="r">Score</th>
+                <th class="r">FIR</th>
+                <th class="r">GIR</th>
+                <th class="r">Putt</th>
+                <th class="r">Scr</th>
+                <th class="r">SG·T</th>
+                <th class="r">By hole</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rounds %}
+            <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
+                class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}">
+                <td style="font-size: 12px; color: var(--ps-ink-2); letter-spacing: 0.04em;">{{ r.date }}</td>
+                <td>
+                    <div class="ps-course">{{ r.course }}</div>
+                    <div class="ps-meta">round #{{ r.index }} · {{ r.entry_mode_display }}</div>
+                </td>
+                <td style="font-size: 12px; color: var(--ps-ink-3);">{{ r.tees }}</td>
+                <td class="r">
+                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    {% if r.score_to_par is not none %}
+                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                    {% else %}
+                        <span class="ps-topar">&mdash;</span>
+                    {% endif %}
+                </td>
+                <td class="r">{{ r.fir_display or '—' }}</td>
+                <td class="r">{{ r.gir_display or '—' }}</td>
+                <td class="r">{{ r.putts or '—' }}</td>
+                <td class="r">{{ r.scr_display or '—' }}</td>
+                <td class="r" style="color: var(--ps-accent);">—</td>
+                <td class="r" style="width: 220px;">
+                    {% if r.sparkline %}
+                    <svg width="210" height="28" style="display: block;">
+                        <path d="{{ r.sparkline.path }}" stroke="var(--ps-accent)" stroke-width="1.4" fill="none" stroke-linecap="round" />
+                        <circle cx="{{ r.sparkline.final_x }}" cy="{{ r.sparkline.final_y }}" r="2.4" fill="var(--ps-accent)" />
+                    </svg>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p class="placeholder">No rounds yet.</p>
+        <a href="/rounds/new" class="ps-btn">Add Round</a>
+    </div>
+    {% endif %}
+</section>
 {% endblock %}

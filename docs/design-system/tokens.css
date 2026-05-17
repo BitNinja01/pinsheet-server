@@ -3,14 +3,14 @@
  * apply the .ps-light / .ps-dark class to a wrapping element to opt in.
  *
  * Aesthetic: editorial / tour-pro — warm cream paper with mint accent,
- * monospace data type, Barlow Condensed for display numerals. No
- * gradients, no rounded corners, no shadows. Hairline 1px rules. */
+ * JetBrains Mono throughout (self-hosted, NerdFont NL). No gradients,
+ * no rounded corners, no shadows. Hairline 1px rules. */
 
 :root {
   /* ── Type stacks ─────────────────────────────────────────────────── */
-  --ps-font-display: 'Barlow Condensed', 'Oswald', system-ui, sans-serif;
-  --ps-font-body:    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
-  --ps-font-mono:    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --ps-font-display: 'JetBrains Mono', ui-monospace, monospace;
+  --ps-font-body:    'JetBrains Mono', ui-monospace, monospace;
+  --ps-font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
   /* ── Type scale (px) ─────────────────────────────────────────────── */
   --ps-fs-eyebrow:   10px;   /* uppercase labels, 0.16em tracking */
@@ -22,10 +22,10 @@
   --ps-fs-h2:        18px;   /* card titles */
   --ps-fs-h1:        32px;   /* page headlines */
   --ps-fs-stat:      38px;   /* stat strip numerals */
-  --ps-fs-hero:      240px;  /* hero handicap numeral (Barlow Condensed 200) */
+  --ps-fs-hero:      200px;  /* hero handicap numeral */
 
   /* ── Font weights ────────────────────────────────────────────────── */
-  --ps-fw-display:   200;    /* hero numerals — Barlow Condensed thin */
+  --ps-fw-display:   400;    /* hero numerals */
   --ps-fw-body:      400;
   --ps-fw-label:     500;    /* eyebrows, chips, buttons */
   --ps-fw-strong:    600;
@@ -79,6 +79,7 @@
   --ps-rule-c:    #d6cdb8;  /* hairline rule color */
   --ps-accent:    #3d8a72;  /* mint — the only chromatic color */
   --ps-accent-dim: rgba(61,138,114,0.12);
+  --ps-brass:      #a4843c;
   --ps-warn:      #b04848;  /* used sparingly for negative deltas */
 }
 
@@ -91,7 +92,8 @@
   --ps-ink-3:     #6c685f;
   --ps-rule-c:    #2a2925;
   --ps-accent:    #5db49a;  /* slightly brighter mint for dark bg */
-  --ps-accent-dim: rgba(93,180,154,0.16);
+  --ps-accent-dim: rgba(93,180,154,0.14);
+  --ps-brass:      #c9a35a;
   --ps-warn:      #d96a6a;
 }
 
