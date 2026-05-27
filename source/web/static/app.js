@@ -636,6 +636,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
+        /* Wire Next Hole button click */
+        range.forEach(function (n) {
+            var btnRow = document.querySelector('#hole-card-' + n + ' .hole-card-btn--next');
+            var saveBtnCheck = document.getElementById('save-round-mobile');
+            if (btnRow && btnRow !== saveBtnCheck) {
+                btnRow.addEventListener('click', function () {
+                    var nextIdx = range.indexOf(n) + 1;
+                    if (nextIdx < range.length) {
+                        navigateToHole(range[nextIdx]);
+                    }
+                });
+            }
+        });
+
         var saveBtn = document.getElementById('save-round-mobile');
         if (saveBtn) {
             saveBtn.addEventListener('click', submitRound);
@@ -650,10 +664,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var fwyEl = document.getElementById('parsed-fairway-' + holeNum);
         var girEl = document.getElementById('parsed-gir-' + holeNum);
         var puttsEl = document.getElementById('parsed-putts-' + holeNum);
-        if (grossEl) grossEl.textContent = parsed.gross || '&mdash;';
-        if (fwyEl) fwyEl.textContent = parsed.fairway || '&mdash;';
-        if (girEl) girEl.textContent = parsed.gir || '&mdash;';
-        if (puttsEl) puttsEl.textContent = parsed.putts || '&mdash;';
+        if (grossEl) grossEl.textContent = parsed.gross || '\u2014';
+        if (fwyEl) fwyEl.textContent = parsed.fairway || '\u2014';
+        if (girEl) girEl.textContent = parsed.gir || '\u2014';
+        if (puttsEl) puttsEl.textContent = parsed.putts || '\u2014';
         scorecardData[holeNum] = parsed;
 
         /* Sync to desktop table inputs */
@@ -705,6 +719,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 setTimeout(function () { input.focus(); }, 300);
             }
         }
+    }
+    function syncDesktopToMobile(holeNum) {
+        var saved = scorecardData[holeNum] || {};
+        var shorthandInput = document.getElementById('shorthand-' + holeNum);
+        if (shorthandInput) {
+            shorthandInput.value = buildShorthand(saved);
+        }
+        var gEl = document.getElementById('parsed-gross-' + holeNum);
+        var fEl = document.getElementById('parsed-fairway-' + holeNum);
+        var giEl = document.getElementById('parsed-gir-' + holeNum);
+        var pEl = document.getElementById('parsed-putts-' + holeNum);
+        if (gEl) gEl.textContent = saved.gross || '\u2014';
+        if (fEl) fEl.textContent = saved.fairway || '\u2014';
+        if (giEl) giEl.textContent = saved.gir || '\u2014';
+        if (pEl) pEl.textContent = saved.putts || '\u2014';
+        updateProgressDots();
     }
     window._navigateHole = navigateToHole;
 
@@ -1038,6 +1068,12 @@ document.addEventListener('DOMContentLoaded', function () {
             updateSubtotals();
         }
         _saveScorecardData();
+
+        /* Sync back to mobile hole card */
+        var row = e.target.closest('tr');
+        if (row && row.dataset.hole) {
+            syncDesktopToMobile(parseInt(row.dataset.hole));
+        }
     });
 
     document.getElementById('scorecard-area').addEventListener('focusout', function (e) {
