@@ -1,14 +1,14 @@
 [Unit]
-Description=PinSheet Modern
+Description=PinSheet Server
 After=network.target
 
 [Service]
 Type=simple
-User=pinsheet
-WorkingDirectory=/opt/pinsheet
+User=hickory
+WorkingDirectory=/opt/pinsheet-server
 Environment=SECRET_KEY=REPLACE_ME
-Environment=FLASK_DEBUG=0
-ExecStart=/opt/pinsheet/.venv/bin/python source/main.py --host 127.0.0.1 --port 8080
+Environment=FLASK_ENV=production
+ExecStart=/opt/pinsheet-server/.venv/bin/python source/main.py --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=2
 
