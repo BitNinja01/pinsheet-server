@@ -12,9 +12,11 @@
         {% endif %}
     </div>
 
+    {% if g.is_own_data %}
     <div class="round-actions">
         <button class="btn" id="btn-delete">Delete</button>
     </div>
+    {% endif %}
 
     {% if entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">

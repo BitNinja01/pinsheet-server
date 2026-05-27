@@ -8,6 +8,7 @@ import sys
 import threading
 import webbrowser
 import zipfile
+from functools import wraps
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
@@ -245,6 +246,15 @@ def _check_view_permission():
     if not hasattr(g, "view_user"):
         return
     g.is_own_data = current_user.is_authenticated and g.view_user["id"] == current_user.id
+
+
+def requires_own_data(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not g.is_own_data:
+            return "Forbidden", 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 PORT = 8420
@@ -559,6 +569,8 @@ def api_welcome_done():
 @app.route("/rounds/new")
 @login_required
 def round_entry():
+    if not g.is_own_data:
+        return "You can only enter data for yourself.", 403
     today = date.today().isoformat()
     no_courses = len(g.courses) == 0
     return render_template("round_entry.html", settings=g.settings, courses=g.courses, today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
@@ -573,6 +585,7 @@ def api_draft_round_get():
 
 @app.route("/api/drafts/round", methods=["PUT"])
 @login_required
+@requires_own_data
 def api_draft_round_put():
     save_round_draft(request.get_json())
     return jsonify({"ok": True})
@@ -580,6 +593,7 @@ def api_draft_round_put():
 
 @app.route("/api/drafts/round", methods=["DELETE"])
 @login_required
+@requires_own_data
 def api_draft_round_delete():
     clear_round_draft()
     return jsonify({"ok": True})
@@ -594,6 +608,7 @@ def api_draft_course_get():
 
 @app.route("/api/drafts/course", methods=["PUT"])
 @login_required
+@requires_own_data
 def api_draft_course_put():
     save_course_draft(request.get_json())
     return jsonify({"ok": True})
@@ -601,6 +616,7 @@ def api_draft_course_put():
 
 @app.route("/api/drafts/course", methods=["DELETE"])
 @login_required
+@requires_own_data
 def api_draft_course_delete():
     clear_course_draft()
     return jsonify({"ok": True})
@@ -608,6 +624,7 @@ def api_draft_course_delete():
 
 @app.route("/api/rounds", methods=["POST"])
 @login_required
+@requires_own_data
 def api_rounds_post():
     data = request.get_json()
     date_val = data.get("date", "")
@@ -774,6 +791,7 @@ def report_card(date, index):
 
 @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
 @login_required
+@requires_own_data
 def api_rounds_delete(date, index):
     delete_round(date, index)
     return jsonify({"ok": True})
@@ -782,6 +800,8 @@ def api_rounds_delete(date, index):
 @app.route("/courses/new")
 @login_required
 def course_entry():
+    if not g.is_own_data:
+        return "You can only enter data for yourself.", 403
     return render_template("course_entry.html", courses=g.courses, settings=g.settings, all_users=get_users())
 
 
@@ -859,6 +879,7 @@ def course_detail(name):
 
 @app.route("/api/courses", methods=["POST"])
 @login_required
+@requires_own_data
 def api_courses_post():
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -882,6 +903,7 @@ def api_courses_post():
 
 @app.route("/api/courses/<name>", methods=["DELETE"])
 @login_required
+@requires_own_data
 def api_courses_delete(name):
     for r in g.all_rounds:
         if r.get("course") == name:
@@ -1043,6 +1065,7 @@ def settings_page():
 
 @app.route("/settings/import", methods=["GET", "POST"])
 @login_required
+@requires_own_data
 def settings_import():
     if request.method == "POST":
         uploaded = request.files.get("zipfile")
@@ -1089,6 +1112,7 @@ def settings_import():
 
 @app.route("/api/settings", methods=["PUT"])
 @login_required
+@requires_own_data
 def api_settings_put():
     data = request.get_json()
     save_settings(data)
