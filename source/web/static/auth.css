@@ -1,0 +1,117 @@
+.auth-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+    border: 1px solid var(--ps-ink-1);
+    padding: 40px;
+}
+
+.auth-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--ps-ink);
+    margin-bottom: 32px;
+    text-align: center;
+    letter-spacing: -0.02em;
+}
+
+.auth-logo::after {
+    content: '.';
+    color: var(--ps-accent);
+}
+
+.auth-heading {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ps-ink-2);
+    margin-bottom: 24px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.auth-error {
+    background: rgba(204, 51, 0, 0.08);
+    border: 1px solid #c30;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: #c30;
+    font-size: 12px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.auth-field label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ps-ink-3);
+}
+
+.auth-field input[type="text"],
+.auth-field input[type="password"] {
+    background: var(--ps-ink-0);
+    border: 1px solid var(--ps-ink-1);
+    color: var(--ps-ink);
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+}
+
+.auth-field input:focus {
+    border-color: var(--ps-accent);
+}
+
+.auth-button {
+    margin-top: 8px;
+    background: var(--ps-accent);
+    color: #0a0a0a;
+    border: none;
+    padding: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+}
+
+.auth-button:hover {
+    opacity: 0.9;
+}
+
+.auth-footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ps-ink-3);
+}
+
+.auth-footer a {
+    color: var(--ps-accent);
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
