@@ -11,6 +11,11 @@ from database import get_db, init_db, set_db_path
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
+_HOLES_NORM = {"": "all", "18": "all", "front9": "front", "back9": "back"}
+
+def _norm_holes(raw: str) -> str:
+    return _HOLES_NORM.get(raw, raw)
+
 
 def init_data_dir() -> None:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,7 +114,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list:
             "course": row["course_name"],
             "tees": row["tee_name"],
             "holes_played": row["holes_played"],
-            "holes_selection": row["holes_played"],
+            "holes_selection": _norm_holes(row["holes_played"]),
             "entry_mode": row["entry_mode"],
             "holes": json.loads(row["holes"]) if row["holes"] else {},
             "total_gross": row["total_gross"],
@@ -144,7 +149,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> None:
             date,
             index,
             golf_round.get("tees", ""),
-            golf_round.get("holes_played") or golf_round.get("holes_selection", ""),
+            _norm_holes(golf_round.get("holes_played") or golf_round.get("holes_selection", "")),
             golf_round.get("entry_mode", ""),
             json.dumps(golf_round.get("holes", {})),
             golf_round.get("total_gross", ""),
