@@ -30,6 +30,7 @@
         {% endif %}
 
         <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="file" name="zipfile" accept=".zip" style="margin-bottom: 16px;">
             <br>
             <button type="submit" class="btn-accent">Import</button>

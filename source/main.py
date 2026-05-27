@@ -562,7 +562,7 @@ def dashboard():
 @app.route("/api/welcome", methods=["POST"])
 def api_welcome_done():
     g.settings["welcome_shown"] = True
-    save_settings(g.settings)
+    save_settings(g.settings, g.view_user["id"])
     return jsonify({"ok": True})
 
 
@@ -1115,7 +1115,7 @@ def settings_import():
 @requires_own_data
 def api_settings_put():
     data = request.get_json()
-    save_settings(data)
+    save_settings(data, g.view_user["id"])
     return jsonify({"ok": True})
 
 
