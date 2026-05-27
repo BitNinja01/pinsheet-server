@@ -1065,12 +1065,12 @@ def stats():
             {"label": "L10", "value": _fmt(l10v)},
             {"label": "L20", "value": _fmt(l20v)},
         ]
-        value = _fmt(l5v)
+        value = _fmt(b8v)
         delta_text = "\u2014"
         delta_class = ""
         cell_class = ""
-        if l5v is not None and l20v is not None:
-            raw = l5v - l20v
+        if b8v is not None and l20v is not None:
+            raw = b8v - l20v
             if raw != 0:
                 is_up = (raw > 0 and higher_better) or (raw < 0 and not higher_better)
                 delta_class = "is-up" if is_up else "is-down"
@@ -1125,43 +1125,43 @@ def stats():
         return (hits / total * 100) if total else None
 
     # ── Stat Strip ──────────────────────────────────────────────────
-    _sa_l5 = calc_scoring_average(l5)
+    _sa_b8 = calc_scoring_average(b8)
     _sa_l20 = calc_scoring_average(l20)
-    _fir_l5 = calc_fir_percent(l5, g.courses)
+    _fir_b8 = calc_fir_percent(b8, g.courses)
     _fir_l20 = calc_fir_percent(l20, g.courses)
-    _gir_l5 = calc_gir_percent(l5)
+    _gir_b8 = calc_gir_percent(b8)
     _gir_l20 = calc_gir_percent(l20)
-    _pt_l5 = calc_putts_per_round(l5)
+    _pt_b8 = calc_putts_per_round(b8)
     _pt_l20 = calc_putts_per_round(l20)
-    _sc_l5 = calc_scramble_percent(l5, g.courses)
+    _sc_b8 = calc_scramble_percent(b8, g.courses)
     _sc_l20 = calc_scramble_percent(l20, g.courses)
 
-    def _sd(l5v, l20v, suffix="", precision=1, higher_better=False):
-        if l5v is not None and l20v is not None and l5v != l20v:
-            raw = l5v - l20v
+    def _sd(b8v, l20v, suffix="", precision=1, higher_better=False):
+        if b8v is not None and l20v is not None and b8v != l20v:
+            raw = b8v - l20v
             is_up = (raw > 0 and higher_better) or (raw < 0 and not higher_better)
             return ("is-up" if is_up else "is-down"), f"{raw:+.{precision}f}{suffix} vs L20"
         return "", "\u2014"
 
-    _sd_sa_cls, _sd_sa_txt = _sd(_sa_l5, _sa_l20, "", 1, False)
-    _sd_fir_cls, _sd_fir_txt = _sd(_fir_l5, _fir_l20, "%", 1, True)
-    _sd_gir_cls, _sd_gir_txt = _sd(_gir_l5, _gir_l20, "%", 1, True)
-    _sd_pt_cls, _sd_pt_txt = _sd(_pt_l5, _pt_l20, "", 1, False)
-    _sd_sc_cls, _sd_sc_txt = _sd(_sc_l5, _sc_l20, "%", 1, True)
+    _sd_sa_cls, _sd_sa_txt = _sd(_sa_b8, _sa_l20, "", 1, False)
+    _sd_fir_cls, _sd_fir_txt = _sd(_fir_b8, _fir_l20, "%", 1, True)
+    _sd_gir_cls, _sd_gir_txt = _sd(_gir_b8, _gir_l20, "%", 1, True)
+    _sd_pt_cls, _sd_pt_txt = _sd(_pt_b8, _pt_l20, "", 1, False)
+    _sd_sc_cls, _sd_sc_txt = _sd(_sc_b8, _sc_l20, "%", 1, True)
 
     strip_data = [
         {"label": "Rounds", "value": str(len(all_eligible)), "is_pct": False,
          "delta_class": "is-up" if this_month_rounds > 0 else "",
          "delta_text": f"+{this_month_rounds} this month"},
-        {"label": "Avg Score", "value": fmt_val(_sa_l5, "", 1), "is_pct": False,
+        {"label": "Avg Score", "value": fmt_val(_sa_b8, "", 1), "is_pct": False,
          "delta_class": _sd_sa_cls, "delta_text": _sd_sa_txt},
-        {"label": "FIR%", "value": fmt_val(_fir_l5, "", 0), "is_pct": True,
+        {"label": "FIR%", "value": fmt_val(_fir_b8, "", 0), "is_pct": True,
          "delta_class": _sd_fir_cls, "delta_text": _sd_fir_txt},
-        {"label": "GIR%", "value": fmt_val(_gir_l5, "", 0), "is_pct": True,
+        {"label": "GIR%", "value": fmt_val(_gir_b8, "", 0), "is_pct": True,
          "delta_class": _sd_gir_cls, "delta_text": _sd_gir_txt},
-        {"label": "Putts/Rd", "value": fmt_val(_pt_l5, "", 1), "is_pct": False,
+        {"label": "Putts/Rd", "value": fmt_val(_pt_b8, "", 1), "is_pct": False,
          "delta_class": _sd_pt_cls, "delta_text": _sd_pt_txt},
-        {"label": "Scramble%", "value": fmt_val(_sc_l5, "", 0), "is_pct": True,
+        {"label": "Scramble%", "value": fmt_val(_sc_b8, "", 0), "is_pct": True,
          "delta_class": _sd_sc_cls, "delta_text": _sd_sc_txt},
     ]
 
@@ -1177,7 +1177,7 @@ def stats():
     sa_l20_ = calc_scoring_average(l20)
 
     section1 = {
-        "label": "Scoring Statistics",
+        "label": "Scoring",
         "cells": [
             _cell("Score Avg", sa_b8, sa_l5_, sa_l10, sa_l20_, "", 1, False),
             _placeholder_cell("Strokes Gained"),
@@ -1210,7 +1210,7 @@ def stats():
     _pg_l20 = calc_putts_per_gir(l20)
 
     section2 = {
-        "label": "Putting Statistics",
+        "label": "Putting",
         "cells": [
             _cell("Putts / Round", _pt_b8, _pt_l5_, _pt_l10, _pt_l20_, "", 1, False),
             _cell("1-Putt %", _o1_b8, _o1_l5, _o1_l10, _o1_l20, "%", 1, True),
@@ -1233,7 +1233,7 @@ def stats():
     _px_l20 = calc_penalties_per_round(l20)
 
     section3 = {
-        "label": "Short Game Statistics",
+        "label": "Short Game",
         "cells": [
             _cell("Scramble %", _sc_b8, _sc_l5_, _sc_l10, _sc_l20_, "%", 1, True),
             _placeholder_cell("Sand Save %"),
@@ -1261,7 +1261,7 @@ def stats():
     _p3_l20 = calc_scoring_avg_by_par_type(l20, g.courses).get(3)
 
     section4 = {
-        "label": "Tee to Green Statistics",
+        "label": "Tee to Green",
         "cells": [
             _cell("FIR %", _fir_b8, _fir_l5_, _fir_l10, _fir_l20_, "%", 1, True),
             _cell("GIR %", _gir_b8, _gir_l5_, _gir_l10, _gir_l20_, "%", 1, True),
