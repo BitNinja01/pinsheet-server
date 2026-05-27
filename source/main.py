@@ -1367,10 +1367,10 @@ def settings_import():
                            current_page="settings", all_users=get_users())
 
 
+@csrf.exempt
 @app.route("/api/settings", methods=["PUT"])
 @login_required
 @requires_own_data
-@csrf.exempt
 def api_settings_put():
     data = request.get_json()
     _log.info("api_settings_put user_id=%s, data=%s", current_user.id, data)
