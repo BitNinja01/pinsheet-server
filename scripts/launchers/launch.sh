@@ -15,4 +15,9 @@ if [ -f "$PROJECT_DIR/requirements.txt" ]; then
     pip install -q -r "$PROJECT_DIR/requirements.txt"
 fi
 
+if [ -z "$SECRET_KEY" ]; then
+    export SECRET_KEY="dev-key-$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+    echo "Generated SECRET_KEY for development: $SECRET_KEY"
+fi
+
 python "$PROJECT_DIR/source/main.py"

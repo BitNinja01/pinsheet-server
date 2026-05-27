@@ -15,4 +15,10 @@ if exist "%PROJECT_DIR%\requirements.txt" (
     pip install -q -r "%PROJECT_DIR%\requirements.txt"
 )
 
+if "%SECRET_KEY%"=="" (
+    python -c "import secrets; print(secrets.token_hex(16))" > %TEMP%\psk.txt
+    set /p SECRET_KEY=<%TEMP%\psk.txt
+    del %TEMP%\psk.txt
+)
+
 python "%PROJECT_DIR%\source\main.py"
