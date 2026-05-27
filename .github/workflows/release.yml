@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build source zip
+        run: |
+          git archive --format=zip --output="pinsheet-server_${{ steps.version.outputs.VERSION }}.zip" HEAD
+
+      - name: Fetch release notes
+        id: notes
+        run: |
+          PR_NUM=$(gh pr list --base main --state merged --json number --jq '.[-1].number')
+          if [ -n "$PR_NUM" ]; then
+            gh pr view "$PR_NUM" --json body --jq '.body' > /tmp/release_notes.md
+            echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
+          else
+            echo "No recent PR found" > /tmp/release_notes.md
+            echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "v${{ steps.version.outputs.VERSION }}"
+          body_path: ${{ steps.notes.outputs.NOTES_FILE }}
+          files: pinsheet-server_${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false
