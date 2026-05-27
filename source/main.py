@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
+from __init__ import __version__
 from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 
 from database import set_db_path, init_db
@@ -214,6 +215,8 @@ def logout():
 
 @app.before_request
 def _load_globals():
+    g.version = __version__
+
     if request.endpoint in ("login_page", "register_page", "static"):
         return
 
