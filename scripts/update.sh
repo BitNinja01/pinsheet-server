@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -e
-sudo systemctl stop pinsheet
-cd /opt/pinsheet-server
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SVC=pinsheet
+
+sudo systemctl stop "$SVC"
+cd "$DIR"
 git pull
-sudo systemctl start pinsheet
-sudo systemctl status pinsheet --no-pager
+sudo systemctl start "$SVC"
+sudo systemctl status "$SVC" --no-pager
