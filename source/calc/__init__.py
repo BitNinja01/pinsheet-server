@@ -53,6 +53,8 @@ from calc.putting import (
 )
 from calc.scoring import (
     calc_trend,
+    iter_holes,
+    calc_per_hole_stats,
     calc_scoring_average,
     calc_scoring_trend,
     calc_scoring_avg_by_par_type,

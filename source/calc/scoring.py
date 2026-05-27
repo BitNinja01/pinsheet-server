@@ -15,6 +15,18 @@ def calc_trend(all_rounds: list, calc_fn, *args, filter_fn=None) -> list:
     return result
 
 
+def iter_holes(rounds, courses):
+    for r in rounds:
+        if not r.get("holes"):
+            continue
+        course_name = r.get("course", "")
+        course = courses.get(course_name, {})
+        holes_dict = course.get("holes", {})
+        for hole_num, h in r["holes"].items():
+            par = int(holes_dict.get(str(hole_num), {}).get("par", 0))
+            yield r, hole_num, h, par, course_name, holes_dict
+
+
 def calc_scoring_average(rounds) -> float | None:
     scores = [int(r["total_gross"]) for r in rounds
               if r.get("total_gross") and r["total_gross"] != "0"
@@ -736,3 +748,128 @@ def calc_season_rounds(rounds: list, settings: dict) -> list:
         if (start_month, start_day) <= round_md <= (end_month, end_day):
             result.append(r)
     return result
+
+
+def calc_per_hole_stats(
+    rounds: list,
+    courses: dict,
+    course_name: str,
+    hole_num: int,
+    handicap_index: float | None = None,
+) -> dict:
+    h_str = str(hole_num)
+    gross_vals: list[int] = []
+    fir_hits = 0
+    fir_eligible = 0
+    fir_miss_l = 0
+    fir_miss_r = 0
+    gir_hits = 0
+    gir_total = 0
+    gir_miss_s = 0
+    gir_miss_lo = 0
+    gir_miss_l = 0
+    gir_miss_r = 0
+    putts_vals: list[int] = []
+    pen_vals: list[int] = []
+    scramble_attempts = 0
+    scramble_successes = 0
+    par_val = None
+    strokes_received = 0
+    holes_with_si = 0
+
+    for r, h_round_num, h, par, round_course_name, holes_dict in iter_holes(rounds, courses):
+        if round_course_name != course_name:
+            continue
+        if str(h_round_num) != h_str:
+            continue
+
+        if par:
+            par_val = par
+
+        if h.get("gross"):
+            gross = int(h["gross"])
+            gross_vals.append(gross)
+
+            if handicap_index is not None and par_val:
+                si_val = holes_dict.get(h_str, {}).get("hole_index")
+                if si_val is not None:
+                    try:
+                        si_int = int(si_val)
+                        tee_data = courses.get(course_name, {}).get("tees", {})
+                        first_tee = next(iter(tee_data.values())) if tee_data else {}
+                        slope = float(first_tee.get("slope", "") or "113")
+                        rating = float(first_tee.get("rating", "") or "0")
+                        c_par = int(courses.get(course_name, {}).get("par", par_val) or par_val)
+                        course_hcp = round(handicap_index * slope / 113 + (c_par - rating))
+                        strokes_received += 1 if si_int <= course_hcp else 0
+                        holes_with_si += 1
+                    except (ValueError, TypeError, StopIteration):
+                        pass
+
+        if par_val and par_val in (4, 5):
+            fir_eligible += 1
+            fw = h.get("fairway", "")
+            if fw == "H":
+                fir_hits += 1
+            elif fw in {"L", "OBL"}:
+                fir_miss_l += 1
+            elif fw in {"R", "OBR"}:
+                fir_miss_r += 1
+
+        gir = h.get("gir", "")
+        if gir:
+            gir_total += 1
+            if gir == "H":
+                gir_hits += 1
+            elif gir in {"L", "OBL"}:
+                gir_miss_l += 1
+            elif gir in {"R", "OBR"}:
+                gir_miss_r += 1
+            elif gir in {"S", "OBS"}:
+                gir_miss_s += 1
+            elif gir in {"LO", "OBLO"}:
+                gir_miss_lo += 1
+
+        if h.get("putts"):
+            putts_vals.append(int(h["putts"]))
+
+        if h.get("penalties"):
+            pen_vals.append(int(h["penalties"]))
+
+        if gir and gir != "H" and h.get("gross") and par_val:
+            scramble_attempts += 1
+            if int(h["gross"]) <= par_val:
+                scramble_successes += 1
+
+    fir_pct = (fir_hits / fir_eligible * 100) if fir_eligible else None
+    total_misses = fir_miss_l + fir_miss_r
+    fir_miss_l_pct = (fir_miss_l / total_misses * 100) if total_misses else None
+    fir_miss_r_pct = (fir_miss_r / total_misses * 100) if total_misses else None
+
+    total_gir_misses = gir_miss_s + gir_miss_lo + gir_miss_l + gir_miss_r
+
+    total_holes = len(gross_vals)
+    avg_score = sum(gross_vals) / total_holes if total_holes else None
+    avg_vs_par_val = (avg_score - par_val) if (avg_score is not None and par_val is not None) else None
+
+    expected_val = (strokes_received / holes_with_si) if holes_with_si else None
+    gap_val = (avg_vs_par_val - expected_val) if (avg_vs_par_val is not None and expected_val is not None) else None
+
+    return {
+        "rounds_played": total_holes,
+        "avg_score": avg_score,
+        "avg_vs_par": avg_vs_par_val,
+        "expected": expected_val,
+        "gap": gap_val,
+        "fir_pct": fir_pct,
+        "fir_miss_l_pct": fir_miss_l_pct,
+        "fir_miss_r_pct": fir_miss_r_pct,
+        "gir_pct": (gir_hits / gir_total * 100) if gir_total else None,
+        "gir_miss_s_pct": (gir_miss_s / total_gir_misses * 100) if total_gir_misses else None,
+        "gir_miss_lo_pct": (gir_miss_lo / total_gir_misses * 100) if total_gir_misses else None,
+        "gir_miss_l_pct": (gir_miss_l / total_gir_misses * 100) if total_gir_misses else None,
+        "gir_miss_r_pct": (gir_miss_r / total_gir_misses * 100) if total_gir_misses else None,
+        "avg_putts": sum(putts_vals) / len(putts_vals) if putts_vals else None,
+        "avg_penalties": sum(pen_vals) / len(pen_vals) if pen_vals else None,
+        "scramble_pct": (scramble_successes / scramble_attempts * 100) if scramble_attempts else None,
+    }

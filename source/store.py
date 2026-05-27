@@ -11,6 +11,11 @@ from database import get_db, init_db, set_db_path
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
+_HOLES_NORM = {"": "all", "18": "all", "front9": "front", "back9": "back"}
+
+def _norm_holes(raw: str) -> str:
+    return _HOLES_NORM.get(raw, raw)
+
 
 def init_data_dir() -> None:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -22,6 +27,7 @@ def load_settings(user_id: int = 1) -> dict:
     defaults = {"season_start_month": 1, "season_end_month": 12, "season_start_day": 1, "season_end_day": 28, "season_enabled": False}
     db = get_db()
     row = db.execute("SELECT data FROM settings WHERE user_id = ?", (user_id,)).fetchone()
+    _log.info("load_settings user_id=%s data=%s", user_id, row["data"] if row else "(none)")
     db.close()
     if row:
         data = json.loads(row["data"])
@@ -33,6 +39,12 @@ def load_settings(user_id: int = 1) -> dict:
 
 def save_settings(data: dict, user_id: int = 1) -> None:
     db = get_db()
+    _log.info("save_settings user_id=%s data=%s", user_id, json.dumps(data))
+    row = db.execute("SELECT data FROM settings WHERE user_id = ?", (user_id,)).fetchone()
+    if row:
+        existing = json.loads(row["data"])
+        existing.update(data)
+        data = existing
     db.execute(
         "INSERT OR REPLACE INTO settings (user_id, data) VALUES (?, ?)",
         (user_id, json.dumps(data)),
@@ -109,6 +121,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list:
             "course": row["course_name"],
             "tees": row["tee_name"],
             "holes_played": row["holes_played"],
+            "holes_selection": _norm_holes(row["holes_played"]),
             "entry_mode": row["entry_mode"],
             "holes": json.loads(row["holes"]) if row["holes"] else {},
             "total_gross": row["total_gross"],
@@ -143,7 +156,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> None:
             date,
             index,
             golf_round.get("tees", ""),
-            golf_round.get("holes_played", ""),
+            _norm_holes(golf_round.get("holes_played") or golf_round.get("holes_selection", "")),
             golf_round.get("entry_mode", ""),
             json.dumps(golf_round.get("holes", {})),
             golf_round.get("total_gross", ""),
@@ -168,6 +181,16 @@ def delete_round(date: str, index: str, user_id: int = 1) -> None:
     db.commit()
     db.close()
     _log.info("round deleted: %s #%s", date, index)
+
+
+def update_round_handicap(date: str, index: int, handicap: float, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE rounds SET computed_handicap = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+        (str(handicap), user_id, date, index),
+    )
+    db.commit()
+    db.close()
 
 
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
@@ -223,7 +246,7 @@ def clear_round_draft(user_id: int = 1) -> None:
 
 def get_users() -> list:
     db = get_db()
-    rows = db.execute("SELECT id, username, display_name FROM users").fetchall()
+    rows = db.execute("SELECT id, username, display_name FROM users WHERE password_hash != ''").fetchall()
     db.close()
     return [{"id": r["id"], "username": r["username"], "display_name": r["display_name"]} for r in rows]
 

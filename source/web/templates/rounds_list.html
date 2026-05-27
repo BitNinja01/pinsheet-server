@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Rounds</div>
+        <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">{{ rounds|length }} rounds</div>
+    </div>
+    <div class="ps-row">
+        <a href="/rounds/new" class="ps-btn">Add Round</a>
+    </div>
+</div>
+
+<section>
+    {% if rounds %}
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th>Tees</th>
+                <th class="r">Gross</th>
+                <th class="r">+/-</th>
+                <th class="r">Diff</th>
+                <th class="r">FIR</th>
+                <th class="r">GIR</th>
+                <th class="r">Putt</th>
+                <th class="r">By hole</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rounds %}
+            <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
+                class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}">
+                <td style="font-size: 12px; color: var(--ps-ink-2); letter-spacing: 0.04em;">{{ r.date }}</td>
+                <td>
+                    <div class="ps-course">{{ r.course }}</div>
+                    <div class="ps-meta">round #{{ r.index }} · {{ r.entry_mode_display }}</div>
+                </td>
+                <td style="font-size: 12px; color: var(--ps-ink-3);">{{ r.tees }}</td>
+                <td class="r">
+                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                </td>
+                <td class="r">
+                    {% if r.score_to_par is not none %}
+                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                    {% else %}
+                        <span class="ps-topar">&mdash;</span>
+                    {% endif %}
+                </td>
+                <td class="r" style="font-size: 13px; color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</td>
+                <td class="r">{{ r.fir_display or '—' }}</td>
+                <td class="r">{{ r.gir_display or '—' }}</td>
+                <td class="r">{{ r.putts or '—' }}</td>
+                <td class="r" style="width: 220px;">
+                    {% if r.sparkline %}
+                    <svg width="210" height="28" style="display: block;">
+                        <path d="{{ r.sparkline.path }}" stroke="var(--ps-accent)" stroke-width="1.4" fill="none" stroke-linecap="round" />
+                        <circle cx="{{ r.sparkline.final_x }}" cy="{{ r.sparkline.final_y }}" r="2.4" fill="var(--ps-accent)" />
+                    </svg>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p class="placeholder">No rounds yet.</p>
+        <a href="/rounds/new" class="ps-btn">Add Round</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

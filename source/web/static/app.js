@@ -30,11 +30,11 @@ document.addEventListener("DOMContentLoaded", function () {
             season_end_day: parseInt(seasonEnd[1]) || 28,
             handicap_target: document.getElementById("handicap-target")?.value || "",
         };
-        fetch("/api/settings", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
+        console.log("Saving settings:", data);
+        var xhr = new XMLHttpRequest();
+        xhr.open("PUT", "/api/settings", false);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.send(JSON.stringify(data));
     }
 
     document.querySelectorAll(".theme-swatch").forEach(function (swatch) {

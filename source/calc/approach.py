@@ -7,11 +7,10 @@ def calc_fir_percent(rounds, courses) -> float | None:
     for r in rounds:
         if not r.get("holes"):
             continue
-        course_name = r.get("course")
-        if not course_name or course_name not in courses:
-            continue
+        course = courses.get(r.get("course", ""), {})
+        holes = course.get("holes", {})
         for hole_num, hole_data in r["holes"].items():
-            par = int(courses[course_name]["holes"][str(hole_num)]["par"])
+            par = int(holes.get(str(hole_num), {}).get("par", 0))
             if par == 3:
                 continue
             eligible += 1
@@ -39,14 +38,13 @@ def calc_scramble_percent(rounds, courses) -> float | None:
     for r in rounds:
         if not r.get("holes"):
             continue
-        course_name = r.get("course")
-        if not course_name or course_name not in courses:
-            continue
+        course = courses.get(r.get("course", ""), {})
+        holes = course.get("holes", {})
         for hole_num, hole_data in r["holes"].items():
             if hole_data.get("gir") == "H":
                 continue
             missed_gir += 1
-            par = int(courses[course_name]["holes"][str(hole_num)]["par"])
+            par = int(holes.get(str(hole_num), {}).get("par", 0))
             if int(hole_data.get("gross", "999")) <= par:
                 saved += 1
     return (saved / missed_gir) * 100 if missed_gir else None

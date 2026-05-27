@@ -21,11 +21,18 @@
     margin-bottom: 32px;
     text-align: center;
     letter-spacing: -0.02em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.auth-logo::after {
-    content: '.';
-    color: var(--ps-accent);
+.auth-logo::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: var(--ps-accent);
+    border-radius: 50%;
+    display: inline-block;
 }
 
 .auth-heading {

@@ -98,12 +98,5 @@ def init_db() -> None:
         );
 
     """)
-
-    cur = db.execute("SELECT COUNT(*) FROM users")
-    if cur.fetchone()[0] == 0:
-        db.execute(
-            "INSERT INTO users (id, username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)",
-            (1, "default", "Player", "", 1),
-        )
     db.commit()
     db.close()
