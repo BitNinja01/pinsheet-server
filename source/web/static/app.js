@@ -51,6 +51,16 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 })();
 
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.round-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+            if (this.dataset.date && this.dataset.index) {
+                window.location.href = '/rounds/' + this.dataset.date + '/' + this.dataset.index;
+            }
+        });
+    });
+});
+
 (function () {
     var form = document.getElementById("settings-form");
     if (!form) return;
