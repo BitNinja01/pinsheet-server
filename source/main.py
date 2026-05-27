@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
-from flask import Flask, render_template, jsonify, request, redirect, url_for, g, flash
+from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 
 from database import set_db_path, init_db
 from store import (
@@ -20,9 +20,9 @@ from store import (
     save_round, delete_round, save_course, delete_course, rename_course,
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
-    get_handicap_benchmarks, get_user_by_id, get_users, get_user,
+    get_handicap_benchmarks, get_user_by_id, get_user,
     create_user, verify_user, user_count,
-    create_invite_code, is_invite_code_valid, consume_invite_code, get_invite_codes,
+    is_invite_code_valid, consume_invite_code,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 from calc import (
