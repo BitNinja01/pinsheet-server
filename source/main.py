@@ -9,13 +9,13 @@ import webbrowser
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
-from flask import Flask, render_template, jsonify, request, redirect, url_for, g
+from flask import Flask, render_template, jsonify, request, g
 
 from database import set_db_path, init_db
 from store import (
     load_settings, save_settings,
     get_courses, get_all_rounds, get_slope_rating,
-    save_round, delete_round, save_course, delete_course, rename_course,
+    save_round, delete_round, save_course, delete_course,
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_handicap_benchmarks,
@@ -31,8 +31,6 @@ from calc import (
     calc_big_number_rate,
     calc_biggest_improvement,
     calc_clean_card_percent,
-    calc_course_handicap,
-    calc_expected_9hole_dif,
     calc_fir_miss_tendency,
     calc_fir_percent,
     calc_first_hi_milestone,
@@ -42,7 +40,6 @@ from calc import (
     calc_golfiest_month,
     calc_handicap_index,
     calc_hi_journey,
-    calc_historical_window,
     calc_hole_in_ones,
     calc_last_year_handicap,
     calc_momentum_recovery,
@@ -964,11 +961,11 @@ def main():
     set_db_path(db_path)
     init_db()
 
-    port = args.port if args.port else find_free_port()
+    port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
 
     chrome_proc = None
-    if args.host == "127.0.0.1" and os.environ.get("FLASK_ENV") != "production":
+    if args.host == "127.0.0.1" and os.environ.get("FLASK_DEBUG") != "0":
         chrome = _find_chrome()
         if chrome:
             chrome_proc = subprocess.Popen(
