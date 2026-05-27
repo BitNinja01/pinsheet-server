@@ -233,7 +233,7 @@ def get_user(username: str) -> dict | None:
     row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     db.close()
     if row:
-        return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "password_hash": row["password_hash"], "is_admin": bool(row["is_admin"])}
+        return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "is_admin": bool(row["is_admin"])}
     return None
 
 
@@ -249,10 +249,7 @@ def get_user_by_id(user_id: int) -> dict | None:
 def create_user(username: str, display_name: str, password: str) -> dict:
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     db = get_db()
-    is_admin = 0
-    user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if user_count == 0:
-        is_admin = 1
+    is_admin = 1 if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0 else 0
     cur = db.execute(
         "INSERT INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
         (username, display_name, password_hash, is_admin),
@@ -264,11 +261,13 @@ def create_user(username: str, display_name: str, password: str) -> dict:
 
 
 def verify_user(username: str, password: str) -> dict | None:
-    user = get_user(username)
-    if not user or not user["password_hash"]:
+    db = get_db()
+    row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    db.close()
+    if not row or not row["password_hash"]:
         return None
-    if bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
-        return user
+    if bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+        return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "is_admin": bool(row["is_admin"])}
     return None
 
 
@@ -314,20 +313,14 @@ def is_invite_code_valid(code: str) -> bool:
 
 def consume_invite_code(code: str, used_by: int) -> bool:
     db = get_db()
-    row = db.execute(
-        "SELECT 1 FROM invite_codes WHERE code = ? AND used_by IS NULL",
-        (code,),
-    ).fetchone()
-    if not row:
-        db.close()
-        return False
-    db.execute(
-        "UPDATE invite_codes SET used_by = ?, used_at = datetime('now') WHERE code = ?",
+    cur = db.execute(
+        "UPDATE invite_codes SET used_by = ?, used_at = datetime('now') WHERE code = ? AND used_by IS NULL",
         (used_by, code),
     )
     db.commit()
+    affected = cur.rowcount
     db.close()
-    return True
+    return affected > 0
 
 
 def get_invite_codes() -> list:
