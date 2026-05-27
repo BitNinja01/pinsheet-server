@@ -76,7 +76,7 @@ def calc_handicap_index(rounds, include_9hole: bool = False) -> float | None:
     if n == 0 or not diffs:
         return None
     best_n = diffs[:n]
-    return math.floor(sum(best_n) / len(best_n) * 10) / 10
+    return round(sum(best_n) / len(best_n), 1)
 
 
 def calc_handicap_trend(all_rounds, include_9hole: bool = False) -> list:
