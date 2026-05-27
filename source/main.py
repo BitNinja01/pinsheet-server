@@ -23,6 +23,7 @@ from store import (
     get_handicap_benchmarks, get_user_by_id, get_user,
     get_users, create_user, verify_user, user_count, real_user_count,
     is_invite_code_valid, consume_invite_code,
+    create_invite_code, get_invite_codes,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 from calc import (
@@ -1146,6 +1147,24 @@ def season_summary():
         penalty_free=penalty_free,
         all_users=get_users(),
     )
+
+
+@app.route("/admin/invites", methods=["GET", "POST"])
+@login_required
+def admin_invites():
+    if not current_user.is_admin:
+        return "Forbidden", 403
+
+    if request.method == "POST":
+        code = create_invite_code(current_user.id)
+        base_url = request.host_url.rstrip("/")
+        return render_template("admin_invites.html", settings=g.settings,
+                               codes=get_invite_codes(), new_code=code, base_url=base_url,
+                               all_users=get_users())
+
+    return render_template("admin_invites.html", settings=g.settings,
+                           codes=get_invite_codes(), new_code=None, base_url=None,
+                           all_users=get_users())
 
 
 def _find_chrome() -> str | None:

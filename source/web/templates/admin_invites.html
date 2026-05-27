@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Admin</div>
+        <h1 class="ps-headline">Invite Codes</h1>
+    </div>
+</div>
+
+{% if new_code %}
+<div class="ps-card" style="margin-top: 24px; max-width: 580px;">
+    <div style="padding: 24px; background: var(--ps-mint-1); border: 1px solid var(--ps-accent);">
+        <p style="color: var(--ps-accent); font-weight: 500; margin: 0 0 8px;">New Invite Code Generated</p>
+        <p style="font-size: 24px; font-weight: 600; margin: 0 0 8px; font-family: 'JetBrains Mono', monospace;">{{ new_code }}</p>
+        <p style="color: var(--ps-ink-2); font-size: 12px; margin: 0;">
+            Registration link:
+            <code style="color: var(--ps-accent); user-select: all;">{{ base_url }}/register?code={{ new_code }}</code>
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<div class="ps-card" style="margin-top: 24px;">
+    <div style="padding: 24px;">
+        <form method="POST" style="margin-bottom: 24px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-accent">Generate New Code</button>
+        </form>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Used By</th>
+                    <th>Used At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in codes %}
+                <tr>
+                    <td style="font-family: 'JetBrains Mono', monospace;">{{ c.code }}</td>
+                    <td>{{ 'Used' if c.used_by else 'Available' }}</td>
+                    <td>{{ c.created_at[:10] if c.created_at else '--' }}</td>
+                    <td>{{ c.user_name or '--' }}</td>
+                    <td>{{ c.used_at[:10] if c.used_at else '--' }}</td>
+                </tr>
+                {% endfor %}
+                {% if not codes %}
+                <tr><td colspan="5" style="color: var(--ps-ink-3); font-style: italic;">No invite codes yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
