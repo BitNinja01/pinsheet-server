@@ -37,7 +37,7 @@
                 {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
                 <a href="/logout">Logout</a>
             </nav>
-            <div style="margin-top: auto; padding-bottom: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--ps-ink-3); text-transform: uppercase; letter-spacing: 0.16em;">v{{ g.version }}</div>
+            <div style="margin-top: auto; padding-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ps-ink-3); text-transform: uppercase; letter-spacing: 0.16em;">v{{ g.version }}</div>
         </aside>
         <main class="ps-main">
             {% block content %}{% endblock %}
