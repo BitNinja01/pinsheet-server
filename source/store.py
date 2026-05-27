@@ -1,6 +1,10 @@
 import json
 import logging
+import secrets
+import string
 from pathlib import Path
+
+import bcrypt
 
 from database import get_db, init_db, set_db_path
 
@@ -222,3 +226,129 @@ def get_users() -> list:
     rows = db.execute("SELECT id, username, display_name FROM users").fetchall()
     db.close()
     return [{"id": r["id"], "username": r["username"], "display_name": r["display_name"]} for r in rows]
+
+
+def get_user(username: str) -> dict | None:
+    db = get_db()
+    row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    db.close()
+    if row:
+        return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "password_hash": row["password_hash"], "is_admin": bool(row["is_admin"])}
+    return None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    db = get_db()
+    row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    db.close()
+    if row:
+        return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "password_hash": row["password_hash"], "is_admin": bool(row["is_admin"])}
+    return None
+
+
+def create_user(username: str, display_name: str, password: str) -> dict:
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    db = get_db()
+    is_admin = 0
+    user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count == 0:
+        is_admin = 1
+    cur = db.execute(
+        "INSERT INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
+        (username, display_name, password_hash, is_admin),
+    )
+    db.commit()
+    user_id = cur.lastrowid
+    db.close()
+    return {"id": user_id, "username": username, "display_name": display_name, "is_admin": bool(is_admin)}
+
+
+def verify_user(username: str, password: str) -> dict | None:
+    user = get_user(username)
+    if not user or not user["password_hash"]:
+        return None
+    if bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        return user
+    return None
+
+
+def user_count() -> int:
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    db.close()
+    return count
+
+
+def _generate_invite_code() -> str:
+    chars = string.ascii_uppercase + string.digits
+    part1 = "".join(secrets.choice(chars) for _ in range(4))
+    part2 = "".join(secrets.choice(chars) for _ in range(4))
+    return f"PS-{part1}-{part2}"
+
+
+def create_invite_code(created_by: int) -> str:
+    db = get_db()
+    while True:
+        code = _generate_invite_code()
+        exists = db.execute("SELECT 1 FROM invite_codes WHERE code = ?", (code,)).fetchone()
+        if not exists:
+            break
+    db.execute(
+        "INSERT INTO invite_codes (code, created_by) VALUES (?, ?)",
+        (code, created_by),
+    )
+    db.commit()
+    db.close()
+    return code
+
+
+def is_invite_code_valid(code: str) -> bool:
+    db = get_db()
+    row = db.execute(
+        "SELECT 1 FROM invite_codes WHERE code = ? AND used_by IS NULL",
+        (code,),
+    ).fetchone()
+    db.close()
+    return row is not None
+
+
+def consume_invite_code(code: str, used_by: int) -> bool:
+    db = get_db()
+    row = db.execute(
+        "SELECT 1 FROM invite_codes WHERE code = ? AND used_by IS NULL",
+        (code,),
+    ).fetchone()
+    if not row:
+        db.close()
+        return False
+    db.execute(
+        "UPDATE invite_codes SET used_by = ?, used_at = datetime('now') WHERE code = ?",
+        (used_by, code),
+    )
+    db.commit()
+    db.close()
+    return True
+
+
+def get_invite_codes() -> list:
+    db = get_db()
+    rows = db.execute("""
+        SELECT ic.*, u1.display_name as creator_name, u2.display_name as user_name
+        FROM invite_codes ic
+        LEFT JOIN users u1 ON ic.created_by = u1.id
+        LEFT JOIN users u2 ON ic.used_by = u2.id
+        ORDER BY ic.created_at DESC
+    """).fetchall()
+    db.close()
+    result = []
+    for r in rows:
+        result.append({
+            "code": r["code"],
+            "created_by": r["created_by"],
+            "creator_name": r["creator_name"],
+            "used_by": r["used_by"],
+            "user_name": r["user_name"],
+            "created_at": r["created_at"],
+            "used_at": r["used_at"],
+        })
+    return result

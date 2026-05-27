@@ -65,6 +65,14 @@ def init_db() -> None:
             data     TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS invite_codes (
+            code        TEXT PRIMARY KEY,
+            created_by  INTEGER REFERENCES users(id),
+            used_by     INTEGER REFERENCES users(id),
+            created_at  TEXT DEFAULT (datetime('now')),
+            used_at     TEXT
+        );
+
     """)
 
     cur = db.execute("SELECT COUNT(*) FROM users")
