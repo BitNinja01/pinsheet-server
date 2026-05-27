@@ -1,14 +1,14 @@
 # Handoff
 
-**Last updated**: 2026-05-27 05:08 UTC
+**Last updated**: 2026-05-26 (session ongoing)
 
 ## Current state
-Multi-user design completed and spec approved — brainstormed through 3-phase plan (SQLite migration → auth → multi-user UI). Implementation plan written with 17 tasks across 3 phases, each independently testable. No code written yet — design + plan only.
+Multi-user implementation complete — all 22 commits (3 phases, 17 tasks) done, smoke-tested (12/12 passing). Uncommitted work: nolock network-filesystem fallback in `database.py` (auto-detects CIFS/SMB and switches to `nolock=1` URI mode). App compiles cleanly (all `.py` files pass `py_compile`).
 
 ## Next actions
-1. **Implement Phase A** — SQLite migration (Tasks A1-A5 in the plan). Rewrite store.py, add database.py, create import page, add systemd service.
-2. **Implement Phase B** — Auth layer (Tasks B1-B7). bcrypt, flask-login, login/register pages, invite codes, `@login_required`.
-3. **Implement Phase C** — Multi-user UI (Tasks C1-C6). User switcher, `?user=` param, admin invites, read-only enforcement.
+1. **Stage and commit** the nolock `database.py` change
+2. **Push** the 22-commit stack to remote (master is 22 ahead of origin)
+3. **Deploy** to LXC — run `scripts/install-service.sh`, set `SECRET_KEY`, `systemctl enable --now pinsheet`
 
 ## Blockers
 None.

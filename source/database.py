@@ -2,6 +2,7 @@ import sqlite3
 import logging
 
 _DB_PATH = None
+_USE_NOLOCK = None
 _log = logging.getLogger("pinsheet")
 
 
@@ -10,16 +11,39 @@ def set_db_path(path: str) -> None:
     _DB_PATH = path
 
 
-def get_db() -> sqlite3.Connection:
+def _open_db_normal():
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-    except sqlite3.OperationalError as e:
-        _log.warning("WAL mode failed (may be on network filesystem): %s", e)
-        conn.execute("PRAGMA journal_mode=DELETE")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("CREATE TABLE IF NOT EXISTS __ping (x)")
+    conn.execute("DROP TABLE IF EXISTS __ping")
+    conn.commit()
+    return conn
+
+
+def _open_db_nolock():
+    conn = sqlite3.connect(f"file:{_DB_PATH}?nolock=1", uri=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=OFF")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+def get_db() -> sqlite3.Connection:
+    global _USE_NOLOCK
+    if _USE_NOLOCK:
+        return _open_db_nolock()
+    if _USE_NOLOCK is False:
+        return _open_db_normal()
+    try:
+        conn = _open_db_normal()
+        _USE_NOLOCK = False
+        return conn
+    except sqlite3.OperationalError:
+        _log.warning("Normal SQLite open failed (likely CIFS/SMB) — falling back to nolock mode")
+        _USE_NOLOCK = True
+        return _open_db_nolock()
 
 
 def init_db() -> None:

@@ -308,3 +308,20 @@
 - Design system files in `docs/design-system/` — deletion is pre-existing (from prior session), not this session's work
 
 **Next**: Implement Phase A (SQLite migration), Phase B (auth), Phase C (multi-user UI)
+
+---
+
+## 2026-05-26 (evening session) — Implementation complete + nolock fallback
+
+**What was done**:
+- Resumed after machine crash — found all 22 implementation commits intact (full 3-phase plan executed)
+- Completed the nolock network-filesystem fallback in `database.py`: auto-detects CIFS/SMB/WAL failures via a ping table, permanently switches to `nolock=1` URI mode with `journal_mode=OFF`
+- Ran `py_compile` on all 10 Python source files — all pass cleanly
+- Smoke-tested the full app with Flask test client: 12/12 assertions pass
+  - Auth flow: login redirect, register first user (auto-admin), login, logout
+  - Auth guard: unauthenticated requests redirect to `/login`
+  - Invite gating: second registration rejected without valid invite code
+  - All protected pages render (dashboard, admin invites, settings, stats, courses, import)
+- Updated HANDOFF.md, SESSION_LOG.md, RUNBOOK.md with current state
+
+**Status**: All code complete. 22 commits ahead of origin. One uncommitted file (database.py nolock).
