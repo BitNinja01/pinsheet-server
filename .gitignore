@@ -1,27 +1,187 @@
-# Byte-compiled
+# Custom — Internal tooling and session artifacts
+PICKUP_PROMPT.md
+AGENTS.md
+.claude/
+.opencode/
+.superpowers/
+plugins/
+
+# Internal documentation (session memory framework, design docs, internal brainstorming)
+docs/HANDOFF.md
+docs/SESSION_LOG.md
+docs/SESSION_LOG_ARCHIVE.md
+docs/BACKLOG.md
+docs/DECISIONS.md
+docs/RUNBOOK.md
+docs/superpowers/
+
+# Build scripts (internal only)
+scripts/build.sh
+scripts/dist.sh
+scripts/*.py
+
+# User data (keep only reference data like benchmarks)
+data/
+!data/handicap_benchmarks.json
+
+# Design system artifacts (internal)
+design-system/
+wireframes/
+image_examples/
+
+# ---> Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
 
-# Virtual env
-.venv/
-venv/
+# C extensions
+*.so
 
-# IDE
-.idea/
-.vscode/
-
-# Distribution
-dist/
+# Distribution / packaging
+.idea
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# User data (created at runtime)
-data/
+# PyInstaller
+*.manifest
+*.spec
 
-# Artifacts from other tools
-.claude/
-CLAUDE.md
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+# .python-version
+
+# pipenv
+#Pipfile.lock
+
+# UV
+#uv.lock
+
+# poetry
+#poetry.lock
+
+# pdm
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#.idea/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
 .aider*
-.superpowers/
-PICKUP_PROMPT.md
-image_examples/
+CLAUDE.md
+fonts/
