@@ -176,6 +176,16 @@ def delete_round(date: str, index: str, user_id: int = 1) -> None:
     _log.info("round deleted: %s #%s", date, index)
 
 
+def update_round_handicap(date: str, index: int, handicap: float, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE rounds SET computed_handicap = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+        (str(handicap), user_id, date, index),
+    )
+    db.commit()
+    db.close()
+
+
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
     if holes_sel == "front":
         slope  = float(tee_data.get("front_slope",  tee_data.get("slope",  113)))

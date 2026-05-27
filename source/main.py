@@ -25,6 +25,7 @@ from store import (
     get_users, create_user, verify_user, user_count, real_user_count,
     is_invite_code_valid, consume_invite_code,
     create_invite_code, get_invite_codes,
+    update_round_handicap,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 from calc import (
@@ -1101,6 +1102,15 @@ def settings_import():
             elif name.endswith("settings.json"):
                 settings_data = json.loads(zf.read(name))
                 save_settings(settings_data, user_id)
+
+        all_imported = get_all_rounds(user_id)
+        chronological = list(reversed(all_imported))
+        include_9hole = g.settings.get("include_9hole", True)
+        for i, r in enumerate(chronological):
+            window = chronological[:i + 1]
+            hi = calc_handicap_index(window, include_9hole)
+            if hi is not None:
+                update_round_handicap(r["date"], r["index"], hi, user_id)
 
         return render_template("settings_import.html", settings=g.settings,
                                imported={"courses": courses_count, "rounds": rounds_count},
