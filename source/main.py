@@ -215,8 +215,6 @@ def logout():
 
 @app.before_request
 def _load_globals():
-    g.version = __version__
-
     if request.endpoint in ("login_page", "register_page", "static"):
         return
 
@@ -241,6 +239,11 @@ def _load_globals():
     g.settings = load_settings(g.view_user["id"])
     g.courses = get_courses()
     g.all_rounds = get_all_rounds(g.view_user["id"])
+
+
+@app.context_processor
+def inject_version():
+    return dict(version=__version__)
 
 
 @app.before_request
