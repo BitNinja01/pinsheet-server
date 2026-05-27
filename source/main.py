@@ -133,6 +133,7 @@ csrf = CSRFProtect(app)
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login_page():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -157,6 +158,7 @@ def login_page():
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register_page():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -263,6 +265,7 @@ def _make_chart_data(hi_values):
 
 
 @app.route("/")
+@login_required
 def dashboard():
     if not g.settings.get("welcome_shown"):
         return render_template("welcome.html", settings=g.settings)
@@ -522,6 +525,7 @@ def api_welcome_done():
 
 
 @app.route("/rounds/new")
+@login_required
 def round_entry():
     today = date.today().isoformat()
     no_courses = len(g.courses) == 0
@@ -529,42 +533,49 @@ def round_entry():
 
 
 @app.route("/api/drafts/round", methods=["GET"])
+@login_required
 def api_draft_round_get():
     draft = load_round_draft()
     return jsonify(draft or {})
 
 
 @app.route("/api/drafts/round", methods=["PUT"])
+@login_required
 def api_draft_round_put():
     save_round_draft(request.get_json())
     return jsonify({"ok": True})
 
 
 @app.route("/api/drafts/round", methods=["DELETE"])
+@login_required
 def api_draft_round_delete():
     clear_round_draft()
     return jsonify({"ok": True})
 
 
 @app.route("/api/drafts/course", methods=["GET"])
+@login_required
 def api_draft_course_get():
     draft = load_course_draft()
     return jsonify(draft or {})
 
 
 @app.route("/api/drafts/course", methods=["PUT"])
+@login_required
 def api_draft_course_put():
     save_course_draft(request.get_json())
     return jsonify({"ok": True})
 
 
 @app.route("/api/drafts/course", methods=["DELETE"])
+@login_required
 def api_draft_course_delete():
     clear_course_draft()
     return jsonify({"ok": True})
 
 
 @app.route("/api/rounds", methods=["POST"])
+@login_required
 def api_rounds_post():
     data = request.get_json()
     date_val = data.get("date", "")
@@ -623,6 +634,7 @@ def api_rounds_post():
 
 
 @app.route("/rounds/<date>/<index>")
+@login_required
 def round_detail(date, index):
     round_data = None
     for r in g.all_rounds:
@@ -683,6 +695,7 @@ def round_detail(date, index):
 
 
 @app.route("/rounds/<date>/<index>/report")
+@login_required
 def report_card(date, index):
     this_round = None
     for r in g.all_rounds:
@@ -727,17 +740,20 @@ def report_card(date, index):
 
 
 @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
+@login_required
 def api_rounds_delete(date, index):
     delete_round(date, index)
     return jsonify({"ok": True})
 
 
 @app.route("/courses/new")
+@login_required
 def course_entry():
     return render_template("course_entry.html", courses=g.courses, settings=g.settings)
 
 
 @app.route("/courses")
+@login_required
 def course_list():
     course_data = []
     for name, course in g.courses.items():
@@ -763,6 +779,7 @@ def course_list():
 
 
 @app.route("/courses/<name>")
+@login_required
 def course_detail(name):
     course = g.courses.get(name)
     if not course:
@@ -807,6 +824,7 @@ def course_detail(name):
 
 
 @app.route("/api/courses", methods=["POST"])
+@login_required
 def api_courses_post():
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -829,6 +847,7 @@ def api_courses_post():
 
 
 @app.route("/api/courses/<name>", methods=["DELETE"])
+@login_required
 def api_courses_delete(name):
     for r in g.all_rounds:
         if r.get("course") == name:
@@ -838,6 +857,7 @@ def api_courses_delete(name):
 
 
 @app.route("/stats")
+@login_required
 def stats():
     include_9hole = g.settings.get("include_9hole", True)
 
@@ -980,6 +1000,7 @@ def stats():
 
 
 @app.route("/settings")
+@login_required
 def settings_page():
     themes = ["dark", "light"]
     return render_template("settings.html", settings=g.settings, courses=g.courses, themes=themes,
@@ -987,6 +1008,7 @@ def settings_page():
 
 
 @app.route("/settings/import", methods=["GET", "POST"])
+@login_required
 def settings_import():
     if request.method == "POST":
         uploaded = request.files.get("zipfile")
@@ -1029,6 +1051,7 @@ def settings_import():
 
 
 @app.route("/api/settings", methods=["PUT"])
+@login_required
 def api_settings_put():
     data = request.get_json()
     save_settings(data)
@@ -1036,6 +1059,7 @@ def api_settings_put():
 
 
 @app.route("/season")
+@login_required
 def season_summary():
     include_9hole = g.settings.get("include_9hole", True)
 
