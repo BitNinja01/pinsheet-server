@@ -11,9 +11,21 @@
         <aside class="ps-sidebar">
             <div class="ps-logo">PinSheet</div>
             <div>
-                <div class="ps-eyebrow" style="margin-bottom: 6px;">Player</div>
-                <div class="ps-serif" style="font-size: 20px; line-height: 1.1;">Golfer</div>
-                <div style="font-size: 12px; color: var(--ps-ink-3); margin-top: 2px;">PinSheet</div>
+                <div class="ps-eyebrow" style="margin-bottom: 6px;">Viewing</div>
+                <div class="ps-serif" style="font-size: 20px; line-height: 1.1;">{{ g.view_user.display_name }}</div>
+                <div style="position: relative; margin-top: 4px;">
+                    <select id="user-switcher"
+                            style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ps-ink-3);
+                                   background: transparent; border: 1px solid var(--ps-ink-1); padding: 4px 6px;
+                                   width: 100%; outline: none; cursor: pointer;"
+                            onchange="switchUser(this.value)">
+                        {% for u in all_users %}
+                        <option value="{{ u.username }}" {% if u.id == g.view_user.id %}selected{% endif %}>
+                            {{ u.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <nav class="ps-nav">
                 <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
@@ -24,12 +36,21 @@
                 <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
                 <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
                 <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
+                <a href="/logout">Logout</a>
             </nav>
         </aside>
         <main class="ps-main">
             {% block content %}{% endblock %}
         </main>
     </div>
+    <script>
+        document.getElementById('user-switcher').addEventListener('change', function() {
+            var user = this.value;
+            var url = new URL(window.location.href);
+            url.searchParams.set('user', user);
+            window.location.href = url.toString();
+        });
+    </script>
     <script src="/static/app.js"></script>
 </body>
 </html>

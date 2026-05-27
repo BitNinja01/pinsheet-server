@@ -21,7 +21,7 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_handicap_benchmarks, get_user_by_id, get_user,
-    create_user, verify_user, user_count, real_user_count,
+    get_users, create_user, verify_user, user_count, real_user_count,
     is_invite_code_valid, consume_invite_code,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
@@ -211,9 +211,39 @@ def logout():
 
 @app.before_request
 def _load_globals():
-    g.settings = load_settings()
+    if request.endpoint in ("login_page", "register_page", "static"):
+        return
+
+    current_user_id = current_user.id if current_user.is_authenticated else 1
+
+    view_username = request.args.get("user")
+    if view_username:
+        view_user_dict = get_user(view_username)
+        if view_user_dict:
+            g.view_user = view_user_dict
+        else:
+            g.view_user = None
+    else:
+        if current_user.is_authenticated:
+            g.view_user = get_user_by_id(current_user_id)
+        else:
+            g.view_user = {"id": 1, "username": "default", "display_name": "Player", "is_admin": False}
+
+    if g.view_user is None:
+        g.view_user = {"id": 1, "username": "default", "display_name": "Player", "is_admin": False}
+
+    g.settings = load_settings(g.view_user["id"])
     g.courses = get_courses()
-    g.all_rounds = get_all_rounds()
+    g.all_rounds = get_all_rounds(g.view_user["id"])
+
+
+@app.before_request
+def _check_view_permission():
+    if request.endpoint in ("login_page", "register_page", "static"):
+        return
+    if not hasattr(g, "view_user"):
+        return
+    g.is_own_data = current_user.is_authenticated and g.view_user["id"] == current_user.id
 
 
 PORT = 8420
@@ -268,7 +298,7 @@ def _make_chart_data(hi_values):
 @login_required
 def dashboard():
     if not g.settings.get("welcome_shown"):
-        return render_template("welcome.html", settings=g.settings)
+        return render_template("welcome.html", settings=g.settings, all_users=get_users())
     include_9hole = g.settings.get("include_9hole", True)
 
     l20 = _last_n_rounds(g.all_rounds, g.courses, 20)
@@ -514,7 +544,8 @@ def dashboard():
                            current_page="dashboard",
                            season_label=season_label,
                            hi_movement=hi_movement, career_low=career_low, hi_insight=hi_insight,
-                           chart=chart, chart_data_json=chart_data_json)
+                           chart=chart, chart_data_json=chart_data_json,
+                           all_users=get_users())
 
 
 @app.route("/api/welcome", methods=["POST"])
@@ -529,7 +560,7 @@ def api_welcome_done():
 def round_entry():
     today = date.today().isoformat()
     no_courses = len(g.courses) == 0
-    return render_template("round_entry.html", settings=g.settings, courses=g.courses, today=today, no_courses=no_courses, current_page="round_entry")
+    return render_template("round_entry.html", settings=g.settings, courses=g.courses, today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
 
 
 @app.route("/api/drafts/round", methods=["GET"])
@@ -691,6 +722,7 @@ def round_detail(date, index):
         total={"gross": total_gross, "par": total_par,
                "diff": total_gross - total_par if total_par else 0},
         settings=g.settings,
+        all_users=get_users(),
     )
 
 
@@ -736,7 +768,7 @@ def report_card(date, index):
 
     rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round]), calc_penalties_per_round(l20), False, "", 1))
 
-    return render_template("report_card.html", rows=rows, round=this_round, settings=g.settings)
+    return render_template("report_card.html", rows=rows, round=this_round, settings=g.settings, all_users=get_users())
 
 
 @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
@@ -749,7 +781,7 @@ def api_rounds_delete(date, index):
 @app.route("/courses/new")
 @login_required
 def course_entry():
-    return render_template("course_entry.html", courses=g.courses, settings=g.settings)
+    return render_template("course_entry.html", courses=g.courses, settings=g.settings, all_users=get_users())
 
 
 @app.route("/courses")
@@ -775,7 +807,7 @@ def course_list():
 
     course_data.sort(key=lambda c: c["name"].lower())
 
-    return render_template("courses.html", courses=course_data, settings=g.settings)
+    return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users())
 
 
 @app.route("/courses/<name>")
@@ -820,6 +852,7 @@ def course_detail(name):
         course=course, name=name, tees=tees, holes=hole_rows,
         play_count=play_count, first_played=first_played, last_played=last_played,
         settings=g.settings,
+        all_users=get_users(),
     )
 
 
@@ -996,7 +1029,7 @@ def stats():
         })
     sections["trends"] = {"label": "Trends", "headline": "Round-by-round performance history.", "trends": trend_rows}
 
-    return render_template("stats.html", sections=sections, settings=g.settings)
+    return render_template("stats.html", sections=sections, settings=g.settings, all_users=get_users())
 
 
 @app.route("/settings")
@@ -1004,7 +1037,7 @@ def stats():
 def settings_page():
     themes = ["dark", "light"]
     return render_template("settings.html", settings=g.settings, courses=g.courses, themes=themes,
-                           current_page="settings")
+                           current_page="settings", all_users=get_users())
 
 
 @app.route("/settings/import", methods=["GET", "POST"])
@@ -1014,13 +1047,15 @@ def settings_import():
         uploaded = request.files.get("zipfile")
         if not uploaded:
             return render_template("settings_import.html", settings=g.settings, imported=None,
-                                   error="No file provided", current_page="settings")
+                                   error="No file provided", current_page="settings",
+                                   all_users=get_users())
 
         try:
             zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
         except zipfile.BadZipFile:
             return render_template("settings_import.html", settings=g.settings, imported=None,
-                                   error="Invalid zip file", current_page="settings")
+                                   error="Invalid zip file", current_page="settings",
+                                   all_users=get_users())
 
         user_id = 1  # Phase A: default user
         courses_count = 0
@@ -1044,10 +1079,11 @@ def settings_import():
 
         return render_template("settings_import.html", settings=g.settings,
                                imported={"courses": courses_count, "rounds": rounds_count},
-                               current_page="settings")
+                               current_page="settings",
+                               all_users=get_users())
 
     return render_template("settings_import.html", settings=g.settings, imported=None,
-                           current_page="settings")
+                           current_page="settings", all_users=get_users())
 
 
 @app.route("/api/settings", methods=["PUT"])
@@ -1108,6 +1144,7 @@ def season_summary():
         walking_miles=walking_miles,
         riding_miles=riding_miles,
         penalty_free=penalty_free,
+        all_users=get_users(),
     )
 
 
