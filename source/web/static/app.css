@@ -167,6 +167,10 @@ body {
     gap: 22px;
 }
 
+.ps-mobile-header {
+    display: none;
+}
+
 .ps-main {
     display: flex;
     flex-direction: column;
@@ -1208,4 +1212,8 @@ select.hole-input { width: 3rem; appearance: none; }
         margin-right: var(--ps-sp-3);
     }
     .wizard-step { padding: var(--ps-sp-4); }
+
+    /* Stats fallback: 1 column (Task 8 upgrades to 2-col) */
+    .stats-grid { grid-template-columns: 1fr; }
+    .stat-cell { border-right: none; }
 }
