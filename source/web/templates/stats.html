@@ -1,78 +1,108 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stats-layout">
-    <nav class="stats-nav">
-        {% for key, section in sections.items() %}
-        <a href="#section-{{ key }}" class="stats-nav-link">{{ section.label }}</a>
-        {% endfor %}
-    </nav>
-
-    <div class="stats-content">
-        {% for key, section in sections.items() %}
-        <section class="stats-section" id="section-{{ key }}">
-            <h2 class="stats-section-title">{{ section.label }}</h2>
-            <p class="stats-headline">{{ section.headline }}</p>
-
-            {% if key == "bests" and section.bests %}
-            <table class="data-table">
-                <thead>
-                    <tr><th>Category</th><th>Best</th><th>Date</th></tr>
-                </thead>
-                <tbody>
-                {% for label, val, date_val in section.bests %}
-                    <tr>
-                        <td>{{ label }}</td>
-                        <td>{{ val if val is not none else "&mdash;" }}</td>
-                        <td>{{ date_val or "&mdash;" }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% elif key == "trends" and section.trends %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Date</th><th>Course</th><th>Score</th><th>+/-</th>
-                        <th>Diff</th><th>FIR</th><th>GIR</th><th>Putts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for r in section.trends %}
-                    <tr>
-                        <td>{{ r.date }}</td>
-                        <td>{{ r.course }}</td>
-                        <td>{{ r.score }}</td>
-                        <td>{% if r.vs_par is not none %}{{ '%+d'|format(r.vs_par) }}{% else %}&mdash;{% endif %}</td>
-                        <td>{{ r.diff }}</td>
-                        <td>{{ r.fir }}</td>
-                        <td>{{ r.gir }}</td>
-                        <td>{{ r.putts }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% elif section.rows %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Stat</th><th>Best 8</th><th>Last 5</th><th>Last 10</th><th>Last 20</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for label, values in section.rows %}
-                    <tr>
-                        <td>{{ label }}</td>
-                        <td>{{ values[0] }}</td>
-                        <td>{{ values[1] }}</td>
-                        <td>{{ values[2] }}</td>
-                        <td>{{ values[3] }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-        </section>
-        {% endfor %}
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Rolling Averages</div>
+        <h1 class="ps-h1">Performance at a glance</h1>
     </div>
 </div>
+
+<div class="ps-stat-strip">
+    {% for item in strip %}
+    <div class="ps-stat">
+        <div class="ps-eyebrow">{{ item.label }}</div>
+        <div class="ps-stat-v">{{ item.value }}{% if item.is_pct %}<span style="font-size: 24px; color: var(--ps-ink-2);">%</span>{% endif %}</div>
+        <div class="ps-stat-delta{% if item.delta_class %} {{ item.delta_class }}{% endif %}">{{ item.delta_text }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+{% for section in sections %}
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 14px;">
+        <div>
+            <div class="ps-eyebrow">Category {{ loop.index }}</div>
+            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">{{ section.label }}</div>
+        </div>
+    </div>
+    <div class="stats-grid">
+        {% for cell in section.cells %}
+        <div class="stat-cell{% if cell.cell_class %} {{ cell.cell_class }}{% endif %}">
+            <div class="stat-cell-label">{{ cell.label }}</div>
+            <div class="stat-cell-value">{{ cell.value }}</div>
+            <div class="stat-cell-delta{% if cell.delta_class %} {{ cell.delta_class }}{% endif %}">{{ cell.delta }}</div>
+            <div class="stat-cell-windows">
+                {% for w in cell.windows %}
+                <div class="stat-cell-window">{{ w.label }}: <strong>{{ w.value }}</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endfor %}
+
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 14px;">
+        <div>
+            <div class="ps-eyebrow">Personal Records</div>
+            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">Bests</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th class="r">Value</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for label, val, date_val in bests_section.bests %}
+            <tr>
+                <td>{{ label }}</td>
+                <td class="r ps-course">{{ val if val is not none else "&mdash;" }}</td>
+                <td style="font-size: 12px; color: var(--ps-ink-2);">{{ date_val or "&mdash;" }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 14px;">
+        <div>
+            <div class="ps-eyebrow">Last {{ trends_section.trends|length }} Rounds</div>
+            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">Recent Trends</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th class="r">Score</th>
+                <th class="r">+/-</th>
+                <th class="r">Diff</th>
+                <th class="r">FIR%</th>
+                <th class="r">GIR%</th>
+                <th class="r">Putts</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in trends_section.trends %}
+            <tr>
+                <td style="font-size: 12px; color: var(--ps-ink-2);">{{ r.date }}</td>
+                <td><div class="ps-course">{{ r.course }}</div></td>
+                <td class="r ps-course">{{ r.score }}</td>
+                <td class="r">{% if r.vs_par is not none %}{{ '%+d'|format(r.vs_par) }}{% else %}&mdash;{% endif %}</td>
+                <td class="r">{{ r.diff }}</td>
+                <td class="r">{{ r.fir }}</td>
+                <td class="r">{{ r.gir }}</td>
+                <td class="r">{{ r.putts }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
 {% endblock %}

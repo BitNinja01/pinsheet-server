@@ -27,6 +27,7 @@ data/
 
 # Design system artifacts (internal)
 design-system/
+open-design/
 wireframes/
 image_examples/
 
