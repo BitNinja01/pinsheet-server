@@ -1,6 +1,8 @@
 import sqlite3
+import logging
 
 _DB_PATH = None
+_log = logging.getLogger("pinsheet")
 
 
 def set_db_path(path: str) -> None:
@@ -11,7 +13,11 @@ def set_db_path(path: str) -> None:
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.OperationalError as e:
+        _log.warning("WAL mode failed (may be on network filesystem): %s", e)
+        conn.execute("PRAGMA journal_mode=DELETE")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -40,7 +46,6 @@ def init_db() -> None:
             course_name   TEXT NOT NULL,
             date          TEXT NOT NULL,
             round_index   INTEGER NOT NULL DEFAULT 0,
-            UNIQUE(user_id, date, round_index),
             tee_name      TEXT,
             holes_played  TEXT,
             entry_mode    TEXT,
@@ -51,7 +56,8 @@ def init_db() -> None:
             notes         TEXT,
             excluded      INTEGER DEFAULT 0,
             computed_handicap TEXT,
-            created_at    TEXT DEFAULT (datetime('now'))
+            created_at    TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, date, round_index)
         );
 
         CREATE TABLE IF NOT EXISTS settings (
