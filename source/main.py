@@ -11,8 +11,9 @@ from datetime import date, timedelta, datetime
 
 from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 
+from database import set_db_path, init_db
 from store import (
-    init_data_dir, load_settings, save_settings,
+    load_settings, save_settings,
     get_courses, get_all_rounds, get_slope_rating,
     save_round, delete_round, save_course, delete_course, rename_course,
     load_round_draft, save_round_draft, clear_round_draft,
@@ -946,19 +947,36 @@ def _find_chrome() -> str | None:
 
 
 def main():
-    init_data_dir()
-    port = find_free_port()
-    url = f"http://127.0.0.1:{port}"
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=None)
+    parser.add_argument("--data", default=None)
+    args = parser.parse_args()
 
-    chrome = _find_chrome()
-    chrome_proc = None
-    if chrome:
-        chrome_proc = subprocess.Popen(
-            [chrome, f"--app={url}", "--start-maximized"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+    if args.data:
+        data_dir = Path(args.data)
     else:
-        webbrowser.open(url)
+        data_dir = Path(__file__).parent.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    db_path = str(data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    port = args.port if args.port else find_free_port()
+    url = f"http://{args.host}:{port}"
+
+    chrome_proc = None
+    if args.host == "127.0.0.1" and os.environ.get("FLASK_ENV") != "production":
+        chrome = _find_chrome()
+        if chrome:
+            chrome_proc = subprocess.Popen(
+                [chrome, f"--app={url}", "--start-maximized"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        else:
+            webbrowser.open(url)
 
     if chrome_proc:
         def _watch_chrome():
@@ -968,8 +986,8 @@ def main():
         threading.Thread(target=_watch_chrome, daemon=True).start()
 
     from waitress import serve
-    print(f"PinSheet → {url}")
-    serve(app, host="127.0.0.1", port=port)
+    print(f"PinSheet -> http://{args.host}:{port}")
+    serve(app, host=args.host, port=port)
 
 
 if __name__ == "__main__":
