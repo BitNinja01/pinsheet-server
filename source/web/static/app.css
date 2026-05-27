@@ -1069,3 +1069,32 @@ select.hole-input { width: 3rem; appearance: none; }
     display: inline-block;
 }
 .btn:hover { background: var(--ps-ink); color: var(--ps-paper); }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * MOBILE: Touch Targets
+ * ────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ps-btn, .btn-accent, .btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        padding: var(--ps-sp-2) var(--ps-sp-5);
+    }
+    .ps-chip {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+    }
+    .ps-nav a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+    .step-input, .hole-input, select.step-input {
+        min-height: 44px;
+    }
+    .auth-button {
+        min-height: 44px;
+    }
+}
