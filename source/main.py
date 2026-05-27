@@ -216,7 +216,7 @@ def _load_globals():
     if request.endpoint in ("login_page", "register_page", "static"):
         return
 
-    current_user_id = current_user.id if current_user.is_authenticated else 1
+    current_user_id = current_user.id if current_user.is_authenticated else None
 
     view_username = request.args.get("user")
     if view_username:
@@ -229,10 +229,10 @@ def _load_globals():
         if current_user.is_authenticated:
             g.view_user = get_user_by_id(current_user_id)
         else:
-            g.view_user = {"id": 1, "username": "default", "display_name": "Player", "is_admin": False}
+            g.view_user = None
 
     if g.view_user is None:
-        g.view_user = {"id": 1, "username": "default", "display_name": "Player", "is_admin": False}
+        return
 
     g.settings = load_settings(g.view_user["id"])
     g.courses = get_courses()
@@ -243,7 +243,7 @@ def _load_globals():
 def _check_view_permission():
     if request.endpoint in ("login_page", "register_page", "static"):
         return
-    if not hasattr(g, "view_user"):
+    if not hasattr(g, "view_user") or g.view_user is None:
         return
     g.is_own_data = current_user.is_authenticated and g.view_user["id"] == current_user.id
 
@@ -560,9 +560,10 @@ def dashboard():
 
 
 @app.route("/api/welcome", methods=["POST"])
+@login_required
 def api_welcome_done():
     g.settings["welcome_shown"] = True
-    save_settings(g.settings, g.view_user["id"])
+    save_settings(g.settings, current_user.id)
     return jsonify({"ok": True})
 
 
@@ -579,7 +580,7 @@ def round_entry():
 @app.route("/api/drafts/round", methods=["GET"])
 @login_required
 def api_draft_round_get():
-    draft = load_round_draft()
+    draft = load_round_draft(current_user.id)
     return jsonify(draft or {})
 
 
@@ -587,7 +588,7 @@ def api_draft_round_get():
 @login_required
 @requires_own_data
 def api_draft_round_put():
-    save_round_draft(request.get_json())
+    save_round_draft(request.get_json(), current_user.id)
     return jsonify({"ok": True})
 
 
@@ -595,14 +596,14 @@ def api_draft_round_put():
 @login_required
 @requires_own_data
 def api_draft_round_delete():
-    clear_round_draft()
+    clear_round_draft(current_user.id)
     return jsonify({"ok": True})
 
 
 @app.route("/api/drafts/course", methods=["GET"])
 @login_required
 def api_draft_course_get():
-    draft = load_course_draft()
+    draft = load_course_draft(current_user.id)
     return jsonify(draft or {})
 
 
@@ -610,7 +611,7 @@ def api_draft_course_get():
 @login_required
 @requires_own_data
 def api_draft_course_put():
-    save_course_draft(request.get_json())
+    save_course_draft(request.get_json(), current_user.id)
     return jsonify({"ok": True})
 
 
@@ -618,7 +619,7 @@ def api_draft_course_put():
 @login_required
 @requires_own_data
 def api_draft_course_delete():
-    clear_course_draft()
+    clear_course_draft(current_user.id)
     return jsonify({"ok": True})
 
 
@@ -676,7 +677,7 @@ def api_rounds_post():
     if new_hi is not None:
         golf_round["computed_handicap"] = str(new_hi)
 
-    save_round(golf_round, date_val, 0)
+    save_round(golf_round, date_val, 0, current_user.id)
     index = 0
 
     return jsonify({"date": date_val, "index": index, "differential": differential})
@@ -793,7 +794,7 @@ def report_card(date, index):
 @login_required
 @requires_own_data
 def api_rounds_delete(date, index):
-    delete_round(date, index)
+    delete_round(date, index, current_user.id)
     return jsonify({"ok": True})
 
 
@@ -1081,7 +1082,7 @@ def settings_import():
                                    error="Invalid zip file", current_page="settings",
                                    all_users=get_users())
 
-        user_id = 1  # Phase A: default user
+        user_id = current_user.id
         courses_count = 0
         rounds_count = 0
 
@@ -1115,7 +1116,7 @@ def settings_import():
 @requires_own_data
 def api_settings_put():
     data = request.get_json()
-    save_settings(data, g.view_user["id"])
+    save_settings(data, current_user.id)
     return jsonify({"ok": True})
 
 
