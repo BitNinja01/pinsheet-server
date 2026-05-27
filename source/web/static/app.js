@@ -11,6 +11,47 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 (function () {
+    var sidebar = document.getElementById('ps-sidebar');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    var hamburger = document.getElementById('hamburger-btn');
+    if (!sidebar || !backdrop || !hamburger) return;
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        hamburger.classList.add('open');
+        backdrop.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        hamburger.classList.remove('open');
+        backdrop.classList.remove('visible');
+        document.body.style.overflow = '';
+    }
+
+    hamburger.addEventListener('click', function () {
+        if (sidebar.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    });
+
+    backdrop.addEventListener('click', closeSidebar);
+
+    sidebar.querySelectorAll('.ps-nav a').forEach(function (link) {
+        link.addEventListener('click', closeSidebar);
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+            closeSidebar();
+        }
+    });
+})();
+
+(function () {
     var form = document.getElementById("settings-form");
     if (!form) return;
 
