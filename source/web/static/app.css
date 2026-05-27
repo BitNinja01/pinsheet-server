@@ -1234,7 +1234,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
-    .mobile-cards { display: none !important; }
+    .mobile-cards, .hole-cards, .hole-progress { display: none !important; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
@@ -1301,4 +1301,150 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-body);
     color: var(--ps-ink);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * HOLE CARDS (round entry mobile)
+ * ────────────────────────────────────────────────────────────────── */
+.hole-cards { display: none; }
+@media (max-width: 768px) {
+    .hole-cards { display: block; }
+}
+
+.hole-card {
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-4);
+    background: var(--ps-paper);
+}
+.hole-card + .hole-card { margin-top: var(--ps-sp-2); }
+
+.hole-card-header {
+    text-align: center;
+    margin-bottom: var(--ps-sp-3);
+}
+.hole-card-hole-num {
+    font-size: var(--ps-fs-h1);
+    font-weight: var(--ps-fw-display);
+    color: var(--ps-accent);
+}
+.hole-card-hole-info {
+    display: flex;
+    justify-content: center;
+    gap: var(--ps-sp-5);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    margin-top: 4px;
+}
+.hole-card-hole-info span { color: var(--ps-ink); font-weight: var(--ps-fw-label); }
+
+.hole-card-parsed {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--ps-sp-2);
+    margin-bottom: var(--ps-sp-3);
+}
+.hole-card-parsed-field {
+    background: var(--ps-paper-2);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-2) var(--ps-sp-3);
+}
+.hole-card-parsed-label {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+}
+.hole-card-parsed-value {
+    font-size: 20px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.hole-card-input-area {
+    background: var(--ps-paper-2);
+    border: 2px solid var(--ps-accent);
+    padding: var(--ps-sp-3);
+    margin-bottom: var(--ps-sp-3);
+}
+.hole-card-input-label {
+    font-size: var(--ps-fs-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+    margin-bottom: 4px;
+}
+.hole-card-shorthand {
+    width: 100%;
+    padding: 14px;
+    font-size: 22px;
+    font-family: var(--ps-font-mono);
+    background: var(--ps-paper);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    color: var(--ps-ink);
+    text-align: center;
+    letter-spacing: 2px;
+    box-sizing: border-box;
+}
+.hole-card-shorthand:focus {
+    outline: none;
+    border-color: var(--ps-accent);
+}
+.hole-card-hint {
+    font-size: var(--ps-fs-eyebrow);
+    color: var(--ps-ink-3);
+    text-align: center;
+    margin-top: 6px;
+}
+
+.hole-card-actions {
+    display: flex;
+    gap: var(--ps-sp-2);
+}
+.hole-card-btn {
+    flex: 1;
+    padding: 14px;
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    background: transparent;
+    color: var(--ps-ink-2);
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-body);
+    cursor: pointer;
+}
+.hole-card-btn--next {
+    background: var(--ps-accent);
+    color: #0a0a0a;
+    border-color: var(--ps-accent);
+    font-weight: var(--ps-fw-label);
+}
+
+/* Hole progress bar */
+.hole-progress {
+    display: flex;
+    gap: 3px;
+    padding: var(--ps-sp-2) 0;
+    margin-bottom: var(--ps-sp-3);
+    overflow-x: auto;
+}
+.hole-progress-dot {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    background: var(--ps-paper);
+    color: var(--ps-ink-3);
+    flex-shrink: 0;
+}
+.hole-progress-dot.completed {
+    background: var(--ps-accent);
+    color: #0a0a0a;
+    border-color: var(--ps-accent);
+}
+.hole-progress-dot.current {
+    border-color: var(--ps-accent);
+    color: var(--ps-accent);
 }
