@@ -1448,3 +1448,31 @@ select.hole-input { width: 3rem; appearance: none; }
     border-color: var(--ps-accent);
     color: var(--ps-accent);
 }
+
+/* ── Season summary cards ── */
+.season-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--ps-sp-2);
+}
+.season-card {
+    background: var(--ps-paper-2);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-2) var(--ps-sp-3);
+    text-align: center;
+}
+.sc-label {
+    display: block;
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+}
+.sc-value {
+    display: block;
+    font-size: var(--ps-fs-table-num);
+    font-weight: 600;
+    margin-top: 2px;
+}
