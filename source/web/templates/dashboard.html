@@ -158,7 +158,7 @@
                 <td class="r">{{ r.putts or '—' }}</td>
                 <td class="r" style="width: 220px;">
                     {% if r.sparkline %}
-                    <svg width="210" height="28" style="display: block;">
+                    <svg viewBox="0 0 210 28" style="display: block; max-width: 100%; height: auto;">
                         <path d="{{ r.sparkline.path }}" stroke="var(--ps-accent)" stroke-width="1.4" fill="none" stroke-linecap="round" />
                         <circle cx="{{ r.sparkline.final_x }}" cy="{{ r.sparkline.final_y }}" r="2.4" fill="var(--ps-accent)" />
                     </svg>
