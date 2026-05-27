@@ -1209,14 +1209,19 @@ def stats():
     _pg_l10 = calc_putts_per_gir(l10)
     _pg_l20 = calc_putts_per_gir(l20)
 
+    _o2_b8 = calc_two_putt_percent(b8)
+    _o2_l5 = calc_two_putt_percent(l5)
+    _o2_l10 = calc_two_putt_percent(l10)
+    _o2_l20 = calc_two_putt_percent(l20)
+
     section2 = {
         "label": "Putting",
         "cells": [
             _cell("Putts / Round", _pt_b8, _pt_l5_, _pt_l10, _pt_l20_, "", 1, False),
             _cell("1-Putt %", _o1_b8, _o1_l5, _o1_l10, _o1_l20, "%", 1, True),
+            _cell("2-Putt %", _o2_b8, _o2_l5, _o2_l10, _o2_l20, "%", 1, True),
             _cell("3-Putt %", _o3_b8, _o3_l5, _o3_l10, _o3_l20, "%", 1, False),
             _cell("Putts / GIR", _pg_b8, _pg_l5, _pg_l10, _pg_l20, "", 2, False),
-            _placeholder_cell("SG: Putting"),
             _placeholder_cell("Longest Made"),
         ],
     }

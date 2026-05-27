@@ -34,6 +34,9 @@ document.addEventListener("DOMContentLoaded", function () {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
+            keepalive: true,
+        }).catch(function (err) {
+            console.error("Failed to save settings:", err);
         });
     }
 
