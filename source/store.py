@@ -223,7 +223,7 @@ def clear_round_draft(user_id: int = 1) -> None:
 
 def get_users() -> list:
     db = get_db()
-    rows = db.execute("SELECT id, username, display_name FROM users").fetchall()
+    rows = db.execute("SELECT id, username, display_name FROM users WHERE password_hash != ''").fetchall()
     db.close()
     return [{"id": r["id"], "username": r["username"], "display_name": r["display_name"]} for r in rows]
 

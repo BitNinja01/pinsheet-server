@@ -22,8 +22,10 @@ document.getElementById("welcome-start").addEventListener("click", function () {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}"
-    }).then(function () {
-        window.location.href = "/";
+    }).then(function (resp) {
+        if (resp.ok) {
+            window.location.href = "/";
+        }
     });
 });
 </script>

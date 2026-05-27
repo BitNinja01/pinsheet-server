@@ -561,6 +561,7 @@ def dashboard():
 
 @app.route("/api/welcome", methods=["POST"])
 @login_required
+@csrf.exempt
 def api_welcome_done():
     g.settings["welcome_shown"] = True
     save_settings(g.settings, current_user.id)
