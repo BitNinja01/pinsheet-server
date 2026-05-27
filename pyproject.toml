@@ -7,6 +7,15 @@ name = "pinsheet-server"
 version = "0.1.0"
 requires-python = ">=3.11"
 
+dependencies = [
+    "flask>=3.0",
+    "waitress>=2.0",
+    "bcrypt>=4.0",
+    "flask-login>=0.6",
+    "flask-limiter>=3.0",
+    "flask-wtf>=1.2",
+]
+
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-flask>=1", "pytest-cov>=5"]
 
