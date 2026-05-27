@@ -1,11 +1,13 @@
-import os
+import io
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
 import threading
 import webbrowser
+import zipfile
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
@@ -857,46 +859,46 @@ def settings_page():
                            current_page="settings")
 
 
-@app.route("/settings/import")
+@app.route("/settings/import", methods=["GET", "POST"])
 def settings_import():
-    return render_template("settings_import.html", settings=g.settings, imported=None)
+    if request.method == "POST":
+        uploaded = request.files.get("zipfile")
+        if not uploaded:
+            return render_template("settings_import.html", settings=g.settings, imported=None,
+                                   error="No file provided", current_page="settings")
 
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
+        except zipfile.BadZipFile:
+            return render_template("settings_import.html", settings=g.settings, imported=None,
+                                   error="Invalid zip file", current_page="settings")
 
-@app.route("/settings/import", methods=["POST"])
-def settings_import_post():
-    uploaded = request.files.get("zipfile")
-    if not uploaded:
-        return render_template("settings_import.html", settings=g.settings, imported=None, error="No file provided")
+        user_id = 1  # Phase A: default user
+        courses_count = 0
+        rounds_count = 0
 
-    import zipfile, io
+        for name in zf.namelist():
+            if name.endswith("courses.json"):
+                courses_data = json.loads(zf.read(name))
+                for cname, cdata in courses_data.items():
+                    save_course(cdata, cname)
+                    courses_count += 1
+            elif "rounds/" in name and name.endswith(".json"):
+                year_data = json.loads(zf.read(name))
+                for date_str, date_rounds in year_data.items():
+                    for idx, rdata in date_rounds.items():
+                        save_round(rdata, date_str, int(idx), user_id)
+                        rounds_count += 1
+            elif name.endswith("settings.json"):
+                settings_data = json.loads(zf.read(name))
+                save_settings(settings_data, user_id)
 
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
-    except zipfile.BadZipFile:
-        return render_template("settings_import.html", settings=g.settings, imported=None, error="Invalid zip file")
+        return render_template("settings_import.html", settings=g.settings,
+                               imported={"courses": courses_count, "rounds": rounds_count},
+                               current_page="settings")
 
-    user_id = 1  # Phase A: default user
-    courses_count = 0
-    rounds_count = 0
-
-    for name in zf.namelist():
-        if name.endswith("courses.json"):
-            courses_data = json.loads(zf.read(name))
-            for cname, cdata in courses_data.items():
-                save_course(cdata, cname)
-                courses_count += 1
-        elif "rounds/" in name and name.endswith(".json"):
-            year_data = json.loads(zf.read(name))
-            for date_str, date_rounds in year_data.items():
-                for idx, rdata in date_rounds.items():
-                    save_round(rdata, date_str, int(idx), user_id)
-                    rounds_count += 1
-        elif name.endswith("settings.json"):
-            settings_data = json.loads(zf.read(name))
-            save_settings(settings_data, user_id)
-
-    return render_template("settings_import.html", settings=g.settings,
-                           imported={"courses": courses_count, "rounds": rounds_count})
+    return render_template("settings_import.html", settings=g.settings, imported=None,
+                           current_page="settings")
 
 
 @app.route("/api/settings", methods=["PUT"])
