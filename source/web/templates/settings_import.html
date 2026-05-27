@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Settings</div>
+        <h1 class="ps-headline">Import Data</h1>
+    </div>
+</div>
+
+<div class="ps-card" style="margin-top: 24px; max-width: 580px;">
+    <div style="padding: 24px;">
+        <p style="color: var(--ps-ink-2); margin-bottom: 16px; line-height: 1.5;">
+            Upload a zip file of your old PinSheet data directory (containing
+            <code>courses.json</code>, <code>rounds/</code>, and
+            <code>settings.json</code>).
+        </p>
+
+        {% if imported %}
+        <div style="background: var(--ps-mint-1); border: 1px solid var(--ps-accent); padding: 16px; margin-bottom: 16px;">
+            <p style="color: var(--ps-accent); margin: 0; font-weight: 500;">
+                Imported {{ imported.courses }} courses and {{ imported.rounds }} rounds.
+            </p>
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div style="background: rgba(204, 51, 0, 0.08); border: 1px solid #c30; padding: 16px; margin-bottom: 16px;">
+            <p style="color: #c30; margin: 0; font-weight: 500;">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="zipfile" accept=".zip" style="margin-bottom: 16px;">
+            <br>
+            <button type="submit" class="btn-accent">Import</button>
+        </form>
+
+        <p style="color: var(--ps-ink-3); font-size: 12px; margin-top: 24px;">
+            <a href="/settings" style="color: var(--ps-ink-3);">Back to Settings</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
