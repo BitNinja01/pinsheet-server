@@ -249,7 +249,7 @@ def get_user_by_id(user_id: int) -> dict | None:
 def create_user(username: str, display_name: str, password: str) -> dict:
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     db = get_db()
-    is_admin = 1 if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0 else 0
+    is_admin = 1 if db.execute("SELECT COUNT(*) FROM users WHERE password_hash != ''").fetchone()[0] == 0 else 0
     cur = db.execute(
         "INSERT INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
         (username, display_name, password_hash, is_admin),
@@ -274,6 +274,13 @@ def verify_user(username: str, password: str) -> dict | None:
 def user_count() -> int:
     db = get_db()
     count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    db.close()
+    return count
+
+
+def real_user_count() -> int:
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM users WHERE password_hash != ''").fetchone()[0]
     db.close()
     return count
 

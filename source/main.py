@@ -21,7 +21,7 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_handicap_benchmarks, get_user_by_id, get_user,
-    create_user, verify_user, user_count,
+    create_user, verify_user, user_count, real_user_count,
     is_invite_code_valid, consume_invite_code,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
@@ -88,7 +88,7 @@ login_manager.init_app(app)
 login_manager.login_view = "login_page"
 login_manager.session_protection = "strong"
 
-app.config["REMEMBER_COOKIE_SECURE"] = True
+app.config["REMEMBER_COOKIE_SECURE"] = os.environ.get("HTTPS", "").lower() in ("1", "true", "yes")
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 app.config["REMEMBER_COOKIE_DURATION"] = 30 * 24 * 60 * 60  # 30 days
@@ -164,7 +164,7 @@ def register_page():
         return redirect(url_for("dashboard"))
 
     invite_code = request.args.get("code", "")
-    first_run = user_count() == 0
+    first_run = real_user_count() == 0
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
