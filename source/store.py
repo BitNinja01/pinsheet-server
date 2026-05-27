@@ -27,6 +27,7 @@ def load_settings(user_id: int = 1) -> dict:
     defaults = {"season_start_month": 1, "season_end_month": 12, "season_start_day": 1, "season_end_day": 28, "season_enabled": False}
     db = get_db()
     row = db.execute("SELECT data FROM settings WHERE user_id = ?", (user_id,)).fetchone()
+    _log.info("load_settings user_id=%s data=%s", user_id, row["data"] if row else "(none)")
     db.close()
     if row:
         data = json.loads(row["data"])
@@ -38,6 +39,7 @@ def load_settings(user_id: int = 1) -> dict:
 
 def save_settings(data: dict, user_id: int = 1) -> None:
     db = get_db()
+    _log.info("save_settings user_id=%s data=%s", user_id, json.dumps(data))
     db.execute(
         "INSERT OR REPLACE INTO settings (user_id, data) VALUES (?, ?)",
         (user_id, json.dumps(data)),

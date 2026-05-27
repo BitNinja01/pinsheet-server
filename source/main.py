@@ -1370,8 +1370,10 @@ def settings_import():
 @app.route("/api/settings", methods=["PUT"])
 @login_required
 @requires_own_data
+@csrf.exempt
 def api_settings_put():
     data = request.get_json()
+    _log.info("api_settings_put user_id=%s, data=%s", current_user.id, data)
     save_settings(data, current_user.id)
     return jsonify({"ok": True})
 
