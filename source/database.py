@@ -1,8 +1,5 @@
 import sqlite3
-import logging
-from pathlib import Path
 
-_log = logging.getLogger("pinsheet")
 _DB_PATH = None
 
 
@@ -62,8 +59,6 @@ def init_db() -> None:
             data     TEXT NOT NULL
         );
 
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_rounds_user_date_index
-            ON rounds(user_id, date, round_index);
     """)
 
     cur = db.execute("SELECT COUNT(*) FROM users")

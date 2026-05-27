@@ -143,7 +143,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> None:
             golf_round.get("entry_mode", ""),
             json.dumps(golf_round.get("holes", {})),
             golf_round.get("total_gross", ""),
-            str(total_putts) if total_putts else None,
+            str(total_putts) if total_putts is not None else None,
             golf_round.get("differential", ""),
             golf_round.get("notes", ""),
             1 if golf_round.get("excluded") else 0,
