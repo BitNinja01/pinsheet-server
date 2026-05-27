@@ -270,3 +270,41 @@
 - `docs/SESSION_LOG.md` — this entry
 
 **Next**: Test kiosk mode, acceptance smoke test, apply design system to remaining pages
+
+## 2026-05-27 05:08 UTC — Session end
+
+**What was done**:
+- Loaded session memory framework (README, HANDOFF, SESSION_LOG, DECISIONS, RUNBOOK, BACKLOG)
+- Reviewed existing multi-user design spec (239 lines) from `docs/superpowers/specs/`
+- Brainstormed and refined the multi-user design with user:
+  - Clean break to SQLite (no JSON fallback), no CLI tools (all web UI)
+  - First-run auto-admin (open registration until first user, then invite-gated)
+  - Self-service JSON import at `/settings/import`
+  - Flask-WTF for CSRF, bcrypt for passwords
+  - Systemd service for LXC deployment (`scripts/pinsheet.service`)
+  - Three-phase approach: SQLite → Auth → Multi-user UI
+- Cross-referenced spec against actual codebase — found and fixed gaps:
+  - Removed references to `manage.py` CLI (killed in brainstorming)
+  - Added `round_index` column to preserve `/rounds/{date}/{index}` URLs
+  - Fixed systemd service path to `scripts/pinsheet.service`
+  - Documented draft functions as implementation detail
+  - Launchers at `scripts/launchers/` noted for SECRET_KEY update
+- Wrote comprehensive implementation plan (17 tasks, ~1840 lines)
+  - Phase A: SQLite migration (5 tasks — store rewrite, import page, systemd, launchers)
+  - Phase B: Auth layer (7 tasks — deps, store functions, Flask-Login, routes, templates, @login_required)
+  - Phase C: Multi-user UI (5 tasks + polish — view param, user switcher, admin invites, read-only enforcement)
+- Ran internal self-review: fixed admin route POST, placeholder removal, missing imports
+
+**Files touched**:
+- `docs/superpowers/specs/2026-05-26-multi-user-design.md` — refined from 239-line draft to 410-line approved spec
+- `docs/superpowers/plans/2026-05-26-multi-user.md` — new, 1840-line implementation plan
+- `docs/HANDOFF.md` — updated state/next actions
+- `docs/SESSION_LOG.md` — this entry
+
+**Decisions made**:
+- No CLI tools — all admin operations are web UI. Bootstrap via first-run auto-admin.
+- JSON import: self-service at `/settings/import` (any user imports own data), not admin-gated
+- Drafts: kept as per-user JSON files to minimize SQLite migration scope
+- Design system files in `docs/design-system/` — deletion is pre-existing (from prior session), not this session's work
+
+**Next**: Implement Phase A (SQLite migration), Phase B (auth), Phase C (multi-user UI)

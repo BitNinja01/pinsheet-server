@@ -44,3 +44,35 @@ Same launcher-script pattern as the original pinsheet:
 - `webbrowser.open()` handles browser launch across all 3 platforms
 
 The Flask/waitress server stays alive in the terminal — user Ctrl+C to exit. The browser becomes the UI surface.
+
+---
+
+## 2026-05-27 — Multi-user: SQLite clean break
+
+Moving to a multi-user model required a database. Key decisions:
+
+- **Clean break from JSON**: No dual-backend. `store.py` is rewritten to SQLite with identical public API signatures. Old data migrated via `/settings/import` web upload — no `manage.py` CLI.
+- **Courses table uses single JSON blob column**: `data TEXT` stores the full course dict (location, tees, holes) as serialized JSON. Keeps the store API simple — no schema explosion for variable tee/hole structures.
+- **Round index preserved in SQLite**: Added `round_index INTEGER NOT NULL DEFAULT 0` column to preserve the `{date: {index: round_data}}` JSON structure for URL compatibility (`/rounds/{date}/{index}`). Gaps from deletions acceptable.
+- **Drafts stay as JSON files**: Course/round in-progress wizard state stays in `data/drafts/<user_id>.json` to minimize SQLite migration scope. Not caller-visible — function signatures unchanged.
+
+## 2026-05-27 — Multi-user: Auth and bootstrap
+
+- **No CLI tools**: All operations (invite code generation, import, bootstrap) are web UI. Host registers via first-run auto-admin — when user count is 0, `/register` is open (no invite code required). First user gets `is_admin=1`.
+- **Flask-WTF for CSRF**: Chosen over manual implementation. JSON API routes are auto-exempted (Flask-WTF skips `application/json` requests), so existing `app.js` fetch calls need no changes.
+- **Walled garden model**: No guest access, no public profiles. Everyone sees everyone's data (no per-stat privacy). `?user=username` URL param for cross-user viewing. Write operations restricted to own data.
+
+## 2026-05-27 — Multi-user: Deployment
+
+- **Systemd service** at `scripts/pinsheet.service` (alongside existing `scripts/launchers/`). `scripts/install-service.sh` copies to `/etc/systemd/system/`.
+- **SECRET_KEY enforced**: App refuses to start if unset or placeholder. Generated with `python -c "import secrets; print(secrets.token_hex(32))"` — no helper script needed.
+- **Chrome auto-launch disabled in production**: Only launches browser when `--host 127.0.0.1` is used and `FLASK_ENV != "production"`. Server-only in deployment.
+
+## 2026-05-27 — Multi-user: Phased implementation
+
+Three sequential phases, each producing a working app:
+1. **Phase A**: SQLite migration (default user id=1, no auth). App works identically to current.
+2. **Phase B**: Auth layer (bcrypt, flask-login, login/register, invite codes, `@login_required`).
+3. **Phase C**: Multi-user UI (user switcher, `?user=` param, admin invites page, read-only enforcement).
+
+Each phase compiles and can be smoke-tested independently. No big-bang rewrite.
