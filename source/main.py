@@ -1288,40 +1288,10 @@ def stats():
         ],
     }
 
-    # ── Trends ──────────────────────────────────────────────────────
-    chronological = list(reversed(g.all_rounds))
-    trend_rows = []
-    for r in chronological:
-        d = r.get("date", "")
-        if not r.get("total_gross") or r["total_gross"] == "0":
-            continue
-        if r.get("holes_selection", "all") != "all":
-            continue
-        course = g.courses.get(r.get("course", ""), {})
-        par = int(course.get("par", 0))
-        gross = int(r.get("total_gross", 0))
-        trend_rows.append({
-            "date": d,
-            "course": r.get("course", ""),
-            "score": gross,
-            "vs_par": gross - par if par else None,
-            "diff": r.get("differential", ""),
-            "fir": fmt_val(calc_fir_percent([r], g.courses), "%", 1),
-            "gir": fmt_val(calc_gir_percent([r]), "%", 1),
-            "putts": str(sum(int(h.get("putts", 0)) for h in r.get("holes", {}).values() if h.get("putts"))) if r.get("holes") else "\u2014",
-        })
-
-    trends_data = {
-        "label": "Trends",
-        "headline": "Round-by-round performance history.",
-        "trends": trend_rows,
-    }
-
     return render_template("stats.html",
         strip=strip_data,
         sections=sections_data,
         bests_section=bests_data,
-        trends_section=trends_data,
         settings=g.settings,
         all_users=get_users(),
         current_page="stats",

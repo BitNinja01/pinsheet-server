@@ -67,41 +67,4 @@
         </tbody>
     </table>
 </section>
-
-<section>
-    <div class="ps-row ps-between" style="margin-bottom: 14px;">
-        <div>
-            <div class="ps-eyebrow">Last {{ trends_section.trends|length }} Rounds</div>
-            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">Recent Trends</div>
-        </div>
-    </div>
-    <table class="ps-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Course</th>
-                <th class="r">Score</th>
-                <th class="r">+/-</th>
-                <th class="r">Diff</th>
-                <th class="r">FIR%</th>
-                <th class="r">GIR%</th>
-                <th class="r">Putts</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for r in trends_section.trends %}
-            <tr>
-                <td style="font-size: 12px; color: var(--ps-ink-2);">{{ r.date }}</td>
-                <td><div class="ps-course">{{ r.course }}</div></td>
-                <td class="r ps-course">{{ r.score }}</td>
-                <td class="r">{% if r.vs_par is not none %}{{ '%+d'|format(r.vs_par) }}{% else %}&mdash;{% endif %}</td>
-                <td class="r">{{ r.diff }}</td>
-                <td class="r">{{ r.fir }}</td>
-                <td class="r">{{ r.gir }}</td>
-                <td class="r">{{ r.putts }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</section>
 {% endblock %}
