@@ -578,6 +578,123 @@ def round_entry():
     return render_template("round_entry.html", settings=g.settings, courses=g.courses, today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
 
 
+@app.route("/rounds")
+@login_required
+def rounds_list():
+    include_9hole = g.settings.get("include_9hole", True)
+
+    rounds_data = []
+    for r in g.all_rounds:
+        course = g.courses.get(r.get("course", ""), {})
+        total = r.get("total_gross", "")
+        par = course.get("par", 0)
+        score_to_par = int(total) - int(par) if total and par and total != "0" else None
+        raw_mode = r.get("entry_mode")
+        display_mode = "normal" if raw_mode == "detailed" else (raw_mode or "score_only")
+
+        sparkline = None
+        holes_raw = r.get("holes")
+        if holes_raw:
+            sorted_nums = sorted(holes_raw.keys(), key=lambda x: int(x))
+            scores = []
+            for hn in sorted_nums:
+                gv = holes_raw[hn].get("gross")
+                if gv:
+                    scores.append(int(gv))
+            if len(scores) >= 2:
+                lo, hi = min(scores), max(scores)
+                rng = hi - lo if hi != lo else 1
+                sp_w, sp_h, sp_pad = 210, 28, 2
+                iw = sp_w - sp_pad * 2
+                ih = sp_h - sp_pad * 2
+                n = len(scores) - 1
+                pts = []
+                for j, s in enumerate(scores):
+                    pts.append((
+                        sp_pad + (j / n) * iw,
+                        sp_pad + (1 - (s - lo) / rng) * ih,
+                    ))
+                path = " ".join(
+                    f"{'M' if j == 0 else 'L'}{x:.1f} {y:.1f}"
+                    for j, (x, y) in enumerate(pts)
+                )
+                fx, fy = pts[-1]
+                sparkline = {
+                    "path": path,
+                    "final_x": f"{fx:.1f}",
+                    "final_y": f"{fy:.1f}",
+                }
+
+        fir_display = None
+        gir_display = None
+        scr_display = None
+        total_putts = None
+        if r.get("holes"):
+            holes = r["holes"]
+            fir_hit = fir_attempts = 0
+            gir_hit = gir_total = 0
+            scr_updown = scr_opps = 0
+            total_putts = 0
+            course_holes_data = course.get("holes", {})
+            for hn, h in holes.items():
+                fw = h.get("fairway", "")
+                if fw and fw != "N":
+                    fir_attempts += 1
+                    if fw == "H":
+                        fir_hit += 1
+                gi = h.get("gir", "")
+                if gi:
+                    gir_total += 1
+                    if gi == "H":
+                        gir_hit += 1
+                    if gi != "H":
+                        scr_opps += 1
+                        try:
+                            hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
+                            if int(h.get("gross", 99)) <= hole_par:
+                                scr_updown += 1
+                        except (ValueError, TypeError):
+                            pass
+                try:
+                    total_putts += int(h.get("putts", 0) or 0)
+                except (ValueError, TypeError):
+                    pass
+            if fir_attempts > 0:
+                fir_display = f"{fir_hit}/{fir_attempts}"
+            if gir_total > 0:
+                gir_display = f"{gir_hit}/{gir_total}"
+            if scr_opps > 0:
+                scr_display = f"{scr_updown}/{scr_opps}"
+
+        rounds_data.append({
+            "date": r.get("date", ""),
+            "course": r.get("course", ""),
+            "tees": r.get("tees", ""),
+            "total": total,
+            "score_to_par": score_to_par,
+            "differential": r.get("differential", ""),
+            "index": r.get("index", 0),
+            "in_handicap": False,
+            "entry_mode_display": display_mode,
+            "sparkline": sparkline,
+            "fir_display": fir_display,
+            "gir_display": gir_display,
+            "scr_display": scr_display,
+            "putts": total_putts,
+        })
+
+    best_rounds = get_best_n_rounds(g.all_rounds, include_9hole)
+    best_keys = {(r.get("date", ""), r.get("index", 0)) for r in best_rounds}
+    for rd in rounds_data:
+        if (rd["date"], rd["index"]) in best_keys:
+            rd["in_handicap"] = True
+
+    return render_template("rounds_list.html", rounds=rounds_data,
+                           settings=g.settings, all_users=get_users(),
+                           include_9hole=include_9hole,
+                           current_page="rounds_list")
+
+
 @app.route("/api/drafts/round", methods=["GET"])
 @login_required
 def api_draft_round_get():
