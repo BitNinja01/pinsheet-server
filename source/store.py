@@ -40,6 +40,11 @@ def load_settings(user_id: int = 1) -> dict:
 def save_settings(data: dict, user_id: int = 1) -> None:
     db = get_db()
     _log.info("save_settings user_id=%s data=%s", user_id, json.dumps(data))
+    row = db.execute("SELECT data FROM settings WHERE user_id = ?", (user_id,)).fetchone()
+    if row:
+        existing = json.loads(row["data"])
+        existing.update(data)
+        data = existing
     db.execute(
         "INSERT OR REPLACE INTO settings (user_id, data) VALUES (?, ?)",
         (user_id, json.dumps(data)),
