@@ -7,7 +7,6 @@
         <h1 class="ps-h1">Trending in the <em>right direction</em>.</h1>
     </div>
     <div class="ps-row">
-        <button class="ps-btn ps-btn--ghost">Search</button>
         <a href="/rounds/new" class="ps-btn">+ Log round</a>
     </div>
 </div>
@@ -129,7 +128,6 @@
                 <th class="r">GIR</th>
                 <th class="r">Putt</th>
                 <th class="r">Scr</th>
-                <th class="r">SG·T</th>
                 <th class="r">By hole</th>
             </tr>
         </thead>
@@ -155,7 +153,6 @@
                 <td class="r">{{ r.gir_display or '—' }}</td>
                 <td class="r">{{ r.putts or '—' }}</td>
                 <td class="r">{{ r.scr_display or '—' }}</td>
-                <td class="r" style="color: var(--ps-accent);">—</td>
                 <td class="r" style="width: 220px;">
                     {% if r.sparkline %}
                     <svg width="210" height="28" style="display: block;">

@@ -381,7 +381,7 @@ def dashboard():
         gir_display = None
         scr_display = None
         total_putts = None
-        if r.get("entry_mode") == "detailed" and r.get("holes"):
+        if r.get("holes"):
             holes = r["holes"]
             fir_hit = fir_attempts = 0
             gir_hit = gir_total = 0
@@ -478,20 +478,17 @@ def dashboard():
     chart = chart_data["12M"]
     chart_data_json = json.dumps(chart_data)
 
-    season_start = g.settings.get("season_start", "01-01")
-    try:
-        start_month = int(season_start.split("-")[0])
-        if start_month <= 2:
-            season_name = "Winter"
-        elif start_month <= 5:
-            season_name = "Spring"
-        elif start_month <= 8:
-            season_name = "Summer"
-        else:
-            season_name = "Fall"
-    except (ValueError, IndexError):
-        season_name = "Current"
-    yr = datetime.now().strftime("%y")
+    now = datetime.now()
+    start_month = now.month
+    if start_month <= 2:
+        season_name = "Winter"
+    elif start_month <= 5:
+        season_name = "Spring"
+    elif start_month <= 8:
+        season_name = "Summer"
+    else:
+        season_name = "Fall"
+    yr = now.strftime("%y")
     n = min(len(g.all_rounds), 12) if g.all_rounds else 0
     season_label = f"{season_name} '{yr} · last {n} rounds"
 
@@ -524,6 +521,8 @@ def dashboard():
     career_low = None
     best_hi = 999.9
     for r in g.all_rounds:
+        if r.get("excluded"):
+            continue
         ch = r.get("computed_handicap")
         if ch and ch not in ("0", "0.0", "--"):
             try:
