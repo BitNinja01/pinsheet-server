@@ -1213,9 +1213,23 @@ select.hole-input { width: 3rem; appearance: none; }
     }
     .wizard-step { padding: var(--ps-sp-4); }
 
-    /* Stats fallback: 1 column (Task 8 upgrades to 2-col) */
-    .stats-grid { grid-template-columns: 1fr; }
-    .stat-cell { border-right: none; }
+    /* Stats grid: compact 2 columns */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-cell {
+        border-right: none;
+    }
+    .stat-cell-value {
+        font-size: 22px;
+    }
+    .stat-cell-windows {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .stat-cell-label {
+        font-size: 9px;
+    }
 }
 
 /* ── Show/hide helpers ── */
