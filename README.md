@@ -1,3 +1,6 @@
+[![Release](https://img.shields.io/github/v/release/BitNinja01/pinsheet-server.svg?style=for-the-badge&color=green)](https://github.com/BitNinja01/pinsheet-server/releases)
+[![Downloads](https://img.shields.io/github/downloads/BitNinja01/pinsheet-server/total.svg?style=for-the-badge&color=green)](https://github.com/BitNinja01/pinsheet-server/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/BitNinja01/pinsheet-server/ci.yml?branch=dev&style=for-the-badge&label=CI)](https://github.com/BitNinja01/pinsheet-server/actions)
 [![Platform](https://img.shields.io/badge/Platforms-Linux%20|%20macOS%20|%20Windows-white.svg?style=for-the-badge&color=green)](https://github.com/BitNinja01/pinsheet-server)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge&color=green)](https://www.python.org/downloads/)
 
