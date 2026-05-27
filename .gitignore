@@ -14,7 +14,7 @@ docs/BACKLOG.md
 docs/DECISIONS.md
 docs/CONTEXT.md
 docs/RUNBOOK.md
-docs/superpowers/
+docs/superpowers/session.md
 
 # Build scripts (internal only)
 scripts/build.sh
