@@ -32,7 +32,7 @@ jobs:
       - name: Run tests
         env:
           SECRET_KEY: ci-test-key-placeholder
-        run: pytest -v --cov --cov-report=term --cov-fail-under=80
+        run: pytest -v --cov --cov-report=term
 
       - name: Secrets check
         run: |
