@@ -20,7 +20,7 @@ from store import (
     save_round, delete_round, save_course, delete_course,
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
-    get_handicap_benchmarks,
+    get_handicap_benchmarks, get_user_by_id,
 )
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 from calc import (
@@ -78,6 +78,48 @@ _log = logging.getLogger("pinsheet")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
+
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login_page"
+login_manager.session_protection = "strong"
+
+app.config["REMEMBER_COOKIE_SECURE"] = True
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+app.config["REMEMBER_COOKIE_DURATION"] = 30 * 24 * 60 * 60  # 30 days
+
+
+class User:
+    def __init__(self, user_dict):
+        self.id = user_dict["id"]
+        self.username = user_dict["username"]
+        self.display_name = user_dict["display_name"]
+        self.is_admin = user_dict.get("is_admin", False)
+        self._authenticated = True
+
+    @property
+    def is_authenticated(self):
+        return self._authenticated
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
+
+@login_manager.user_loader
+def _load_user(user_id):
+    user_dict = get_user_by_id(int(user_id))
+    return User(user_dict) if user_dict else None
 
 
 @app.before_request
@@ -1000,6 +1042,17 @@ def main():
     else:
         data_dir = Path(__file__).parent.parent / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
+
+    secret_key = os.environ.get("SECRET_KEY", "")
+    default_keys = ("REPLACE_ME", "dev-key-", "change-me", "secret")
+    if not secret_key or secret_key == "":
+        print("ERROR: SECRET_KEY environment variable is required.", file=sys.stderr)
+        print("Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\"", file=sys.stderr)
+        sys.exit(1)
+    if any(secret_key.startswith(dk) for dk in default_keys):
+        print("ERROR: SECRET_KEY must not be a default/placeholder value.", file=sys.stderr)
+        sys.exit(1)
+    app.secret_key = secret_key
 
     db_path = str(data_dir / "pinsheet.db")
     set_db_path(db_path)
