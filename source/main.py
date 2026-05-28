@@ -252,8 +252,8 @@ def inject_version():
 @app.context_processor
 def inject_plugin_globals():
     return {
-        "plugin_blocks": {},
-        "plugin_nav": [],
+        "plugin_blocks": getattr(app, "_plugin_blocks", {}),
+        "plugin_nav": getattr(app, "_plugin_nav", []),
         "plugin_info": {p.plugin_info["name"]: p.plugin_info for p in _plugins if hasattr(p, "plugin_info")},
     }
 
