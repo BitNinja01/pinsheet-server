@@ -94,3 +94,25 @@ API routes at `/api/` prefix for JSON fetch() calls.
 | `docs/DECISIONS.md` | Durable architectural decisions |
 | `docs/RUNBOOK.md` | Operational commands and workflows |
 | `AGENTS.md` | Architecture, conventions, commands |
+
+## Plugins
+
+Plugin packages live in the `plugins/` directory (gitignored). Each plugin is a Python package with an `__init__.py` and a `plugin_info` dict plus `register(app)` / `unregister(app)` functions. Plugins are loaded automatically at server startup.
+
+**Adding a plugin:**
+```bash
+cd plugins
+git clone <plugin-repo-url> <plugin-name>
+# Restart the server
+```
+
+**Writing a quick test plugin:**
+```bash
+mkdir -p plugins/my_test
+cat > plugins/my_test/__init__.py << 'EOF'
+plugin_info = {"name": "my_test", "version": "0.1.0"}
+def register(app):
+    app.config["plugins.my_test"] = "loaded"
+EOF
+# Restart the server — plugin appears in logs
+```
