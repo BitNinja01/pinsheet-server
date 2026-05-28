@@ -80,6 +80,9 @@ from calc import (
     get_best_n_rounds,
 )
 
+from source.plugin import fire_hook, _plugins
+from source.plugin_loader import discover_plugins
+
 _log = logging.getLogger("pinsheet")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -244,6 +247,18 @@ def _load_globals():
 @app.context_processor
 def inject_version():
     return dict(version=__version__)
+
+
+@app.context_processor
+def inject_plugin_globals():
+    return {
+        "plugin_blocks": {},
+        "plugin_nav": [],
+        "plugin_info": {p.plugin_info["name"]: p.plugin_info for p in _plugins if hasattr(p, "plugin_info")},
+    }
+
+
+app.jinja_env.globals.setdefault("plugin_info", {})
 
 
 @app.before_request
@@ -802,9 +817,21 @@ def api_rounds_post():
         golf_round["computed_handicap"] = str(new_hi)
 
     save_round(golf_round, date_val, 0, current_user.id)
+    fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
     index = 0
+    redirect_url = None
+    for plugin in _plugins:
+        fn = getattr(plugin, "post_save_redirect", None)
+        if fn is not None:
+            try:
+                url = fn(golf_round, current_user.id)
+                if url:
+                    redirect_url = url
+                    break
+            except Exception as exc:
+                _log.warning("plugin %s: post_save_redirect() failed — %s", getattr(plugin, "plugin_info", {}).get("name", "?"), exc)
 
-    return jsonify({"date": date_val, "index": index, "differential": differential})
+    return jsonify({"date": date_val, "index": index, "differential": differential, "redirect": redirect_url})
 
 
 @app.route("/rounds/<date>/<index>")
@@ -1023,6 +1050,7 @@ def api_courses_post():
     }
 
     save_course(course, name)
+    fire_hook("on_course_saved", course_name=name, course_data=course, user_id=current_user.id, db_path=app.config["DB_PATH"])
     return jsonify({"ok": True, "name": name})
 
 
@@ -1511,6 +1539,11 @@ def main():
     db_path = str(data_dir / "pinsheet.db")
     set_db_path(db_path)
     init_db()
+    app.config["DB_PATH"] = Path(db_path)
+    app.config["DATA_DIR"] = data_dir
+    app._plugin_blocks = {}
+    app._plugin_nav = []
+    discover_plugins(app)
 
     port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
@@ -1532,6 +1565,17 @@ def main():
             _log.info("Chrome window closed — shutting down")
             os._exit(0)
         threading.Thread(target=_watch_chrome, daemon=True).start()
+
+    import atexit
+
+    def _unregister_plugins():
+        for plugin in _plugins:
+            if hasattr(plugin, "unregister"):
+                try:
+                    plugin.unregister(app)
+                except Exception as exc:
+                    _log.warning("plugin %s: unregister() failed — %s", getattr(plugin, "plugin_info", {}).get("name", "?"), exc)
+    atexit.register(_unregister_plugins)
 
     from waitress import serve
     print(f"PinSheet -> http://{args.host}:{port}")
