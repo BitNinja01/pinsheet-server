@@ -15,5 +15,6 @@ def fire_hook(name: str, **kwargs) -> None:
         try:
             fn(**kwargs)
         except Exception as exc:
-            plugin_name = getattr(plugin, "plugin_info", {}).get("name", "?")
+            pi = getattr(plugin, "plugin_info", None)
+            plugin_name = pi.get("name", "?") if isinstance(pi, dict) else "?"
             _log.warning("plugin %s: %s() failed — %s", plugin_name, name, exc)
