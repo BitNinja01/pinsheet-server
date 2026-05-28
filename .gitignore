@@ -4,7 +4,7 @@ AGENTS.md
 .claude/
 .opencode/
 .superpowers/
-plugins/
+/plugins/
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md
