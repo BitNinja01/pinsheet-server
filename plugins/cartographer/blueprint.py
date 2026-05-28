@@ -1,16 +1,18 @@
 """Flask Blueprint for Cartographer web pages."""
 from __future__ import annotations
 
+import logging
+
 from flask import (
     Blueprint,
     current_app,
-    g,
     render_template,
 )
 
 from cartographer.data import load_courses_geo
-from cartographer.geometry import project_course, fit_hole, smooth_hole_geometry
 from cartographer.renderer import render_hole_svg
+
+log = logging.getLogger("pinsheet")
 
 bp = Blueprint(
     "cartographer",
@@ -50,7 +52,7 @@ def course_picker():
     )
 
 
-@bp.route("/<path:course>/hole/<int:hole_number>")
+@bp.route("/<string:course>/hole/<int:hole_number>")
 def hole_viewer(course, hole_number):
     courses_geo = load_courses_geo()
     course_data = courses_geo.get(course)
@@ -85,6 +87,7 @@ def hole_viewer(course, hole_number):
     try:
         svg_content = render_hole_svg(course, hole_number, settings=settings)
     except Exception:
+        log.exception("cartographer: failed to render hole %d for %s", hole_number, course)
         svg_content = ""
 
     prev_hole = hole_number - 1 if hole_number > 1 else None
@@ -97,11 +100,12 @@ def hole_viewer(course, hole_number):
         hole_number=hole_number,
         prev_hole=prev_hole,
         next_hole=next_hole,
+        error=None,
         current_page="cartographer",
     )
 
 
-@bp.route("/<path:course>/gallery")
+@bp.route("/<string:course>/gallery")
 def course_gallery(course):
     courses_geo = load_courses_geo()
     course_data = courses_geo.get(course)
@@ -112,18 +116,20 @@ def course_gallery(course):
             course_name=course,
             holes=[],
             current_page="cartographer",
-        )
+        ), 404
 
     holes_data = course_data.get("holes", {})
     settings = _get_settings()
+    max_hole = max(int(k) for k in holes_data.keys()) if holes_data else 0
     holes = []
-    for h in range(1, 19):
+    for h in range(1, max_hole + 1):
         hole_key = str(h)
         svg = ""
         if hole_key in holes_data:
             try:
                 svg = render_hole_svg(course, h, settings=settings)
             except Exception:
+                log.exception("cartographer: failed to render hole %d for %s", h, course)
                 svg = ""
         holes.append({"number": h, "svg": svg, "has_data": hole_key in holes_data})
 
