@@ -68,11 +68,17 @@ def register(app):
         log.warning("cartographer: font installation failed", exc_info=True)
 
     # 3. Create DB tables
-    _create_tables(app.config["DB_PATH"])
+    try:
+        _create_tables(app.config["DB_PATH"])
+    except Exception:
+        log.warning("cartographer: DB table creation failed", exc_info=True)
 
     # 4. Register Blueprint
-    from cartographer.blueprint import bp
-    app.register_blueprint(bp)
+    try:
+        from cartographer.blueprint import bp
+        app.register_blueprint(bp)
+    except ImportError:
+        log.warning("cartographer: blueprint not found, web routes unavailable")
 
     # 5. Inject CSS
     head_tag = '<link rel="stylesheet" href="/plugins/cartographer/static/cartographer.css">'
@@ -99,3 +105,12 @@ def unregister(app):
     carto_data._server_data_dir = None
     app.config.pop("plugins.cartographer.yardage_arcs", None)
     app.config.pop("plugins.cartographer.yardage_arc_distances", None)
+
+    head_tag = '<link rel="stylesheet" href="/plugins/cartographer/static/cartographer.css">'
+    current_head = app._plugin_blocks.get("head", "")
+    app._plugin_blocks["head"] = current_head.replace(head_tag, "").strip()
+
+    app._plugin_nav[:] = [
+        entry for entry in app._plugin_nav
+        if entry.get("page_id") != "cartographer"
+    ]
