@@ -6,6 +6,7 @@ import logging
 from flask import (
     Blueprint,
     current_app,
+    g,
     render_template,
 )
 
@@ -49,6 +50,7 @@ def course_picker():
         "course_picker.html",
         courses=courses,
         current_page="cartographer",
+        settings=getattr(g, "settings", {}),
     )
 
 
@@ -62,6 +64,7 @@ def hole_viewer(course, hole_number):
             error=f'No geometry data for "{course}". Run the tagger first.',
             course_name=course,
             current_page="cartographer",
+            settings=getattr(g, "settings", {}),
         ), 404
 
     holes = course_data.get("holes", {})
@@ -72,6 +75,7 @@ def hole_viewer(course, hole_number):
             error=f"Hole {hole_number} not found on {course}.",
             course_name=course,
             current_page="cartographer",
+            settings=getattr(g, "settings", {}),
         ), 404
 
     hole_key = str(hole_number)
@@ -81,6 +85,7 @@ def hole_viewer(course, hole_number):
             error=f"No geometry for hole {hole_number}.",
             course_name=course,
             current_page="cartographer",
+            settings=getattr(g, "settings", {}),
         ), 404
 
     settings = _get_settings()
@@ -102,6 +107,7 @@ def hole_viewer(course, hole_number):
         next_hole=next_hole,
         error=None,
         current_page="cartographer",
+        settings=getattr(g, "settings", {}),
     )
 
 
@@ -116,6 +122,7 @@ def course_gallery(course):
             course_name=course,
             holes=[],
             current_page="cartographer",
+            settings=getattr(g, "settings", {}),
         ), 404
 
     holes_data = course_data.get("holes", {})
@@ -139,4 +146,5 @@ def course_gallery(course):
         holes=holes,
         error=None,
         current_page="cartographer",
+        settings=getattr(g, "settings", {}),
     )

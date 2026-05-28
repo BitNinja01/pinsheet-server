@@ -193,6 +193,7 @@ class TestHoleViewer:
         with cartographer_app.test_client() as client:
             resp = client.get("/plugins/cartographer/Test GC/hole/19")
             assert resp.status_code == 404
+            assert b"Hole 19 not found" in resp.data
 
     def test_valid_hole_returns_svg(self, cartographer_app):
         _write_test_geo(cartographer_app.config["DATA_DIR"], "Test GC", {
@@ -202,7 +203,7 @@ class TestHoleViewer:
             resp = client.get("/plugins/cartographer/Test GC/hole/1")
             assert resp.status_code == 200
             # SVG is in the response (inline SVG, not <img>)
-            assert b"<svg" in resp.data or b"href" in resp.data
+            assert b"<svg" in resp.data
 
 
 class TestCourseGallery:
@@ -223,7 +224,7 @@ class TestCourseGallery:
 
 
 class TestDataDirResolution:
-    def test_server_data_dir_overrides_default(self, monkeypatch, tmp_path):
+    def test_server_data_dir_overrides_default(self, tmp_path):
         """When _server_data_dir is set, _get_plugin_data_dir returns it."""
         from cartographer.data import _get_plugin_data_dir
 
