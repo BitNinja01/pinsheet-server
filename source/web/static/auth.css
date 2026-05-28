@@ -122,3 +122,12 @@
 .auth-footer a:hover {
     text-decoration: underline;
 }
+
+@media (max-width: 400px) {
+    .auth-container {
+        padding: 16px;
+    }
+    .auth-card {
+        padding: 24px;
+    }
+}
