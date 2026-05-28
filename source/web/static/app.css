@@ -1234,10 +1234,11 @@ select.hole-input { width: 3rem; appearance: none; }
 
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
-    .mobile-cards, .hole-cards, .hole-progress { display: none !important; }
+    .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid { display: none !important; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
+    .hole-table-wrap { overflow-x: auto; }
 }
 
 /* ── Round cards (dashboard + rounds list mobile) ── */
@@ -1470,9 +1471,66 @@ select.hole-input { width: 3rem; appearance: none; }
     text-transform: uppercase;
     color: var(--ps-ink-3);
 }
-.sc-value {
-    display: block;
-    font-size: var(--ps-fs-table-num);
+    .sc-value {
+        display: block;
+        font-size: var(--ps-fs-table-num);
+        font-weight: 600;
+        margin-top: 2px;
+    }
+
+/* ── Course detail: tee cards ── */
+.tee-cards { display: none; }
+@media (max-width: 768px) {
+    .tee-cards { display: block; }
+}
+
+.tee-card-item {
+    background: var(--ps-paper-2);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-3);
+    margin-bottom: var(--ps-sp-2);
+}
+.tee-card-name {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-accent);
+    margin-bottom: var(--ps-sp-2);
+}
+.tee-card-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    font-size: var(--ps-fs-micro);
+}
+.tee-card-stat { color: var(--ps-ink-3); }
+.tee-card-stat span { color: var(--ps-ink); font-weight: var(--ps-fw-label); }
+
+/* ── Course detail: hole mini-grid ── */
+.hole-mini-grid { display: none; }
+@media (max-width: 768px) {
+    .hole-mini-grid { display: grid; }
+}
+
+.hole-mini-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--ps-sp-1);
+}
+.hole-mini-item {
+    background: var(--ps-paper-2);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-1) var(--ps-sp-2);
+    text-align: center;
+    font-size: var(--ps-fs-micro);
+}
+.hole-mini-num {
+    font-weight: var(--ps-fw-label);
+    color: var(--ps-ink-3);
+    margin-bottom: 2px;
+}
+.hole-mini-par {
+    font-size: var(--ps-fs-body-lg);
     font-weight: 600;
-    margin-top: 2px;
 }
