@@ -107,5 +107,6 @@ def discover_plugins(app: "Flask") -> None:
             _log.warning("plugin %s: register() failed — %s", mod.plugin_info["name"], exc)
             continue
 
-        _plugins.append(mod)
-        _log.info("plugin loaded: %s v%s", mod.plugin_info["name"], mod.plugin_info["version"])
+        if mod not in _plugins:
+            _plugins.append(mod)
+            _log.info("plugin loaded: %s v%s", mod.plugin_info["name"], mod.plugin_info["version"])

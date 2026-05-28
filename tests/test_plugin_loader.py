@@ -22,24 +22,21 @@ class TestPluginsDir:
 
 
 class TestLoadPluginErrors:
-    def test_missing_plugin_info_is_skipped(self, monkeypatch):
+    def test_missing_plugin_info_is_skipped(self):
         fixture_dir = Path(__file__).parent / "fixtures" / "plugins"
-        monkeypatch.setattr("source.plugin_loader._plugins_dir", lambda: fixture_dir)
         from source.plugin_loader import _load_plugin
         result = _load_plugin(fixture_dir / "broken_no_info")
         assert result is None
 
-    def test_broken_register_module_is_loaded(self, monkeypatch):
+    def test_broken_register_module_is_loaded(self):
         fixture_dir = Path(__file__).parent / "fixtures" / "plugins"
-        monkeypatch.setattr("source.plugin_loader._plugins_dir", lambda: fixture_dir)
         from source.plugin_loader import _load_plugin
         result = _load_plugin(fixture_dir / "broken_bad_register")
         assert result is not None
         assert result.plugin_info["name"] == "bad_register"
 
-    def test_no_register_function_is_skipped(self, monkeypatch):
+    def test_no_register_function_is_skipped(self):
         fixture_dir = Path(__file__).parent / "fixtures" / "plugins"
-        monkeypatch.setattr("source.plugin_loader._plugins_dir", lambda: fixture_dir)
         from source.plugin_loader import _load_plugin
         result = _load_plugin(fixture_dir / "no_register")
         assert result is None
