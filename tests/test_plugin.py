@@ -35,15 +35,8 @@ def plugin_app(tmp_path, monkeypatch):
     return app
 
 
-@pytest.fixture
-def plugin_client(plugin_app):
-    return plugin_app.test_client()
-
-
 class TestPluginDiscovery:
-    def test_plugins_discover_called_before_first_request(
-        self, plugin_app, monkeypatch
-    ):
+    def test_plugins_discover_called_before_first_request(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -57,7 +50,7 @@ class TestPluginDiscovery:
         assert "broken_bad_register" not in names
         assert "no_register" not in names
 
-    def test_plugin_register_called_and_config_set(self, plugin_app, monkeypatch):
+    def test_plugin_register_called_and_config_set(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -67,7 +60,7 @@ class TestPluginDiscovery:
         assert plugin_app.config.get("plugins.minimal") == "loaded"
         assert plugin_app.config.get("plugins.with_everything") == "loaded"
 
-    def test_inject_plugin_info_into_context(self, plugin_app, monkeypatch):
+    def test_inject_plugin_info_into_context(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -76,7 +69,7 @@ class TestPluginDiscovery:
 
         assert "plugin_info" in plugin_app.jinja_env.globals
 
-    def test_static_route_registered(self, plugin_app, monkeypatch):
+    def test_static_route_registered(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -86,7 +79,7 @@ class TestPluginDiscovery:
         endpoint = "_plugin_with_everything_static"
         assert endpoint in plugin_app.view_functions
 
-    def test_template_path_added(self, plugin_app, monkeypatch):
+    def test_template_path_added(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -99,7 +92,7 @@ class TestPluginDiscovery:
 
 
 class TestFireHook:
-    def test_fire_hook_calls_plugin_function(self, plugin_app, monkeypatch):
+    def test_fire_hook_calls_plugin_function(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -127,7 +120,7 @@ class TestFireHook:
         assert calls[0][0] == {"date": "2026-01-01"}
         assert calls[0][1] == 1
 
-    def test_fire_hook_isolates_errors(self, plugin_app, monkeypatch):
+    def test_fire_hook_isolates_errors(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -143,7 +136,7 @@ class TestFireHook:
         plugin.fire_hook("on_round_saved", round_data={}, user_id=1, db_path=Path("/fake/path"))
         assert "error_plugin" in [p.plugin_info["name"] for p in plugin._plugins]
 
-    def test_fire_hook_skips_missing_function(self, plugin_app, monkeypatch):
+    def test_fire_hook_skips_missing_function(self, plugin_app):
         from source import plugin
         plugin._plugins.clear()
 
@@ -151,4 +144,6 @@ class TestFireHook:
         mod.plugin_info = {"name": "no_hook", "version": "1.0.0"}
         plugin._plugins.append(mod)
 
+        # no crash is the pass condition
         plugin.fire_hook("on_round_saved", round_data={}, user_id=1, db_path=Path("/fake/path"))
+        assert "no_hook" in [p.plugin_info["name"] for p in plugin._plugins]
