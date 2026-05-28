@@ -171,6 +171,10 @@ body {
     display: none;
 }
 
+.ps-sidebar-backdrop {
+    display: none;
+}
+
 .ps-main {
     display: flex;
     flex-direction: column;
@@ -1152,7 +1156,6 @@ select.hole-input { width: 3rem; appearance: none; }
 
     /* Backdrop overlay */
     .ps-sidebar-backdrop {
-        display: none;
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.45);
