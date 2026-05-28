@@ -30,6 +30,8 @@
 
     {% if tees %}
     <h3>Tees</h3>
+    <!-- Desktop table -->
+    <div class="desktop-table">
     <table class="data-table tee-table">
         <thead>
             <tr>
@@ -54,21 +56,42 @@
         {% for tee_name, t in tees.items() %}
             <tr>
                 <td>{{ tee_name }}</td>
-                <td>{{ t.get("yardage", "&mdash;") }}</td>
-                <td>{{ t.get("rating", "&mdash;") }}</td>
-                <td>{{ t.get("slope", "&mdash;") }}</td>
-                {% if ns.has_front_rating %}<td>{{ t.get("front_rating", "&mdash;") }}</td>{% endif %}
-                {% if ns.has_front_slope %}<td>{{ t.get("front_slope", "&mdash;") }}</td>{% endif %}
-                {% if ns.has_back_rating %}<td>{{ t.get("back_rating", "&mdash;") }}</td>{% endif %}
-                {% if ns.has_back_slope %}<td>{{ t.get("back_slope", "&mdash;") }}</td>{% endif %}
+                <td>{{ t.get("yardage", "&mdash;")|safe }}</td>
+                <td>{{ t.get("rating", "&mdash;")|safe }}</td>
+                <td>{{ t.get("slope", "&mdash;")|safe }}</td>
+                {% if ns.has_front_rating %}<td>{{ t.get("front_rating", "&mdash;")|safe }}</td>{% endif %}
+                {% if ns.has_front_slope %}<td>{{ t.get("front_slope", "&mdash;")|safe }}</td>{% endif %}
+                {% if ns.has_back_rating %}<td>{{ t.get("back_rating", "&mdash;")|safe }}</td>{% endif %}
+                {% if ns.has_back_slope %}<td>{{ t.get("back_slope", "&mdash;")|safe }}</td>{% endif %}
             </tr>
         {% endfor %}
         </tbody>
     </table>
+    </div>
+
+    <!-- Mobile tee cards -->
+    <div class="tee-cards">
+    {% for tee_name, t in tees.items() %}
+        <div class="tee-card-item">
+            <div class="tee-card-name">{{ tee_name }}</div>
+            <div class="tee-card-stats">
+                <div class="tee-card-stat">Yardage: <span>{{ t.get("yardage", '\u2014') }}</span></div>
+                <div class="tee-card-stat">Rating: <span>{{ t.get("rating", '\u2014') }}</span></div>
+                <div class="tee-card-stat">Slope: <span>{{ t.get("slope", '\u2014') }}</span></div>
+                {% if t.get("front_rating") %}<div class="tee-card-stat">F Rating: <span>{{ t.get("front_rating") }}</span></div>{% endif %}
+                {% if t.get("front_slope") %}<div class="tee-card-stat">F Slope: <span>{{ t.get("front_slope") }}</span></div>{% endif %}
+                {% if t.get("back_rating") %}<div class="tee-card-stat">B Rating: <span>{{ t.get("back_rating") }}</span></div>{% endif %}
+                {% if t.get("back_slope") %}<div class="tee-card-stat">B Slope: <span>{{ t.get("back_slope") }}</span></div>{% endif %}
+            </div>
+        </div>
+    {% endfor %}
+    </div>
     {% endif %}
 
     {% if holes %}
     <h3>Holes</h3>
+    <!-- Desktop table (scrollable on mobile as fallback) -->
+    <div class="hole-table-wrap">
     <table class="data-table hole-table">
         <thead>
             <tr>
@@ -87,12 +110,25 @@
                 <td>{{ h.par }}</td>
                 <td>{{ h.index }}</td>
                 {% for tee_name in tees.keys() %}
-                <td>{{ h.yardages.get(tee_name, "&mdash;") }}</td>
+                <td>{{ h.yardages.get(tee_name, "&mdash;")|safe }}</td>
                 {% endfor %}
             </tr>
         {% endfor %}
         </tbody>
     </table>
+    </div>
+
+    <!-- Mobile hole mini-grid -->
+    <div class="hole-mini-grid">
+    {% for h in holes %}
+        <div class="hole-mini-item">
+            <div class="hole-mini-num">{{ h.num }}</div>
+            <div class="hole-mini-par">{{ h.par }}</div>
+            <div style="color:var(--ps-ink-3);font-size:9px;">Par</div>
+            <div style="color:var(--ps-ink-2);font-size:11px;">SI {{ h.index }}</div>
+        </div>
+    {% endfor %}
+    </div>
     {% endif %}
 </div>
 

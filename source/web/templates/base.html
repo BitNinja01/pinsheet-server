@@ -8,35 +8,46 @@
 </head>
 <body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
     <div class="ps-layout">
-        <aside class="ps-sidebar">
+        <!-- Mobile header (hidden on desktop) -->
+        <div class="ps-mobile-header">
+            <button class="ps-hamburger" id="hamburger-btn" aria-label="Toggle navigation menu">
+                <span></span><span></span><span></span>
+            </button>
             <div class="ps-logo">PinSheet</div>
-            <div>
-                <div class="ps-eyebrow" style="margin-bottom: 6px;">Viewing</div>
-                <div class="ps-serif" style="font-size: 20px; line-height: 1.1;">{{ g.view_user.display_name }}</div>
-                <div style="position: relative; margin-top: 4px;">
-                    <select id="user-switcher"
-                            style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ps-ink-3);
-                                   background: transparent; border: 1px solid var(--ps-ink-1); padding: 4px 6px;
-                                   width: 100%; outline: none; cursor: pointer;"
-                            >
-                        {% for u in all_users %}
-                        <option value="{{ u.username }}" {% if u.id == g.view_user.id %}selected{% endif %}>
-                            {{ u.display_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+        </div>
+        <!-- Backdrop overlay (hidden until sidebar opens) -->
+        <div class="ps-sidebar-backdrop" id="sidebar-backdrop"></div>
+        <aside class="ps-sidebar" id="ps-sidebar">
+            <div class="ps-sidebar-inner">
+                <div class="ps-logo">PinSheet</div>
+                <div>
+                    <div class="ps-eyebrow" style="margin-bottom: 6px;">Viewing</div>
+                    <div class="ps-serif" style="font-size: 20px; line-height: 1.1;">{{ g.view_user.display_name }}</div>
+                    <div style="position: relative; margin-top: 4px;">
+                        <select id="user-switcher"
+                                style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ps-ink-3);
+                                       background: transparent; border: 1px solid var(--ps-ink-1); padding: 4px 6px;
+                                       width: 100%; outline: none; cursor: pointer;"
+                                >
+                            {% for u in all_users %}
+                            <option value="{{ u.username }}" {% if u.id == g.view_user.id %}selected{% endif %}>
+                                {{ u.display_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
+                <nav class="ps-nav">
+                    <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
+                    <a href="/rounds" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
+                    <a href="/stats" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
+                    <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
+                    <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
+                    <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
+                    {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
+                    <a href="/logout">Logout</a>
+                </nav>
             </div>
-            <nav class="ps-nav">
-                <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
-                <a href="/rounds" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
-                <a href="/stats" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
-                <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
-                <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
-                <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
-                {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
-                <a href="/logout">Logout</a>
-            </nav>
         </aside>
         <main class="ps-main">
             {% block content %}{% endblock %}

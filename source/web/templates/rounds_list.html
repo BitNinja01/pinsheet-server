@@ -13,6 +13,8 @@
 
 <section>
     {% if rounds %}
+    <!-- Desktop table -->
+    <div class="desktop-table">
     <table class="ps-table">
         <thead>
             <tr>
@@ -54,7 +56,7 @@
                 <td class="r">{{ r.putts or '—' }}</td>
                 <td class="r" style="width: 220px;">
                     {% if r.sparkline %}
-                    <svg width="210" height="28" style="display: block;">
+                    <svg viewBox="0 0 210 28" style="display: block; max-width: 100%; height: auto;">
                         <path d="{{ r.sparkline.path }}" stroke="var(--ps-accent)" stroke-width="1.4" fill="none" stroke-linecap="round" />
                         <circle cx="{{ r.sparkline.final_x }}" cy="{{ r.sparkline.final_y }}" r="2.4" fill="var(--ps-accent)" />
                     </svg>
@@ -64,6 +66,44 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="mobile-cards">
+    {% for r in rounds %}
+        <div class="round-card{% if r.in_handicap %} is-handicap{% endif %}"
+             data-date="{{ r.date }}" data-index="{{ r.index }}">
+            <div class="round-card-header">
+                <div>
+                    <div class="round-card-date">{{ r.date }}</div>
+                    <div class="round-card-course">{{ r.course }}</div>
+                    <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
+                </div>
+                <div class="round-card-score">
+                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    {% if r.score_to_par is not none %}
+                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="round-card-stats">
+                <div class="round-card-stat"><span class="rcd-label">Diff</span><span class="rcd-value">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</span></div>
+                <div class="round-card-stat"><span class="rcd-label">FIR</span><span class="rcd-value">{{ r.fir_display or '—' }}</span></div>
+                <div class="round-card-stat"><span class="rcd-label">GIR</span><span class="rcd-value">{{ r.gir_display or '—' }}</span></div>
+                <div class="round-card-stat"><span class="rcd-label">Putts</span><span class="rcd-value">{{ r.putts or '—' }}</span></div>
+            </div>
+            {% if r.sparkline %}
+            <div style="padding: 4px 0 8px;">
+                <svg viewBox="0 0 210 28" style="display: block; max-width: 100%; height: auto;">
+                    <path d="{{ r.sparkline.path }}" stroke="var(--ps-accent)" stroke-width="1.4" fill="none" stroke-linecap="round" />
+                    <circle cx="{{ r.sparkline.final_x }}" cy="{{ r.sparkline.final_y }}" r="2.4" fill="var(--ps-accent)" />
+                </svg>
+            </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+    </div>
+
     {% else %}
     <div class="empty-state">
         <p class="placeholder">No rounds yet.</p>

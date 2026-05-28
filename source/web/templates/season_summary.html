@@ -43,6 +43,7 @@
 {% if breakdown %}
 <div class="season-group">
     <h3>Score Breakdown</h3>
+    <div class="desktop-table">
     <table class="data-table">
         <thead>
             <tr><th>Eagles</th><th>Birdies</th><th>Pars</th><th>Bogeys</th><th>Doubles</th><th>Triple+</th></tr>
@@ -58,6 +59,17 @@
             </tr>
         </tbody>
     </table>
+    </div>
+    <div class="mobile-cards">
+        <div class="season-cards">
+            <div class="season-card"><span class="sc-label">Eagles</span><span class="sc-value">{{ breakdown.eagle }}</span></div>
+            <div class="season-card"><span class="sc-label">Birdies</span><span class="sc-value">{{ breakdown.birdie }}</span></div>
+            <div class="season-card"><span class="sc-label">Pars</span><span class="sc-value">{{ breakdown.par }}</span></div>
+            <div class="season-card"><span class="sc-label">Bogeys</span><span class="sc-value">{{ breakdown.bogey }}</span></div>
+            <div class="season-card"><span class="sc-label">Doubles</span><span class="sc-value">{{ breakdown.double }}</span></div>
+            <div class="season-card"><span class="sc-label">Triple+</span><span class="sc-value">{{ breakdown.triple_plus }}</span></div>
+        </div>
+    </div>
 </div>
 {% endif %}
 
