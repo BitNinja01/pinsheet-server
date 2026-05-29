@@ -990,30 +990,7 @@ def course_list():
 
     course_data.sort(key=lambda c: c["name"].lower())
 
-    plugin_actions = {}
-    for entry in getattr(current_app, "_plugin_course_actions", []):
-        actions_fn = entry.get("actions_fn")
-        if callable(actions_fn):
-            for c in course_data:
-                name = c["name"]
-                try:
-                    acts = actions_fn(name)
-                    if acts:
-                        plugin_actions.setdefault(name, []).extend(acts)
-                except Exception:
-                    pass
-        else:
-            label = entry.get("label")
-            url_maker = entry.get("url_maker")
-            if label and callable(url_maker):
-                for c in course_data:
-                    name = c["name"]
-                    plugin_actions.setdefault(name, []).append({
-                        "label": label,
-                        "url": url_maker(name),
-                    })
-
-    return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users(), plugin_actions=plugin_actions)
+    return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users())
 
 
 @app.route("/courses/<name>")

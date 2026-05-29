@@ -27,7 +27,7 @@
         <button class="btn" id="btn-delete-course">Delete</button>
         {% if plugin_actions %}
         {% for action in plugin_actions %}
-        <a href="{{ action.url }}" class="btn-accent" style="margin-left:0.5rem">{{ action.label }}</a>
+        <a href="{{ action.url|default('#') }}" class="btn" style="margin-left:0.5rem"{% for k, v in action.get('attrs', {}).items() %} {{ k }}="{{ v }}"{% endfor %}>{{ action.label }}</a>
         {% endfor %}
         {% endif %}
     </div>

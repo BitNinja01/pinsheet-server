@@ -14,7 +14,6 @@
             <th>Location</th>
             <th>Times Played</th>
             <th>Last Played</th>
-            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -30,11 +29,6 @@
             </td>
             <td>{{ c.play_count }}</td>
             <td>{{ c.last_played or "&mdash;" }}</td>
-            <td class="course-actions">
-                {% for action in (plugin_actions|default({})).get(c.name, []) %}
-                <a href="{{ action.url|default('#') }}" class="btn-accent" onclick="event.stopPropagation()"{% for k, v in action.get('attrs', {}).items() %} {{ k }}="{{ v }}"{% endfor %}>{{ action.label }}</a>
-                {% endfor %}
-            </td>
         </tr>
     {% endfor %}
     </tbody>
