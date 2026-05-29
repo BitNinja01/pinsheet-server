@@ -26,7 +26,7 @@ export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 python source/main.py
 ```
 
-Opens `http://127.0.0.1:8420` in your browser. On first run, register an account (auto-admin — no invite code needed).
+Opens `http://127.0.0.1:8080` in your browser. On first run, register an account (auto-admin — no invite code needed).
 
 ## Installation
 

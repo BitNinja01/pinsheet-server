@@ -279,7 +279,7 @@ def requires_own_data(f):
     return decorated
 
 
-PORT = 8420
+PORT = 8080
 
 
 def find_free_port() -> int:
@@ -1550,14 +1550,17 @@ def main():
 
     chrome_proc = None
     if args.host == "127.0.0.1" and os.environ.get("FLASK_DEBUG") != "0":
-        chrome = _find_chrome()
-        if chrome:
-            chrome_proc = subprocess.Popen(
-                [chrome, f"--app={url}", "--start-maximized"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            chrome = _find_chrome()
+            if chrome:
+                chrome_proc = subprocess.Popen(
+                    [chrome, f"--app={url}", "--start-maximized"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+            else:
+                webbrowser.open(url)
         else:
-            webbrowser.open(url)
+            _log.info("No display found — skipping browser launch")
 
     if chrome_proc:
         def _watch_chrome():
