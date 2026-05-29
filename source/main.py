@@ -23,7 +23,7 @@ _repo_root = str(Path(__file__).resolve().parent.parent)
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-from flask import Flask, render_template, jsonify, request, redirect, url_for, g
+from flask import Flask, current_app, render_template, jsonify, request, redirect, url_for, g
 
 from database import set_db_path, init_db
 from store import (
