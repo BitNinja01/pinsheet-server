@@ -4,9 +4,7 @@ AGENTS.md
 .claude/
 .opencode/
 .superpowers/
-/plugins/*
-!/plugins/cartographer/
-!/plugins/cartographer/**
+/plugins/
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md
