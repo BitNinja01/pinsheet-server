@@ -31,6 +31,8 @@ def cartographer_app(tmp_path, monkeypatch):
     monkeypatch.setattr(store_mod, "_DATA_DIR", data_dir)
 
     app = main_mod.app
+    original_got_first = getattr(app, "_got_first_request", False)
+
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
@@ -47,6 +49,7 @@ def cartographer_app(tmp_path, monkeypatch):
         search_path.append(templates_dir)
 
     import cartographer.data as carto_data
+    original_data_dir = carto_data._server_data_dir
     carto_data._server_data_dir = carto_data_dir
 
     try:
@@ -72,8 +75,8 @@ def cartographer_app(tmp_path, monkeypatch):
     db.commit()
     db.close()
 
+    from cartographer.blueprint import bp
     if not _bp_registered:
-        from cartographer.blueprint import bp
         app.register_blueprint(bp)
         _bp_registered = True
 
@@ -91,9 +94,10 @@ def cartographer_app(tmp_path, monkeypatch):
 
     yield app
 
-    carto_data._server_data_dir = None
     app._plugin_blocks["head"] = app._plugin_blocks.get("head", "").replace(head_tag, "").strip().strip("\n")
     app._plugin_nav[:] = [e for e in app._plugin_nav if e.get("page_id") != "cartographer"]
+    carto_data._server_data_dir = original_data_dir
+    app._got_first_request = original_got_first
 
 
 def _write_test_geo(data_dir: Path, course_name: str, hole_data: dict) -> None:
