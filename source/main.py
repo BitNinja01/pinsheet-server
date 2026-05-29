@@ -1031,31 +1031,11 @@ def course_detail(name):
             "yardages": yardages,
         })
 
-    plugin_actions = []
-    for entry in getattr(current_app, "_plugin_course_actions", []):
-        actions_fn = entry.get("actions_fn")
-        if callable(actions_fn):
-            try:
-                acts = actions_fn(name)
-                if acts:
-                    plugin_actions.extend(acts)
-            except Exception:
-                pass
-        else:
-            label = entry.get("label")
-            url_maker = entry.get("url_maker")
-            if label and callable(url_maker):
-                plugin_actions.append({
-                    "label": label,
-                    "url": url_maker(name),
-                })
-
     return render_template("course_detail.html",
         course=course, name=name, tees=tees, holes=hole_rows,
         play_count=play_count, first_played=first_played, last_played=last_played,
         settings=g.settings,
         all_users=get_users(),
-        plugin_actions=plugin_actions,
     )
 
 
