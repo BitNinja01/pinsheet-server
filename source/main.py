@@ -990,7 +990,18 @@ def course_list():
 
     course_data.sort(key=lambda c: c["name"].lower())
 
-    return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users())
+    plugin_actions = {}
+    for action in getattr(current_app, "_plugin_course_actions", []):
+        url_maker = action.get("url_maker")
+        if callable(url_maker):
+            for c in course_data:
+                name = c["name"]
+                plugin_actions.setdefault(name, []).append({
+                    "label": action["label"],
+                    "url": url_maker(name),
+                })
+
+    return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users(), plugin_actions=plugin_actions)
 
 
 @app.route("/courses/<name>")
@@ -1031,11 +1042,21 @@ def course_detail(name):
             "yardages": yardages,
         })
 
+    plugin_actions = []
+    for action in getattr(current_app, "_plugin_course_actions", []):
+        url_maker = action.get("url_maker")
+        if callable(url_maker):
+            plugin_actions.append({
+                "label": action["label"],
+                "url": url_maker(name),
+            })
+
     return render_template("course_detail.html",
         course=course, name=name, tees=tees, holes=hole_rows,
         play_count=play_count, first_played=first_played, last_played=last_played,
         settings=g.settings,
         all_users=get_users(),
+        plugin_actions=plugin_actions,
     )
 
 
@@ -1553,6 +1574,7 @@ def main():
     app.config["DATA_DIR"] = data_dir
     app._plugin_blocks = {}
     app._plugin_nav = []
+    app._plugin_course_actions = []
     discover_plugins(app)
 
     port = args.port if args.port is not None else find_free_port()

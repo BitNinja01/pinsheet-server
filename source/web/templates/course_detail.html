@@ -25,6 +25,11 @@
     {% if g.is_own_data %}
     <div class="round-actions">
         <button class="btn" id="btn-delete-course">Delete</button>
+        {% if plugin_actions %}
+        {% for action in plugin_actions %}
+        <a href="{{ action.url }}" class="btn-accent" style="margin-left:0.5rem">{{ action.label }}</a>
+        {% endfor %}
+        {% endif %}
     </div>
     {% endif %}
 
