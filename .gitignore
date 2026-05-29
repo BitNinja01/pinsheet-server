@@ -5,6 +5,7 @@ AGENTS.md
 .opencode/
 .superpowers/
 /plugins/
+!/plugins/.gitkeep
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md
