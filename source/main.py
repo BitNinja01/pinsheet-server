@@ -13,6 +13,13 @@ from pathlib import Path
 from datetime import date, timedelta, datetime
 
 from __init__ import __version__
+
+# Ensure the repo root is on sys.path so source.* imports resolve
+# regardless of Python version, virtualenv setup, or CWD configuration.
+_repo_root = str(Path(__file__).resolve().parent.parent)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 
 from database import set_db_path, init_db
