@@ -991,15 +991,27 @@ def course_list():
     course_data.sort(key=lambda c: c["name"].lower())
 
     plugin_actions = {}
-    for action in getattr(current_app, "_plugin_course_actions", []):
-        url_maker = action.get("url_maker")
-        if callable(url_maker):
+    for entry in getattr(current_app, "_plugin_course_actions", []):
+        actions_fn = entry.get("actions_fn")
+        if callable(actions_fn):
             for c in course_data:
                 name = c["name"]
-                plugin_actions.setdefault(name, []).append({
-                    "label": action["label"],
-                    "url": url_maker(name),
-                })
+                try:
+                    acts = actions_fn(name)
+                    if acts:
+                        plugin_actions.setdefault(name, []).extend(acts)
+                except Exception:
+                    pass
+        else:
+            label = entry.get("label")
+            url_maker = entry.get("url_maker")
+            if label and callable(url_maker):
+                for c in course_data:
+                    name = c["name"]
+                    plugin_actions.setdefault(name, []).append({
+                        "label": label,
+                        "url": url_maker(name),
+                    })
 
     return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users(), plugin_actions=plugin_actions)
 
@@ -1043,13 +1055,23 @@ def course_detail(name):
         })
 
     plugin_actions = []
-    for action in getattr(current_app, "_plugin_course_actions", []):
-        url_maker = action.get("url_maker")
-        if callable(url_maker):
-            plugin_actions.append({
-                "label": action["label"],
-                "url": url_maker(name),
-            })
+    for entry in getattr(current_app, "_plugin_course_actions", []):
+        actions_fn = entry.get("actions_fn")
+        if callable(actions_fn):
+            try:
+                acts = actions_fn(name)
+                if acts:
+                    plugin_actions.extend(acts)
+            except Exception:
+                pass
+        else:
+            label = entry.get("label")
+            url_maker = entry.get("url_maker")
+            if label and callable(url_maker):
+                plugin_actions.append({
+                    "label": label,
+                    "url": url_maker(name),
+                })
 
     return render_template("course_detail.html",
         course=course, name=name, tees=tees, holes=hole_rows,
