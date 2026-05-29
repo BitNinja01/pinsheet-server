@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -82,6 +83,23 @@ def _load_plugin(plugin_dir: Path) -> "object | None":
     return mod
 
 
+def _install_requirements(plugin_dir: Path) -> None:
+    req_path = plugin_dir / "requirements.txt"
+    if not req_path.exists():
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            _log.info("plugin %s: requirements installed", plugin_dir.name)
+        else:
+            _log.warning("plugin %s: pip install failed — %s", plugin_dir.name, result.stderr.strip())
+    except Exception as exc:
+        _log.warning("plugin %s: pip install error — %s", plugin_dir.name, exc)
+
+
 def discover_plugins(app: "Flask") -> None:
     plugins_dir = _plugins_dir()
     if not plugins_dir.exists():
@@ -100,6 +118,7 @@ def discover_plugins(app: "Flask") -> None:
 
         _wire_template_path(app, mod.plugin_info["name"], entry)
         _wire_static_route(app, mod.plugin_info["name"], entry)
+        _install_requirements(entry)
 
         try:
             mod.register(app)
