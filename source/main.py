@@ -12,7 +12,10 @@ from functools import wraps
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
-from __init__ import __version__
+try:
+    from . import __version__
+except ImportError:
+    from __init__ import __version__
 
 # Ensure the repo root is on sys.path so source.* imports resolve
 # regardless of Python version, virtualenv setup, or CWD configuration.
