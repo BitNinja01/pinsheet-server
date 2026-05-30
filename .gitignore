@@ -1,6 +1,7 @@
 # Custom — Internal tooling and session artifacts
 PICKUP_PROMPT.md
 AGENTS.md
+CODEBASE_IMPROVEMENTS.md
 .claude/
 .opencode/
 .superpowers/
