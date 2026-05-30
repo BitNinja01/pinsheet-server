@@ -20,7 +20,7 @@ from calc import (
 )
 from source.routes.auth import requires_own_data
 from calc import stat_delta
-from source.calc.models import dict_to_course
+from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
 

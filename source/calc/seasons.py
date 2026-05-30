@@ -1,7 +1,7 @@
 import calendar
 from collections import Counter
 from datetime import date
-from calc.models import RoundData, CourseData
+from source.models import RoundData, CourseData
 
 
 def calc_rounds_this_year(all_rounds: list[RoundData]) -> int:

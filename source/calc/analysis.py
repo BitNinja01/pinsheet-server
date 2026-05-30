@@ -1,4 +1,4 @@
-from calc.models import RoundData, CourseData, HoleDef
+from source.models import RoundData, CourseData, HoleDef
 
 
 def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:

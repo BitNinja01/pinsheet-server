@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from calc.models import RoundData, CourseData, HoleData, HoleDef, TeeData
+from source.models import RoundData, CourseData, HoleData, HoleDef, TeeData
 
 
 def calc_trend(all_rounds: list[RoundData], calc_fn, *args, filter_fn=None) -> list:
