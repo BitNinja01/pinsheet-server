@@ -12,7 +12,7 @@ from store import (
 )
 from calc import calc_handicap_index
 from source._helpers import requires_own_data
-from source.calc.models import dict_to_round
+
 
 _log = logging.getLogger("pinsheet")
 
@@ -67,10 +67,10 @@ def register_settings_routes(app, csrf):
             chronological = list(reversed(all_imported))
             include_9hole = g.settings.get("include_9hole", True)
             for i, r in enumerate(chronological):
-                window = [dict_to_round(w) for w in chronological[:i + 1]]
+                window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:
-                    update_round_handicap(r["date"], r["index"], hi, user_id)
+                    update_round_handicap(r.date, r.index, hi, user_id)
 
             return render_template("settings_import.html", settings=g.settings,
                                    imported={"courses": courses_count, "rounds": rounds_count},

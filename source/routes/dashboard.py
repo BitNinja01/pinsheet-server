@@ -9,7 +9,7 @@ from calc import calc_last_year_handicap, get_best_n_rounds
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 
 from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
-from source.calc.models import dict_to_round, dict_to_course
+from source.calc.models import dict_to_course
 
 
 def register_dashboard_routes(app, limiter, csrf):
@@ -20,7 +20,7 @@ def register_dashboard_routes(app, limiter, csrf):
             return render_template("welcome.html", settings=g.settings, all_users=get_users())
         include_9hole = g.settings.get("include_9hole", True)
 
-        rounds = [dict_to_round(r) for r in g.all_rounds]
+        rounds = list(g.all_rounds)
         courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
 
         l20 = _last_n_rounds(rounds, courses_dict, 20)
@@ -48,29 +48,29 @@ def register_dashboard_routes(app, limiter, csrf):
 
         rounds_data = []
         for r in g.all_rounds[:20]:
-            course = g.courses.get(r.get("course", ""), {})
-            total = r.get("total_gross", "")
+            course = g.courses.get(r.course, {})
+            total = r.total_gross
             par = course.get("par", 0)
             score_to_par = int(total) - int(par) if total and par and total != "0" else None
-            raw_mode = r.get("entry_mode")
+            raw_mode = r.entry_mode
             display_mode = "normal" if raw_mode == "detailed" else (raw_mode or "score_only")
 
-            sparkline = sparkline_svg(r.get("holes"))
+            sparkline = sparkline_svg(r.holes)
 
-            hs = per_round_hole_stats(r.get("holes") or {}, course.get("holes", {}))
+            hs = per_round_hole_stats(r.holes, course.get("holes", {}))
             fir_display = hs["fir_display"]
             gir_display = hs["gir_display"]
             scr_display = hs["scr_display"]
             total_putts = hs["total_putts"]
 
             rounds_data.append({
-                "date": r.get("date", ""),
-                "course": r.get("course", ""),
-                "tees": r.get("tees", ""),
+                "date": r.date,
+                "course": r.course,
+                "tees": r.tees,
                 "total": total,
                 "score_to_par": score_to_par,
-                "differential": r.get("differential", ""),
-                "index": r.get("index", 0),
+                "differential": r.differential,
+                "index": r.index,
                 "in_handicap": False,
                 "entry_mode_display": display_mode,
                 "sparkline": sparkline,
@@ -88,7 +88,7 @@ def register_dashboard_routes(app, limiter, csrf):
 
         all_hi_vals = []
         for r in g.all_rounds:
-            ch = r.get("computed_handicap")
+            ch = r.computed_handicap
             if ch and ch != "0":
                 try:
                     all_hi_vals.append(float(ch))
@@ -102,9 +102,9 @@ def register_dashboard_routes(app, limiter, csrf):
         def _get_hi_for_range(cutoff):
             vals = []
             for r in g.all_rounds:
-                if r.get("date", "") < cutoff:
+                if r.date < cutoff:
                     continue
-                ch = r.get("computed_handicap")
+                ch = r.computed_handicap
                 if ch and ch != "0":
                     try:
                         vals.append(float(ch))
@@ -148,9 +148,9 @@ def register_dashboard_routes(app, limiter, csrf):
             thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             prev_hi = None
             for r in g.all_rounds:
-                if r.get("date", "") <= thirty_days_ago and r.get("computed_handicap"):
+                if r.date <= thirty_days_ago and r.computed_handicap:
                     try:
-                        prev_hi = float(r["computed_handicap"])
+                        prev_hi = float(r.computed_handicap)
                         break
                     except (ValueError, TypeError):
                         pass
@@ -166,9 +166,9 @@ def register_dashboard_routes(app, limiter, csrf):
         career_low = None
         best_hi = 999.9
         for r in g.all_rounds:
-            if r.get("excluded"):
+            if r.excluded:
                 continue
-            ch = r.get("computed_handicap")
+            ch = r.computed_handicap
             if ch and ch not in ("0", "0.0", "--"):
                 try:
                     v = float(ch)
@@ -183,10 +183,10 @@ def register_dashboard_routes(app, limiter, csrf):
         if handicap_panel_val and handicap_panel_val != "--":
             try:
                 curr = float(handicap_panel_val)
-                eligible_20 = [r for r in g.all_rounds[:20] if not r.get("excluded") and r.get("differential") and r["differential"] != "0"]
+                eligible_20 = [r for r in g.all_rounds[:20] if not r.excluded and r.differential and r.differential != "0"]
                 eligible_count = len(eligible_20)
                 best_ids = {(r.date, r.index) for r in best_rounds}
-                counting = sum(1 for r in eligible_20 if (r.get("date"), r.get("index")) in best_ids)
+                counting = sum(1 for r in eligible_20 if (r.date, r.index) in best_ids)
                 hi_insight = f"{counting} of your last {eligible_count} rounds counted toward index."
                 target = curr - 0.3
                 if target > 0:

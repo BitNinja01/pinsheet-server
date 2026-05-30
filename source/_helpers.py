@@ -41,7 +41,7 @@ def sparkline_svg(holes_raw, sp_w=210, sp_h=28, sp_pad=2):
     sorted_nums = sorted(holes_raw.keys(), key=lambda x: int(x))
     scores = []
     for hn in sorted_nums:
-        gv = holes_raw[hn].get("gross")
+        gv = holes_raw[hn].gross
         if gv:
             scores.append(int(gv))
     if len(scores) < 2:
@@ -75,12 +75,12 @@ def per_round_hole_stats(holes, course_holes_data):
     scr_updown = scr_opps = 0
     total_putts = 0
     for hn, h in holes.items():
-        fw = h.get("fairway", "")
+        fw = h.fairway
         if fw and fw != "N":
             fir_attempts += 1
             if fw == "H":
                 fir_hit += 1
-        gi = h.get("gir", "")
+        gi = h.gir
         if gi:
             gir_total += 1
             if gi == "H":
@@ -89,12 +89,12 @@ def per_round_hole_stats(holes, course_holes_data):
                 scr_opps += 1
                 try:
                     hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
-                    if int(h.get("gross", 99)) <= hole_par:
+                    if h.gross <= hole_par:
                         scr_updown += 1
                 except (ValueError, TypeError):
                     pass
         try:
-            total_putts += int(h.get("putts", 0) or 0)
+            total_putts += h.putts
         except (ValueError, TypeError):
             pass
     return {

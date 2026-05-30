@@ -23,10 +23,10 @@ def register_courses_routes(app):
             play_count = 0
             last_played = None
             for r in g.all_rounds:
-                if r.get("course") == name:
+                if r.course == name:
                     play_count += 1
-                    if last_played is None or r.get("date", "") > last_played:
-                        last_played = r.get("date", "")
+                    if last_played is None or r.date > last_played:
+                        last_played = r.date
 
             course_data.append({
                 "name": name,
@@ -50,9 +50,9 @@ def register_courses_routes(app):
         first_played = None
         last_played = None
         for r in g.all_rounds:
-            if r.get("course") == name:
+            if r.course == name:
                 play_count += 1
-                d = r.get("date", "")
+                d = r.date
                 if first_played is None or d < first_played:
                     first_played = d
                 if last_played is None or d > last_played:
@@ -113,7 +113,7 @@ def register_courses_routes(app):
     @requires_own_data
     def api_courses_delete(name):
         for r in g.all_rounds:
-            if r.get("course") == name:
+            if r.course == name:
                 return jsonify({"error": "Cannot delete course with existing rounds"}), 409
         delete_course(name)
         return jsonify({"ok": True})

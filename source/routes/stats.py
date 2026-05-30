@@ -17,7 +17,7 @@ from calc import (
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
 )
 from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
-from source.calc.models import dict_to_round, dict_to_course, HoleDef
+from source.calc.models import dict_to_course, HoleDef
 
 
 def register_stats_routes(app):
@@ -26,7 +26,7 @@ def register_stats_routes(app):
     def stats():
         include_9hole = g.settings.get("include_9hole", True)
 
-        rounds = [dict_to_round(r) for r in g.all_rounds]
+        rounds = list(g.all_rounds)
         courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
 
         all_eligible = [r for r in rounds if not r.excluded]
@@ -278,7 +278,7 @@ def register_stats_routes(app):
     def season_summary():
         include_9hole = g.settings.get("include_9hole", True)
 
-        rounds = [dict_to_round(r) for r in g.all_rounds]
+        rounds = list(g.all_rounds)
         courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
 
         if g.settings.get("season_enabled"):
