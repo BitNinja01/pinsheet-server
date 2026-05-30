@@ -857,7 +857,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .stat-cell-window {
     font-family: var(--ps-font-mono);
-    font-size: 10px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
     letter-spacing: 0.04em;
 }
