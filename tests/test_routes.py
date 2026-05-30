@@ -4,9 +4,12 @@ import os
 import pytest
 
 import main as main_mod
-from main import app, User
+from main import app, User, limiter, csrf
+from source.routes import register_routes
 from database import set_db_path, init_db
 from store import create_user
+
+register_routes(app, limiter, csrf, User)
 
 
 @pytest.fixture

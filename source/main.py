@@ -27,6 +27,7 @@ from store import (
 
 from source.plugin import _plugins
 from source.plugin_loader import discover_plugins
+from source.routes import register_routes
 
 _log = logging.getLogger("pinsheet")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -131,19 +132,6 @@ def _check_view_permission():
     g.is_own_data = current_user.is_authenticated and g.view_user["id"] == current_user.id
 
 
-from source.routes import (
-    register_auth_routes, register_dashboard_routes,
-    register_rounds_routes, register_courses_routes,
-    register_settings_routes, register_stats_routes
-)
-
-register_auth_routes(app, limiter, User)
-register_dashboard_routes(app, limiter, csrf)
-register_rounds_routes(app)
-register_courses_routes(app)
-register_settings_routes(app, csrf)
-register_stats_routes(app)
-
 
 PORT = 8080
 
@@ -221,6 +209,8 @@ def main():
     app._plugin_nav = []
     app._plugin_course_actions = []
     discover_plugins(app)
+
+    register_routes(app, limiter, csrf, User)
 
     port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
