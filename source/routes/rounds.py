@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
-    get_slope_rating, save_round, delete_round, get_users,
+    get_slope_rating, save_round, delete_round,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -23,7 +23,7 @@ from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
-from source.request_data import get_settings, get_courses, get_all_rounds_for_user
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 _log = logging.getLogger("pinsheet")
 
@@ -36,7 +36,10 @@ def register_rounds_routes(app):
             return "You can only enter data for yourself.", 403
         today = date.today().isoformat()
         no_courses = len(get_courses()) == 0
-        return render_template("round_entry.html", settings=get_settings(), courses=get_courses(), today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
+        return render_template("round_entry.html", **base_context(
+            current_page="round_entry",
+            courses=get_courses(), today=today, no_courses=no_courses,
+        ))
 
     @app.route("/rounds")
     @login_required
@@ -85,10 +88,12 @@ def register_rounds_routes(app):
             if (rd["date"], rd["index"]) in best_keys:
                 rd["in_handicap"] = True
 
-        return render_template("rounds_list.html", rounds=rounds_data,
-                               settings=settings, all_users=get_users(),
-                               include_9hole=include_9hole,
-                               current_page="rounds_list")
+        return render_template("rounds_list.html", **base_context(
+            current_page="rounds_list",
+            rounds=rounds_data,
+            settings=settings,
+            include_9hole=include_9hole,
+        ))
 
     @app.route("/api/drafts/round", methods=["GET"])
     @login_required
@@ -255,16 +260,14 @@ def register_rounds_routes(app):
         if entry_mode == "score_only":
             total_gross = int(round_data.gross_total) if round_data.gross_total else 0
 
-        return render_template("round_detail.html",
+        return render_template("round_detail.html", **base_context(
             round=round_data, course=course, holes=holes,
             entry_mode=entry_mode,
             front_nine={"gross": front_gross, "par": front_par, "putts": front_putts},
             back_nine={"gross": back_gross, "par": back_par, "putts": back_putts},
             total={"gross": total_gross, "par": total_par,
                    "diff": total_gross - total_par if total_par else 0},
-            settings=get_settings(),
-            all_users=get_users(),
-        )
+        ))
 
     @app.route("/rounds/<date>/<index>/report")
     @login_required
@@ -311,7 +314,9 @@ def register_rounds_routes(app):
 
         rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round]), calc_penalties_per_round(l20), False, "", 1))
 
-        return render_template("report_card.html", rows=rows, round=this_round, settings=get_settings(), all_users=get_users())
+        return render_template("report_card.html", **base_context(
+            rows=rows, round=this_round,
+        ))
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required

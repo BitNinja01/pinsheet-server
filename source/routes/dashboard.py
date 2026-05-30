@@ -4,7 +4,7 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_users, get_user_by_id, save_settings
+from store import get_user_by_id, save_settings
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
@@ -15,7 +15,7 @@ from source.web.charts import sparkline_svg, make_chart_data
 from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_course
-from source.request_data import get_settings, get_courses, get_all_rounds_for_user
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 
 def register_dashboard_routes(app, limiter, csrf):
@@ -23,7 +23,7 @@ def register_dashboard_routes(app, limiter, csrf):
     @login_required
     def dashboard():
         if not get_settings().get("welcome_shown"):
-            return render_template("welcome.html", settings=get_settings(), all_users=get_users())
+            return render_template("welcome.html", **base_context())
         include_9hole = get_settings().get("include_9hole", True)
 
         all_rounds = get_all_rounds_for_user()
@@ -172,13 +172,14 @@ def register_dashboard_routes(app, limiter, csrf):
             except (ValueError, TypeError):
                 pass
 
-        return render_template("dashboard.html", panels=panels, rounds=rounds_data,
-                               last_year_hi=last_year_hi, settings=get_settings(),
-                               current_page="dashboard",
-                               season_label=season_label,
-                               hi_movement=hi_movement, career_low=career_low, hi_insight=hi_insight,
-                               chart=chart, chart_data_json=chart_data_json,
-                               all_users=get_users())
+        return render_template("dashboard.html", **base_context(
+            current_page="dashboard",
+            panels=panels, rounds=rounds_data,
+            last_year_hi=last_year_hi,
+            season_label=season_label,
+            hi_movement=hi_movement, career_low=career_low, hi_insight=hi_insight,
+            chart=chart, chart_data_json=chart_data_json,
+        ))
 
     @app.route("/api/welcome", methods=["POST"])
     @login_required

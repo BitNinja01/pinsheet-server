@@ -8,11 +8,11 @@ from flask_login import login_required, current_user
 
 from store import (
     save_settings, save_course, save_round,
-    get_all_rounds, update_round_handicap, get_users,
+    get_all_rounds, update_round_handicap,
 )
 from calc import calc_handicap_index
 from source.routes.auth import requires_own_data
-from source.request_data import get_settings, get_courses
+from source.request_data import get_settings, get_courses, base_context
 
 
 _log = logging.getLogger("pinsheet")
@@ -23,8 +23,10 @@ def register_settings_routes(app, csrf):
     @login_required
     def settings_page():
         themes = ["dark", "light"]
-        return render_template("settings.html", settings=get_settings(), courses=get_courses(), themes=themes,
-                               current_page="settings", all_users=get_users())
+        return render_template("settings.html", **base_context(
+            current_page="settings",
+            courses=get_courses(), themes=themes,
+        ))
 
     @app.route("/settings/import", methods=["GET", "POST"])
     @login_required
@@ -33,16 +35,18 @@ def register_settings_routes(app, csrf):
         if request.method == "POST":
             uploaded = request.files.get("zipfile")
             if not uploaded:
-                return render_template("settings_import.html", settings=get_settings(), imported=None,
-                                       error="No file provided", current_page="settings",
-                                       all_users=get_users())
+                return render_template("settings_import.html", **base_context(
+                    current_page="settings",
+                    imported=None, error="No file provided",
+                ))
 
             try:
                 zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
             except zipfile.BadZipFile:
-                return render_template("settings_import.html", settings=get_settings(), imported=None,
-                                       error="Invalid zip file", current_page="settings",
-                                       all_users=get_users())
+                return render_template("settings_import.html", **base_context(
+                    current_page="settings",
+                    imported=None, error="Invalid zip file",
+                ))
 
             user_id = current_user.id
             courses_count = 0
@@ -73,13 +77,15 @@ def register_settings_routes(app, csrf):
                 if hi is not None:
                     update_round_handicap(r.date, r.index, hi, user_id)
 
-            return render_template("settings_import.html", settings=get_settings(),
-                                   imported={"courses": courses_count, "rounds": rounds_count},
-                                   current_page="settings",
-                                   all_users=get_users())
+            return render_template("settings_import.html", **base_context(
+                current_page="settings",
+                imported={"courses": courses_count, "rounds": rounds_count},
+            ))
 
-        return render_template("settings_import.html", settings=get_settings(), imported=None,
-                               current_page="settings", all_users=get_users())
+        return render_template("settings_import.html", **base_context(
+            current_page="settings",
+            imported=None,
+        ))
 
     @csrf.exempt
     @app.route("/api/settings", methods=["PUT"])

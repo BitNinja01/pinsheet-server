@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_users, create_invite_code, get_invite_codes
+from store import create_invite_code, get_invite_codes
 from calc import (
     calc_scoring_average, calc_fir_percent, calc_gir_percent,
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
@@ -21,7 +21,7 @@ from calc import (
 from source.routes.auth import requires_own_data
 from calc import stat_delta
 from source.models import dict_to_course
-from source.request_data import get_settings, get_courses, get_all_rounds_for_user
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 
 def register_stats_routes(app):
@@ -242,14 +242,12 @@ def register_stats_routes(app):
             ],
         }
 
-        return render_template("stats.html",
+        return render_template("stats.html", **base_context(
+            current_page="stats",
             strip=strip_data,
             sections=sections_data,
             bests_section=bests_data,
-            settings=get_settings(),
-            all_users=get_users(),
-            current_page="stats",
-        )
+        ))
 
     @app.route("/season")
     @login_required
@@ -286,7 +284,7 @@ def register_stats_routes(app):
         rounds_count = len(season_rounds)
         total_rounds = calc_rounds_total(rounds)
 
-        return render_template("season_summary.html",
+        return render_template("season_summary.html", **base_context(
             settings=settings,
             rounds_count=rounds_count,
             total_rounds=total_rounds,
@@ -306,8 +304,7 @@ def register_stats_routes(app):
             walking_miles=walking_miles,
             riding_miles=riding_miles,
             penalty_free=penalty_free,
-            all_users=get_users(),
-        )
+        ))
 
     @app.route("/admin/invites", methods=["GET", "POST"])
     @login_required
@@ -318,10 +315,10 @@ def register_stats_routes(app):
         if request.method == "POST":
             code = create_invite_code(current_user.id)
             base_url = request.host_url.rstrip("/")
-            return render_template("admin_invites.html", settings=get_settings(),
-                                   codes=get_invite_codes(), new_code=code, base_url=base_url,
-                                   all_users=get_users())
+            return render_template("admin_invites.html", **base_context(
+                codes=get_invite_codes(), new_code=code, base_url=base_url,
+            ))
 
-        return render_template("admin_invites.html", settings=get_settings(),
-                               codes=get_invite_codes(), new_code=None, base_url=None,
-                               all_users=get_users())
+        return render_template("admin_invites.html", **base_context(
+            codes=get_invite_codes(), new_code=None, base_url=None,
+        ))

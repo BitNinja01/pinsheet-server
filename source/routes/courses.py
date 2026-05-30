@@ -1,9 +1,9 @@
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import save_course, delete_course, get_users
+from store import save_course, delete_course
 from source.routes.auth import requires_own_data
-from source.request_data import get_settings, get_courses, get_all_rounds_for_user
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.plugin import fire_hook
 
 
@@ -13,7 +13,9 @@ def register_courses_routes(app):
     def course_entry():
         if not g.is_own_data:
             return "You can only enter data for yourself.", 403
-        return render_template("course_entry.html", courses=get_courses(), settings=get_settings(), all_users=get_users())
+        return render_template("course_entry.html", **base_context(
+            courses=get_courses(),
+        ))
 
     @app.route("/courses")
     @login_required
@@ -38,7 +40,9 @@ def register_courses_routes(app):
 
         course_data.sort(key=lambda c: c["name"].lower())
 
-        return render_template("courses.html", courses=course_data, settings=get_settings(), all_users=get_users())
+        return render_template("courses.html", **base_context(
+            courses=course_data,
+        ))
 
     @app.route("/courses/<name>")
     @login_required
@@ -78,12 +82,10 @@ def register_courses_routes(app):
                 "yardages": yardages,
             })
 
-        return render_template("course_detail.html",
+        return render_template("course_detail.html", **base_context(
             course=course, name=name, tees=tees, holes=hole_rows,
             play_count=play_count, first_played=first_played, last_played=last_played,
-            settings=get_settings(),
-            all_users=get_users(),
-        )
+        ))
 
     @app.route("/api/courses", methods=["POST"])
     @login_required
