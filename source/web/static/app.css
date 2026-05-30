@@ -336,7 +336,7 @@ body {
     color: var(--ps-ink-2);
 }
 .ps-stat .ps-stat-delta {
-    font-size: 12px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
@@ -788,7 +788,7 @@ select.hole-input { width: 3rem; appearance: none; }
     color: var(--ps-ink);
 }
 .ps-stat .ps-stat-delta {
-    font-size: 12px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
