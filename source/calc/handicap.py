@@ -1,3 +1,4 @@
+import bisect
 import math
 
 from calc.models import RoundData
@@ -84,11 +85,30 @@ def calc_handicap_index(rounds: list[RoundData], include_9hole: bool = False) ->
 def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False) -> list:
     chronological = list(reversed(all_rounds))
     result = []
-    for i, r in enumerate(chronological):
-        window = chronological[max(0, i - 19):i + 1]
-        val = calc_handicap_index(window, include_9hole)
-        if val is not None:
+    window_diffs = []
+    window_items = []
+
+    for r in chronological:
+        if r.excluded or not r.differential or r.differential == "0":
+            continue
+        if r.holes_selection != "all":
+            if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
+                continue
+
+        diff = math.floor(float(r.differential) * 10) / 10
+
+        window_items.append((diff, r))
+        bisect.insort(window_diffs, diff)
+
+        if len(window_items) > 20:
+            old_diff, _ = window_items.pop(0)
+            window_diffs.remove(old_diff)
+
+        n = count_table_n(len(window_diffs))
+        if n > 0:
+            val = round(sum(window_diffs[:n]) / n, 1)
             result.append((r.date, val))
+
     return result
 
 
