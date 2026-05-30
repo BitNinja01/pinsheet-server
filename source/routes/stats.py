@@ -15,9 +15,10 @@ from calc import (
     calc_first_hi_milestone, calc_score_breakdown, calc_hole_in_ones,
     calc_best_gir_round, calc_best_fir_round, calc_season_yardage,
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
+    calc_per_round_average, calc_hole_percentage,
 )
 from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
-from source.calc.models import dict_to_course, HoleDef
+from source.calc.models import dict_to_course
 
 
 def register_stats_routes(app):
@@ -75,33 +76,6 @@ def register_stats_routes(app):
                 "windows": [{"label": "B8", "value": d}, {"label": "L5", "value": d}, {"label": "L10", "value": d}, {"label": "L20", "value": d}],
             }
 
-        def _per_round_stat(rounds, predicate):
-            total = 0
-            for r in rounds:
-                course = courses_dict.get(r.course)
-                course_holes = course.holes if course else {}
-                for hn, h in r.holes.items():
-                    gross = h.gross
-                    par = course_holes.get(hn, HoleDef()).par
-                    if gross and par and predicate(gross, par):
-                        total += 1
-            return total / len(rounds) if rounds else None
-
-        def _hole_pct(rounds, predicate):
-            hits = 0
-            total = 0
-            for r in rounds:
-                course = courses_dict.get(r.course)
-                course_holes = course.holes if course else {}
-                for hn, h in r.holes.items():
-                    gross = h.gross
-                    par = course_holes.get(hn, HoleDef()).par
-                    if gross and par:
-                        total += 1
-                        if predicate(gross, par):
-                            hits += 1
-            return (hits / total * 100) if total else None
-
         # ── Stat Strip ──────────────────────────────────────────────────
         _sa_b8 = calc_scoring_average(b8)
         _sa_l20 = calc_scoring_average(l20)
@@ -137,10 +111,10 @@ def register_stats_routes(app):
         ]
 
         # ── Section 1: Scoring Statistics ───────────────────────────────
-        _birdie = lambda r: _per_round_stat(r, lambda g, p: g < p)
-        _bogey = lambda r: _per_round_stat(r, lambda g, p: g == p + 1)
-        _dbl = lambda r: _per_round_stat(r, lambda g, p: g >= p + 2)
-        _pb = lambda r: _hole_pct(r, lambda g, p: g < p)
+        _birdie = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g < p)
+        _bogey = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g == p + 1)
+        _dbl = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g >= p + 2)
+        _pb = lambda r: calc_hole_percentage(r, courses_dict, lambda g, p: g < p)
 
         sa_b8 = calc_scoring_average(b8)
         sa_l5_ = calc_scoring_average(l5)

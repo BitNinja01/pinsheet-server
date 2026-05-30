@@ -10,6 +10,8 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    calc_handicap_values_in_range,
+    calc_career_low_handicap,
 )
 from calc.approach import (
     calc_fir_percent,
@@ -67,6 +69,8 @@ from calc.scoring import (
     calc_pob_trend,
     calc_clean_card_trend,
     calc_big_number_trend,
+    calc_per_round_average,
+    calc_hole_percentage,
 )
 from calc.analysis import (
     calc_penalty_stats,

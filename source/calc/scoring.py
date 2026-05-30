@@ -434,3 +434,34 @@ def calc_penalties_per_round(rounds: list[RoundData]) -> float | None:
         pen = sum(h.penalties for h in r.holes.values())
         totals.append(pen)
     return sum(totals) / len(totals) if totals else None
+
+
+def calc_per_round_average(rounds: list[RoundData], courses: dict[str, CourseData], predicate) -> float | None:
+    total = 0
+    for r in rounds:
+        course_name = r.course
+        course = courses.get(course_name)
+        course_holes = course.holes if course else {}
+        for hn, h in r.holes.items():
+            gross = h.gross
+            par = course_holes.get(hn, HoleDef()).par
+            if gross and par and predicate(gross, par):
+                total += 1
+    return total / len(rounds) if rounds else None
+
+
+def calc_hole_percentage(rounds: list[RoundData], courses: dict[str, CourseData], predicate) -> float | None:
+    hits = 0
+    total = 0
+    for r in rounds:
+        course_name = r.course
+        course = courses.get(course_name)
+        course_holes = course.holes if course else {}
+        for hn, h in r.holes.items():
+            gross = h.gross
+            par = course_holes.get(hn, HoleDef()).par
+            if gross and par:
+                total += 1
+                if predicate(gross, par):
+                    hits += 1
+    return (hits / total * 100) if total else None

@@ -110,3 +110,34 @@ def calc_raw_hi(rounds: list[RoundData], include_9hole: bool = False) -> float |
     if not diffs:
         return None
     return (sum(diffs) / len(diffs)) * 0.96
+
+
+def calc_handicap_values_in_range(all_rounds: list[RoundData], cutoff: str) -> list[float]:
+    vals = []
+    for r in all_rounds:
+        if r.date < cutoff:
+            continue
+        ch = r.computed_handicap
+        if ch and ch != "0":
+            try:
+                vals.append(float(ch))
+            except ValueError:
+                pass
+    vals.reverse()
+    return vals
+
+
+def calc_career_low_handicap(all_rounds: list[RoundData]) -> str | None:
+    best_hi = 999.9
+    for r in all_rounds:
+        if r.excluded:
+            continue
+        ch = r.computed_handicap
+        if ch and ch not in ("0", "0.0", "--"):
+            try:
+                v = float(ch)
+                if 0 < v < best_hi:
+                    best_hi = v
+            except (ValueError, TypeError):
+                pass
+    return str(round(best_hi, 1)) if best_hi < 999.0 else None

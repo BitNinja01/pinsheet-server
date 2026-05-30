@@ -5,7 +5,7 @@ from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import get_courses, get_all_rounds, get_users, get_user_by_id, save_settings
-from calc import calc_last_year_handicap, get_best_n_rounds
+from calc import calc_last_year_handicap, get_best_n_rounds, calc_handicap_values_in_range, calc_career_low_handicap
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 
 from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
@@ -99,24 +99,10 @@ def register_dashboard_routes(app, limiter, csrf):
         cutoff_12m = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
         cutoff_2y = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
 
-        def _get_hi_for_range(cutoff):
-            vals = []
-            for r in g.all_rounds:
-                if r.date < cutoff:
-                    continue
-                ch = r.computed_handicap
-                if ch and ch != "0":
-                    try:
-                        vals.append(float(ch))
-                    except ValueError:
-                        pass
-            vals.reverse()
-            return vals
-
         chart_data = {
-            "3M": _make_chart_data(_get_hi_for_range(cutoff_3m)),
-            "12M": _make_chart_data(_get_hi_for_range(cutoff_12m)),
-            "2Y": _make_chart_data(_get_hi_for_range(cutoff_2y)),
+            "3M": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_3m)),
+            "12M": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_12m)),
+            "2Y": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_2y)),
             "All": _make_chart_data(all_hi_vals[::-1]),
         }
 
@@ -163,21 +149,7 @@ def register_dashboard_routes(app, limiter, csrf):
             except (ValueError, TypeError):
                 pass
 
-        career_low = None
-        best_hi = 999.9
-        for r in g.all_rounds:
-            if r.excluded:
-                continue
-            ch = r.computed_handicap
-            if ch and ch not in ("0", "0.0", "--"):
-                try:
-                    v = float(ch)
-                    if 0 < v < best_hi:
-                        best_hi = v
-                except (ValueError, TypeError):
-                    pass
-        if best_hi < 999.0:
-            career_low = str(round(best_hi, 1))
+        career_low = calc_career_low_handicap(g.all_rounds)
 
         hi_insight = None
         if handicap_panel_val and handicap_panel_val != "--":
