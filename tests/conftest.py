@@ -1,6 +1,6 @@
 import pytest
 
-from source.calc.models import dict_to_round, dict_to_course, RoundData, CourseData
+from source.models import dict_to_round, dict_to_course, RoundData, CourseData
 
 
 @pytest.fixture

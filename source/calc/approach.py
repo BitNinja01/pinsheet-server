@@ -1,4 +1,4 @@
-from calc.models import RoundData, CourseData, HoleDef
+from source.models import RoundData, CourseData, HoleDef
 from calc.scoring import calc_trend
 
 

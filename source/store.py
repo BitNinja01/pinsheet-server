@@ -7,7 +7,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
-from source.calc.models import dict_to_round, RoundData
+from source.models import dict_to_round, RoundData
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"

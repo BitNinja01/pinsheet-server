@@ -1,7 +1,7 @@
 import bisect
 import math
 
-from calc.models import RoundData
+from source.models import RoundData
 
 
 def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:

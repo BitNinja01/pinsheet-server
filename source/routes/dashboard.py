@@ -14,7 +14,7 @@ from calc import (
 from source.web.charts import sparkline_svg, make_chart_data
 from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
-from source.calc.models import dict_to_course
+from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
 

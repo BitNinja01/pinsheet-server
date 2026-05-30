@@ -21,7 +21,7 @@ from calc import (
 from source.web.charts import sparkline_svg
 from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
-from source.calc.models import dict_to_round, dict_to_course
+from source.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
