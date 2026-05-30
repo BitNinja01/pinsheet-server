@@ -21,8 +21,8 @@ def calc_putts_per_gir(rounds) -> float | None:
     return sum(putts) / len(putts) if putts else None
 
 
-def calc_three_putt_percent(rounds) -> float | None:
-    three_putts = 0
+def _putt_threshold_percent(rounds, predicate) -> float | None:
+    hits = 0
     total = 0
     for r in rounds:
         if not r.get("holes"):
@@ -30,51 +30,25 @@ def calc_three_putt_percent(rounds) -> float | None:
         for h in r["holes"].values():
             if h.get("putts"):
                 total += 1
-                if int(h["putts"]) >= 3:
-                    three_putts += 1
-    return (three_putts / total) * 100 if total else None
-
-
-def calc_four_plus_putt_percent(rounds) -> float | None:
-    four_plus = 0
-    total = 0
-    for r in rounds:
-        if not r.get("holes"):
-            continue
-        for h in r["holes"].values():
-            if h.get("putts"):
-                total += 1
-                if int(h["putts"]) >= 4:
-                    four_plus += 1
-    return (four_plus / total) * 100 if total else None
-
-
-def calc_two_putt_percent(rounds) -> float | None:
-    two_putts = 0
-    total = 0
-    for r in rounds:
-        if not r.get("holes"):
-            continue
-        for h in r["holes"].values():
-            if h.get("putts"):
-                total += 1
-                if int(h["putts"]) == 2:
-                    two_putts += 1
-    return (two_putts / total) * 100 if total else None
+                if predicate(int(h["putts"])):
+                    hits += 1
+    return (hits / total) * 100 if total else None
 
 
 def calc_one_putt_percent(rounds) -> float | None:
-    one_putts = 0
-    total = 0
-    for r in rounds:
-        if not r.get("holes"):
-            continue
-        for h in r["holes"].values():
-            if h.get("putts"):
-                total += 1
-                if int(h["putts"]) == 1:
-                    one_putts += 1
-    return (one_putts / total) * 100 if total else None
+    return _putt_threshold_percent(rounds, lambda p: p == 1)
+
+
+def calc_two_putt_percent(rounds) -> float | None:
+    return _putt_threshold_percent(rounds, lambda p: p == 2)
+
+
+def calc_three_putt_percent(rounds) -> float | None:
+    return _putt_threshold_percent(rounds, lambda p: p >= 3)
+
+
+def calc_four_plus_putt_percent(rounds) -> float | None:
+    return _putt_threshold_percent(rounds, lambda p: p >= 4)
 
 
 def calc_putts_by_par_type(rounds, courses) -> dict:
