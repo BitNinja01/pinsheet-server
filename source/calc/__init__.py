@@ -101,3 +101,9 @@ from calc.seasons import (
     calc_hi_journey,
     calc_season_rounds,
 )
+from calc.composite import (
+    compute_stat_bundle,
+    StatBundle,
+    last_n_rounds,
+    best_n_rounds,
+)

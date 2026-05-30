@@ -5,10 +5,13 @@ from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import get_users, get_user_by_id, save_settings
-from calc import calc_last_year_handicap, get_best_n_rounds, calc_handicap_values_in_range, calc_career_low_handicap
-from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
+from calc import (
+    calc_last_year_handicap, get_best_n_rounds,
+    calc_handicap_values_in_range, calc_career_low_handicap,
+    compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
+)
 
-from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
+from source._helpers import _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
 from source.calc.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
@@ -25,23 +28,22 @@ def register_dashboard_routes(app, limiter, csrf):
         courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
         rounds = list(all_rounds)
 
-        l20 = _last_n_rounds(rounds, courses_dict, 20)
-        b8 = _best_n_rounds(rounds, courses_dict, 8)
+        l20 = last_n_rounds(rounds, 20)
+        b8 = best_n_rounds(rounds, 8)
 
+        bundle = compute_stat_bundle(l20, b8, courses_dict, include_9hole)
+
+        panels_list = ["handicap", "score", "fir", "gir", "putts", "scramble"]
         panels = {}
-        for stat_def in STAT_CATALOG:
-            key = stat_def["key"]
-            if key not in DEFAULT_DASHBOARD_STATS:
-                continue
-            primary = stat_def["fn_primary"](l20, b8, courses_dict, include_9hole)
-            secondary = stat_def["fn_secondary"](l20, b8, courses_dict, include_9hole)
+        for key in panels_list:
+            p = bundle.panels[key]
             panels[key] = {
-                "label": stat_def["label"],
-                "value": f"{primary:.1f}{stat_def['suffix']}" if primary is not None else "--",
-                "secondary": f"{secondary:.1f}{stat_def['suffix']}" if secondary is not None else "--",
-                "higher_better": stat_def["higher_better"],
-                "color": f"rgb({stat_def['color'][0]},{stat_def['color'][1]},{stat_def['color'][2]})",
-                "blank_text": stat_def["blank_text"],
+                "label": p.label,
+                "value": f"{p.value:.1f}{p.suffix}" if p.value is not None else "--",
+                "secondary": f"{p.secondary:.1f}{p.suffix}" if p.secondary is not None else "--",
+                "higher_better": p.higher_better,
+                "color": p.color,
+                "blank_text": p.blank_text,
             }
 
         last_year_hi = calc_last_year_handicap(rounds, include_9hole)

@@ -2,16 +2,6 @@ from functools import wraps
 from flask import g
 
 
-def _last_n_rounds(all_rounds, courses, n: int) -> list:
-    return [r for r in all_rounds[:n] if not r.excluded]
-
-
-def _best_n_rounds(all_rounds, courses, n: int) -> list:
-    eligible = [r for r in all_rounds if not r.excluded and r.differential and r.differential != "0"]
-    eligible.sort(key=lambda r: float(r.differential))
-    return eligible[:min(n, len(eligible))]
-
-
 def _make_chart_data(hi_values):
     chart = {"path": "", "area": "", "points": [], "label_x": "", "label_y": "", "label_v": ""}
     if len(hi_values) < 2:

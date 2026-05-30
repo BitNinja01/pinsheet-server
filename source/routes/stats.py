@@ -16,8 +16,9 @@ from calc import (
     calc_best_gir_round, calc_best_fir_round, calc_season_yardage,
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
     calc_per_round_average, calc_hole_percentage,
+    last_n_rounds, best_n_rounds,
 )
-from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
+from source._helpers import requires_own_data, stat_delta
 from source.calc.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
@@ -33,10 +34,10 @@ def register_stats_routes(app):
         courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
 
         all_eligible = [r for r in rounds if not r.excluded]
-        b8 = _best_n_rounds(rounds, courses_dict, 8)
-        l5 = _last_n_rounds(rounds, courses_dict, 5)
-        l10 = _last_n_rounds(rounds, courses_dict, 10)
-        l20 = _last_n_rounds(rounds, courses_dict, 20)
+        b8 = best_n_rounds(rounds, 8)
+        l5 = last_n_rounds(rounds, 5)
+        l10 = last_n_rounds(rounds, 10)
+        l20 = last_n_rounds(rounds, 20)
 
         now = datetime.now()
         this_month_rounds = sum(1 for r in all_eligible if r.date.startswith(now.strftime("%Y-%m")))

@@ -16,7 +16,7 @@ from calc import (
     calc_gir_percent, calc_putts_per_round, calc_one_putt_percent,
     calc_two_putt_percent, calc_three_putt_percent, calc_scramble_percent,
     calc_scoring_avg_by_par_type, calc_penalties_per_round,
-    get_best_n_rounds,
+    get_best_n_rounds, last_n_rounds,
 )
 from source._helpers import requires_own_data, sparkline_svg, per_round_hole_stats
 from source.calc.models import dict_to_round, dict_to_course
@@ -278,7 +278,7 @@ def register_rounds_routes(app):
 
         courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
 
-        l20 = [r for r in all_rounds_for_user[:20] if not r.excluded]
+        l20 = last_n_rounds(all_rounds_for_user, 20)
         if this_round.date not in [r.date for r in all_rounds_for_user[:20]]:
             l20.insert(0, this_round)
             l20 = l20[:20]
