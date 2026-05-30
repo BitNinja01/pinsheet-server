@@ -370,7 +370,7 @@ body {
 .ps-table th.r,
 .ps-table td.r { text-align: right; }
 .ps-table td {
-    padding: 7px var(--ps-sp-3);
+    padding: 10px var(--ps-sp-3);
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
     font-size: var(--ps-fs-body);
     vertical-align: middle;
