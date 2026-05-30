@@ -177,7 +177,8 @@ def register_rounds_routes(app):
         golf_round["differential"] = str(differential)
 
         g.all_rounds.insert(0, golf_round)
-        new_hi = calc_handicap_index(g.all_rounds, g.settings.get("include_9hole", True))
+        all_typed = [dict_to_round(r) for r in g.all_rounds]
+        new_hi = calc_handicap_index(all_typed, g.settings.get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
 
