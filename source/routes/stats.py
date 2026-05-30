@@ -16,7 +16,7 @@ from calc import (
     calc_best_gir_round, calc_best_fir_round, calc_season_yardage,
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
 )
-from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data
+from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
 
 
 def register_stats_routes(app):
@@ -55,16 +55,7 @@ def register_stats_routes(app):
                 {"label": "L20", "value": _fmt(l20v)},
             ]
             value = _fmt(b8v)
-            delta_text = "\u2014"
-            delta_class = ""
-            cell_class = ""
-            if b8v is not None and l20v is not None:
-                raw = b8v - l20v
-                if raw != 0:
-                    is_up = (raw > 0 and higher_better) or (raw < 0 and not higher_better)
-                    delta_class = "is-up" if is_up else "is-down"
-                    cell_class = "is-improved" if is_up else "is-declined"
-                    delta_text = f"{raw:+.{precision}f}{suffix} vs L20"
+            delta_class, delta_text, cell_class = stat_delta(b8v, l20v, higher_better, precision, suffix)
             return {
                 "label": label, "value": value,
                 "delta": delta_text, "delta_class": delta_class,
@@ -125,18 +116,11 @@ def register_stats_routes(app):
         _sc_b8 = calc_scramble_percent(b8, g.courses)
         _sc_l20 = calc_scramble_percent(l20, g.courses)
 
-        def _sd(b8v, l20v, suffix="", precision=1, higher_better=False):
-            if b8v is not None and l20v is not None and b8v != l20v:
-                raw = b8v - l20v
-                is_up = (raw > 0 and higher_better) or (raw < 0 and not higher_better)
-                return ("is-up" if is_up else "is-down"), f"{raw:+.{precision}f}{suffix} vs L20"
-            return "", "\u2014"
-
-        _sd_sa_cls, _sd_sa_txt = _sd(_sa_b8, _sa_l20, "", 1, False)
-        _sd_fir_cls, _sd_fir_txt = _sd(_fir_b8, _fir_l20, "%", 1, True)
-        _sd_gir_cls, _sd_gir_txt = _sd(_gir_b8, _gir_l20, "%", 1, True)
-        _sd_pt_cls, _sd_pt_txt = _sd(_pt_b8, _pt_l20, "", 1, False)
-        _sd_sc_cls, _sd_sc_txt = _sd(_sc_b8, _sc_l20, "%", 1, True)
+        _sd_sa_cls, _sd_sa_txt, _ = stat_delta(_sa_b8, _sa_l20, False, 1, "")
+        _sd_fir_cls, _sd_fir_txt, _ = stat_delta(_fir_b8, _fir_l20, True, 1, "%")
+        _sd_gir_cls, _sd_gir_txt, _ = stat_delta(_gir_b8, _gir_l20, True, 1, "%")
+        _sd_pt_cls, _sd_pt_txt, _ = stat_delta(_pt_b8, _pt_l20, False, 1, "")
+        _sd_sc_cls, _sd_sc_txt, _ = stat_delta(_sc_b8, _sc_l20, True, 1, "%")
 
         strip_data = [
             {"label": "Rounds", "value": str(len(all_eligible)), "is_pct": False,
