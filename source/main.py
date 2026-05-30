@@ -22,7 +22,6 @@ from flask import Flask, request, g
 
 from database import set_db_path, init_db
 from store import (
-    load_settings, get_courses, get_all_rounds,
     get_user_by_id, get_user,
 )
 
@@ -104,10 +103,6 @@ def _load_globals():
 
     if g.view_user is None:
         return
-
-    g.settings = load_settings(g.view_user["id"])
-    g.courses = get_courses()
-    g.all_rounds = get_all_rounds(g.view_user["id"])
 
 
 @app.context_processor

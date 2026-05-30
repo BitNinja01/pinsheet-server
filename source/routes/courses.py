@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 
 from store import save_course, delete_course, get_users
 from source._helpers import requires_own_data
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 from source.plugin import fire_hook
 
 
@@ -12,17 +13,17 @@ def register_courses_routes(app):
     def course_entry():
         if not g.is_own_data:
             return "You can only enter data for yourself.", 403
-        return render_template("course_entry.html", courses=g.courses, settings=g.settings, all_users=get_users())
+        return render_template("course_entry.html", courses=get_courses(), settings=get_settings(), all_users=get_users())
 
     @app.route("/courses")
     @login_required
     def course_list():
         course_data = []
-        for name, course in g.courses.items():
+        for name, course in get_courses().items():
             location = course.get("location", "")
             play_count = 0
             last_played = None
-            for r in g.all_rounds:
+            for r in get_all_rounds_for_user():
                 if r.course == name:
                     play_count += 1
                     if last_played is None or r.date > last_played:
@@ -37,19 +38,19 @@ def register_courses_routes(app):
 
         course_data.sort(key=lambda c: c["name"].lower())
 
-        return render_template("courses.html", courses=course_data, settings=g.settings, all_users=get_users())
+        return render_template("courses.html", courses=course_data, settings=get_settings(), all_users=get_users())
 
     @app.route("/courses/<name>")
     @login_required
     def course_detail(name):
-        course = g.courses.get(name)
+        course = get_courses().get(name)
         if not course:
             return "Course not found", 404
 
         play_count = 0
         first_played = None
         last_played = None
-        for r in g.all_rounds:
+        for r in get_all_rounds_for_user():
             if r.course == name:
                 play_count += 1
                 d = r.date
@@ -80,7 +81,7 @@ def register_courses_routes(app):
         return render_template("course_detail.html",
             course=course, name=name, tees=tees, holes=hole_rows,
             play_count=play_count, first_played=first_played, last_played=last_played,
-            settings=g.settings,
+            settings=get_settings(),
             all_users=get_users(),
         )
 
@@ -112,7 +113,7 @@ def register_courses_routes(app):
     @login_required
     @requires_own_data
     def api_courses_delete(name):
-        for r in g.all_rounds:
+        for r in get_all_rounds_for_user():
             if r.course == name:
                 return jsonify({"error": "Cannot delete course with existing rounds"}), 409
         delete_course(name)

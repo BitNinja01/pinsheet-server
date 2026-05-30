@@ -21,6 +21,7 @@ from calc import (
 from source._helpers import requires_own_data, sparkline_svg, per_round_hole_stats
 from source.calc.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
 _log = logging.getLogger("pinsheet")
 
@@ -32,17 +33,19 @@ def register_rounds_routes(app):
         if not g.is_own_data:
             return "You can only enter data for yourself.", 403
         today = date.today().isoformat()
-        no_courses = len(g.courses) == 0
-        return render_template("round_entry.html", settings=g.settings, courses=g.courses, today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
+        no_courses = len(get_courses()) == 0
+        return render_template("round_entry.html", settings=get_settings(), courses=get_courses(), today=today, no_courses=no_courses, current_page="round_entry", all_users=get_users())
 
     @app.route("/rounds")
     @login_required
     def rounds_list():
-        include_9hole = g.settings.get("include_9hole", True)
+        settings = get_settings()
+        all_rounds_for_user = get_all_rounds_for_user()
+        include_9hole = settings.get("include_9hole", True)
 
         rounds_data = []
-        for r in g.all_rounds:
-            course = g.courses.get(r.course, {})
+        for r in all_rounds_for_user:
+            course = get_courses().get(r.course, {})
             total = r.total_gross
             par = course.get("par", 0)
             score_to_par = int(total) - int(par) if total and par and total != "0" else None
@@ -74,14 +77,14 @@ def register_rounds_routes(app):
                 "putts": total_putts,
             })
 
-        best_rounds = get_best_n_rounds(g.all_rounds, include_9hole)
+        best_rounds = get_best_n_rounds(all_rounds_for_user, include_9hole)
         best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
                 rd["in_handicap"] = True
 
         return render_template("rounds_list.html", rounds=rounds_data,
-                               settings=g.settings, all_users=get_users(),
+                               settings=settings, all_users=get_users(),
                                include_9hole=include_9hole,
                                current_page="rounds_list")
 
@@ -134,7 +137,7 @@ def register_rounds_routes(app):
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
 
-        course = g.courses.get(course_name, {})
+        course = get_courses().get(course_name, {})
         tees = course.get("tees", {}).get(tees_name, {})
 
         holes_sel = data.get("holes_played", "18")
@@ -175,8 +178,9 @@ def register_rounds_routes(app):
         golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
-        g.all_rounds.insert(0, golf_round_typed)
-        new_hi = calc_handicap_index(g.all_rounds, g.settings.get("include_9hole", True))
+        all_rounds_for_user = get_all_rounds_for_user()
+        all_rounds_for_user.insert(0, golf_round_typed)
+        new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
@@ -201,15 +205,16 @@ def register_rounds_routes(app):
     @app.route("/rounds/<date>/<index>")
     @login_required
     def round_detail(date, index):
+        all_rounds_for_user = get_all_rounds_for_user()
         round_data = None
-        for r in g.all_rounds:
+        for r in all_rounds_for_user:
             if r.date == date and str(r.index) == str(index):
                 round_data = r
                 break
         if not round_data:
             return "Round not found", 404
 
-        course = g.courses.get(round_data.course, {})
+        course = get_courses().get(round_data.course, {})
         course_holes = course.get("holes", {})
         entry_mode = round_data.entry_mode
 
@@ -255,25 +260,26 @@ def register_rounds_routes(app):
             back_nine={"gross": back_gross, "par": back_par, "putts": back_putts},
             total={"gross": total_gross, "par": total_par,
                    "diff": total_gross - total_par if total_par else 0},
-            settings=g.settings,
+            settings=get_settings(),
             all_users=get_users(),
         )
 
     @app.route("/rounds/<date>/<index>/report")
     @login_required
     def report_card(date, index):
+        all_rounds_for_user = get_all_rounds_for_user()
         this_round = None
-        for r in g.all_rounds:
+        for r in all_rounds_for_user:
             if r.date == date and str(r.index) == str(index):
                 this_round = r
                 break
         if not this_round:
             return "Round not found", 404
 
-        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
 
-        l20 = [r for r in g.all_rounds[:20] if not r.excluded]
-        if this_round.date not in [r.date for r in g.all_rounds[:20]]:
+        l20 = [r for r in all_rounds_for_user[:20] if not r.excluded]
+        if this_round.date not in [r.date for r in all_rounds_for_user[:20]]:
             l20.insert(0, this_round)
             l20 = l20[:20]
 
@@ -303,7 +309,7 @@ def register_rounds_routes(app):
 
         rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round]), calc_penalties_per_round(l20), False, "", 1))
 
-        return render_template("report_card.html", rows=rows, round=this_round, settings=g.settings, all_users=get_users())
+        return render_template("report_card.html", rows=rows, round=this_round, settings=get_settings(), all_users=get_users())
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required

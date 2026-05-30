@@ -7,11 +7,12 @@ from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import (
-    save_settings, get_courses, save_course, save_round,
+    save_settings, save_course, save_round,
     get_all_rounds, update_round_handicap, get_users,
 )
 from calc import calc_handicap_index
 from source._helpers import requires_own_data
+from source.request_data import get_settings, get_courses
 
 
 _log = logging.getLogger("pinsheet")
@@ -22,7 +23,7 @@ def register_settings_routes(app, csrf):
     @login_required
     def settings_page():
         themes = ["dark", "light"]
-        return render_template("settings.html", settings=g.settings, courses=g.courses, themes=themes,
+        return render_template("settings.html", settings=get_settings(), courses=get_courses(), themes=themes,
                                current_page="settings", all_users=get_users())
 
     @app.route("/settings/import", methods=["GET", "POST"])
@@ -32,14 +33,14 @@ def register_settings_routes(app, csrf):
         if request.method == "POST":
             uploaded = request.files.get("zipfile")
             if not uploaded:
-                return render_template("settings_import.html", settings=g.settings, imported=None,
+                return render_template("settings_import.html", settings=get_settings(), imported=None,
                                        error="No file provided", current_page="settings",
                                        all_users=get_users())
 
             try:
                 zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
             except zipfile.BadZipFile:
-                return render_template("settings_import.html", settings=g.settings, imported=None,
+                return render_template("settings_import.html", settings=get_settings(), imported=None,
                                        error="Invalid zip file", current_page="settings",
                                        all_users=get_users())
 
@@ -65,19 +66,19 @@ def register_settings_routes(app, csrf):
 
             all_imported = get_all_rounds(user_id)
             chronological = list(reversed(all_imported))
-            include_9hole = g.settings.get("include_9hole", True)
+            include_9hole = get_settings().get("include_9hole", True)
             for i, r in enumerate(chronological):
                 window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:
                     update_round_handicap(r.date, r.index, hi, user_id)
 
-            return render_template("settings_import.html", settings=g.settings,
+            return render_template("settings_import.html", settings=get_settings(),
                                    imported={"courses": courses_count, "rounds": rounds_count},
                                    current_page="settings",
                                    all_users=get_users())
 
-        return render_template("settings_import.html", settings=g.settings, imported=None,
+        return render_template("settings_import.html", settings=get_settings(), imported=None,
                                current_page="settings", all_users=get_users())
 
     @csrf.exempt

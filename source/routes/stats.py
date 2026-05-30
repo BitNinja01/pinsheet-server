@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_courses, get_all_rounds, get_users, create_invite_code, get_invite_codes
+from store import get_users, create_invite_code, get_invite_codes
 from calc import (
     calc_scoring_average, calc_fir_percent, calc_gir_percent,
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
@@ -19,16 +19,18 @@ from calc import (
 )
 from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
 from source.calc.models import dict_to_course
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
 
 def register_stats_routes(app):
     @app.route("/stats")
     @login_required
     def stats():
-        include_9hole = g.settings.get("include_9hole", True)
+        include_9hole = get_settings().get("include_9hole", True)
 
-        rounds = list(g.all_rounds)
-        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+        all_rounds = get_all_rounds_for_user()
+        rounds = list(all_rounds)
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
 
         all_eligible = [r for r in rounds if not r.excluded]
         b8 = _best_n_rounds(rounds, courses_dict, 8)
@@ -242,7 +244,7 @@ def register_stats_routes(app):
             strip=strip_data,
             sections=sections_data,
             bests_section=bests_data,
-            settings=g.settings,
+            settings=get_settings(),
             all_users=get_users(),
             current_page="stats",
         )
@@ -250,13 +252,15 @@ def register_stats_routes(app):
     @app.route("/season")
     @login_required
     def season_summary():
-        include_9hole = g.settings.get("include_9hole", True)
+        settings = get_settings()
+        include_9hole = settings.get("include_9hole", True)
 
-        rounds = list(g.all_rounds)
-        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+        all_rounds = get_all_rounds_for_user()
+        rounds = list(all_rounds)
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
 
-        if g.settings.get("season_enabled"):
-            season_rounds = calc_season_rounds(rounds, g.settings)
+        if settings.get("season_enabled"):
+            season_rounds = calc_season_rounds(rounds, settings)
         else:
             season_rounds = rounds
 
@@ -281,7 +285,7 @@ def register_stats_routes(app):
         total_rounds = calc_rounds_total(rounds)
 
         return render_template("season_summary.html",
-            settings=g.settings,
+            settings=settings,
             rounds_count=rounds_count,
             total_rounds=total_rounds,
             journey=journey,
@@ -312,10 +316,10 @@ def register_stats_routes(app):
         if request.method == "POST":
             code = create_invite_code(current_user.id)
             base_url = request.host_url.rstrip("/")
-            return render_template("admin_invites.html", settings=g.settings,
+            return render_template("admin_invites.html", settings=get_settings(),
                                    codes=get_invite_codes(), new_code=code, base_url=base_url,
                                    all_users=get_users())
 
-        return render_template("admin_invites.html", settings=g.settings,
+        return render_template("admin_invites.html", settings=get_settings(),
                                codes=get_invite_codes(), new_code=None, base_url=None,
                                all_users=get_users())

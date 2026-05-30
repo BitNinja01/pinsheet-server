@@ -4,24 +4,26 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_courses, get_all_rounds, get_users, get_user_by_id, save_settings
+from store import get_users, get_user_by_id, save_settings
 from calc import calc_last_year_handicap, get_best_n_rounds, calc_handicap_values_in_range, calc_career_low_handicap
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 
 from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
 from source.calc.models import dict_to_course
+from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
 
 def register_dashboard_routes(app, limiter, csrf):
     @app.route("/")
     @login_required
     def dashboard():
-        if not g.settings.get("welcome_shown"):
-            return render_template("welcome.html", settings=g.settings, all_users=get_users())
-        include_9hole = g.settings.get("include_9hole", True)
+        if not get_settings().get("welcome_shown"):
+            return render_template("welcome.html", settings=get_settings(), all_users=get_users())
+        include_9hole = get_settings().get("include_9hole", True)
 
-        rounds = list(g.all_rounds)
-        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+        all_rounds = get_all_rounds_for_user()
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
+        rounds = list(all_rounds)
 
         l20 = _last_n_rounds(rounds, courses_dict, 20)
         b8 = _best_n_rounds(rounds, courses_dict, 8)
@@ -47,8 +49,8 @@ def register_dashboard_routes(app, limiter, csrf):
             panels["handicap"]["subtitle"] = f"1y {last_year_hi:.1f}"
 
         rounds_data = []
-        for r in g.all_rounds[:20]:
-            course = g.courses.get(r.course, {})
+        for r in all_rounds[:20]:
+            course = get_courses().get(r.course, {})
             total = r.total_gross
             par = course.get("par", 0)
             score_to_par = int(total) - int(par) if total and par and total != "0" else None
@@ -87,7 +89,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 rd["in_handicap"] = True
 
         all_hi_vals = []
-        for r in g.all_rounds:
+        for r in all_rounds:
             ch = r.computed_handicap
             if ch and ch != "0":
                 try:
@@ -100,9 +102,9 @@ def register_dashboard_routes(app, limiter, csrf):
         cutoff_2y = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
 
         chart_data = {
-            "3M": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_3m)),
-            "12M": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_12m)),
-            "2Y": _make_chart_data(calc_handicap_values_in_range(g.all_rounds, cutoff_2y)),
+            "3M": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_3m)),
+            "12M": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_12m)),
+            "2Y": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_2y)),
             "All": _make_chart_data(all_hi_vals[::-1]),
         }
 
@@ -120,7 +122,7 @@ def register_dashboard_routes(app, limiter, csrf):
         else:
             season_name = "Fall"
         yr = now.strftime("%y")
-        n = min(len(g.all_rounds), 12) if g.all_rounds else 0
+        n = min(len(all_rounds), 12) if all_rounds else 0
         season_label = f"{season_name} '{yr} · last {n} rounds"
 
         handicap_panel_val = panels.get("handicap", {}).get("value", "--")
@@ -133,7 +135,7 @@ def register_dashboard_routes(app, limiter, csrf):
         if handicap_panel_val and handicap_panel_val != "--":
             thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             prev_hi = None
-            for r in g.all_rounds:
+            for r in all_rounds:
                 if r.date <= thirty_days_ago and r.computed_handicap:
                     try:
                         prev_hi = float(r.computed_handicap)
@@ -149,13 +151,13 @@ def register_dashboard_routes(app, limiter, csrf):
             except (ValueError, TypeError):
                 pass
 
-        career_low = calc_career_low_handicap(g.all_rounds)
+        career_low = calc_career_low_handicap(all_rounds)
 
         hi_insight = None
         if handicap_panel_val and handicap_panel_val != "--":
             try:
                 curr = float(handicap_panel_val)
-                eligible_20 = [r for r in g.all_rounds[:20] if not r.excluded and r.differential and r.differential != "0"]
+                eligible_20 = [r for r in all_rounds[:20] if not r.excluded and r.differential and r.differential != "0"]
                 eligible_count = len(eligible_20)
                 best_ids = {(r.date, r.index) for r in best_rounds}
                 counting = sum(1 for r in eligible_20 if (r.date, r.index) in best_ids)
@@ -167,7 +169,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 pass
 
         return render_template("dashboard.html", panels=panels, rounds=rounds_data,
-                               last_year_hi=last_year_hi, settings=g.settings,
+                               last_year_hi=last_year_hi, settings=get_settings(),
                                current_page="dashboard",
                                season_label=season_label,
                                hi_movement=hi_movement, career_low=career_low, hi_insight=hi_insight,
@@ -178,6 +180,7 @@ def register_dashboard_routes(app, limiter, csrf):
     @login_required
     @csrf.exempt
     def api_welcome_done():
-        g.settings["welcome_shown"] = True
-        save_settings(g.settings, current_user.id)
+        settings = get_settings()
+        settings["welcome_shown"] = True
+        save_settings(settings, current_user.id)
         return jsonify({"ok": True})
