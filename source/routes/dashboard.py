@@ -1,0 +1,273 @@
+import json
+from datetime import date, timedelta, datetime
+
+from flask import render_template, request, jsonify, g, current_app
+from flask_login import login_required, current_user
+
+from store import get_courses, get_all_rounds, get_users, get_user_by_id, save_settings
+from calc import calc_last_year_handicap, get_best_n_rounds
+from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
+
+from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data
+
+
+def register_dashboard_routes(app, limiter, csrf):
+    @app.route("/")
+    @login_required
+    def dashboard():
+        if not g.settings.get("welcome_shown"):
+            return render_template("welcome.html", settings=g.settings, all_users=get_users())
+        include_9hole = g.settings.get("include_9hole", True)
+
+        l20 = _last_n_rounds(g.all_rounds, g.courses, 20)
+        b8 = _best_n_rounds(g.all_rounds, g.courses, 8)
+
+        panels = {}
+        for stat_def in STAT_CATALOG:
+            key = stat_def["key"]
+            if key not in DEFAULT_DASHBOARD_STATS:
+                continue
+            primary = stat_def["fn_primary"](l20, b8, g.courses, include_9hole)
+            secondary = stat_def["fn_secondary"](l20, b8, g.courses, include_9hole)
+            panels[key] = {
+                "label": stat_def["label"],
+                "value": f"{primary:.1f}{stat_def['suffix']}" if primary is not None else "--",
+                "secondary": f"{secondary:.1f}{stat_def['suffix']}" if secondary is not None else "--",
+                "higher_better": stat_def["higher_better"],
+                "color": f"rgb({stat_def['color'][0]},{stat_def['color'][1]},{stat_def['color'][2]})",
+                "blank_text": stat_def["blank_text"],
+            }
+
+        last_year_hi = calc_last_year_handicap(g.all_rounds, include_9hole)
+        if last_year_hi is not None:
+            panels["handicap"]["subtitle"] = f"1y {last_year_hi:.1f}"
+
+        rounds_data = []
+        for r in g.all_rounds[:20]:
+            course = g.courses.get(r.get("course", ""), {})
+            total = r.get("total_gross", "")
+            par = course.get("par", 0)
+            score_to_par = int(total) - int(par) if total and par and total != "0" else None
+            raw_mode = r.get("entry_mode")
+            display_mode = "normal" if raw_mode == "detailed" else (raw_mode or "score_only")
+
+            sparkline = None
+            holes_raw = r.get("holes")
+            if holes_raw:
+                sorted_nums = sorted(holes_raw.keys(), key=lambda x: int(x))
+                scores = []
+                for hn in sorted_nums:
+                    gv = holes_raw[hn].get("gross")
+                    if gv:
+                        scores.append(int(gv))
+                if len(scores) >= 2:
+                    lo, hi = min(scores), max(scores)
+                    rng = hi - lo if hi != lo else 1
+                    sp_w, sp_h, sp_pad = 210, 28, 2
+                    iw = sp_w - sp_pad * 2
+                    ih = sp_h - sp_pad * 2
+                    n = len(scores) - 1
+                    pts = []
+                    for j, s in enumerate(scores):
+                        pts.append((
+                            sp_pad + (j / n) * iw,
+                            sp_pad + (1 - (s - lo) / rng) * ih,
+                        ))
+                    path = " ".join(
+                        f"{'M' if j == 0 else 'L'}{x:.1f} {y:.1f}"
+                        for j, (x, y) in enumerate(pts)
+                    )
+                    fx, fy = pts[-1]
+                    sparkline = {
+                        "path": path,
+                        "final_x": f"{fx:.1f}",
+                        "final_y": f"{fy:.1f}",
+                    }
+
+            fir_display = None
+            gir_display = None
+            scr_display = None
+            total_putts = None
+            if r.get("holes"):
+                holes = r["holes"]
+                fir_hit = fir_attempts = 0
+                gir_hit = gir_total = 0
+                scr_updown = scr_opps = 0
+                total_putts = 0
+                course_holes_data = course.get("holes", {})
+                for hn, h in holes.items():
+                    fw = h.get("fairway", "")
+                    if fw and fw != "N":
+                        fir_attempts += 1
+                        if fw == "H":
+                            fir_hit += 1
+                    gi = h.get("gir", "")
+                    if gi:
+                        gir_total += 1
+                        if gi == "H":
+                            gir_hit += 1
+                        if gi != "H":
+                            scr_opps += 1
+                            try:
+                                hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
+                                if int(h.get("gross", 99)) <= hole_par:
+                                    scr_updown += 1
+                            except (ValueError, TypeError):
+                                pass
+                    try:
+                        total_putts += int(h.get("putts", 0) or 0)
+                    except (ValueError, TypeError):
+                        pass
+                if fir_attempts > 0:
+                    fir_display = f"{fir_hit}/{fir_attempts}"
+                if gir_total > 0:
+                    gir_display = f"{gir_hit}/{gir_total}"
+                if scr_opps > 0:
+                    scr_display = f"{scr_updown}/{scr_opps}"
+
+            rounds_data.append({
+                "date": r.get("date", ""),
+                "course": r.get("course", ""),
+                "tees": r.get("tees", ""),
+                "total": total,
+                "score_to_par": score_to_par,
+                "differential": r.get("differential", ""),
+                "index": r.get("index", 0),
+                "in_handicap": False,
+                "entry_mode_display": display_mode,
+                "sparkline": sparkline,
+                "fir_display": fir_display,
+                "gir_display": gir_display,
+                "scr_display": scr_display,
+                "putts": total_putts,
+            })
+
+        best_rounds = get_best_n_rounds(g.all_rounds, include_9hole)
+        best_keys = {(r.get("date", ""), r.get("index", 0)) for r in best_rounds}
+        for rd in rounds_data:
+            if (rd["date"], rd["index"]) in best_keys:
+                rd["in_handicap"] = True
+
+        all_hi_vals = []
+        for r in g.all_rounds:
+            ch = r.get("computed_handicap")
+            if ch and ch != "0":
+                try:
+                    all_hi_vals.append(float(ch))
+                except ValueError:
+                    pass
+
+        cutoff_3m = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+        cutoff_12m = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        cutoff_2y = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
+
+        def _get_hi_for_range(cutoff):
+            vals = []
+            for r in g.all_rounds:
+                if r.get("date", "") < cutoff:
+                    continue
+                ch = r.get("computed_handicap")
+                if ch and ch != "0":
+                    try:
+                        vals.append(float(ch))
+                    except ValueError:
+                        pass
+            vals.reverse()
+            return vals
+
+        chart_data = {
+            "3M": _make_chart_data(_get_hi_for_range(cutoff_3m)),
+            "12M": _make_chart_data(_get_hi_for_range(cutoff_12m)),
+            "2Y": _make_chart_data(_get_hi_for_range(cutoff_2y)),
+            "All": _make_chart_data(all_hi_vals[::-1]),
+        }
+
+        chart = chart_data["12M"]
+        chart_data_json = json.dumps(chart_data)
+
+        now = datetime.now()
+        start_month = now.month
+        if start_month <= 2:
+            season_name = "Winter"
+        elif start_month <= 5:
+            season_name = "Spring"
+        elif start_month <= 8:
+            season_name = "Summer"
+        else:
+            season_name = "Fall"
+        yr = now.strftime("%y")
+        n = min(len(g.all_rounds), 12) if g.all_rounds else 0
+        season_label = f"{season_name} '{yr} · last {n} rounds"
+
+        handicap_panel_val = panels.get("handicap", {}).get("value", "--")
+
+        if handicap_panel_val and handicap_panel_val != "--":
+            chart["label_v"] = handicap_panel_val
+            chart["hero_value"] = handicap_panel_val
+
+        hi_movement = None
+        if handicap_panel_val and handicap_panel_val != "--":
+            thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            prev_hi = None
+            for r in g.all_rounds:
+                if r.get("date", "") <= thirty_days_ago and r.get("computed_handicap"):
+                    try:
+                        prev_hi = float(r["computed_handicap"])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            try:
+                curr = float(handicap_panel_val)
+                if prev_hi is not None:
+                    diff = prev_hi - curr
+                    arrow = "▼" if diff > 0 else "▲"
+                    hi_movement = f"{arrow} {abs(diff):.1f} this month"
+            except (ValueError, TypeError):
+                pass
+
+        career_low = None
+        best_hi = 999.9
+        for r in g.all_rounds:
+            if r.get("excluded"):
+                continue
+            ch = r.get("computed_handicap")
+            if ch and ch not in ("0", "0.0", "--"):
+                try:
+                    v = float(ch)
+                    if 0 < v < best_hi:
+                        best_hi = v
+                except (ValueError, TypeError):
+                    pass
+        if best_hi < 999.0:
+            career_low = str(round(best_hi, 1))
+
+        hi_insight = None
+        if handicap_panel_val and handicap_panel_val != "--":
+            try:
+                curr = float(handicap_panel_val)
+                eligible_20 = [r for r in g.all_rounds[:20] if not r.get("excluded") and r.get("differential") and r["differential"] != "0"]
+                eligible_count = len(eligible_20)
+                best_ids = {(r.get("date"), r.get("index")) for r in best_rounds}
+                counting = sum(1 for r in eligible_20 if (r.get("date"), r.get("index")) in best_ids)
+                hi_insight = f"{counting} of your last {eligible_count} rounds counted toward index."
+                target = curr - 0.3
+                if target > 0:
+                    hi_insight += f" Two more at net par or better drops you below {target:.1f}."
+            except (ValueError, TypeError):
+                pass
+
+        return render_template("dashboard.html", panels=panels, rounds=rounds_data,
+                               last_year_hi=last_year_hi, settings=g.settings,
+                               current_page="dashboard",
+                               season_label=season_label,
+                               hi_movement=hi_movement, career_low=career_low, hi_insight=hi_insight,
+                               chart=chart, chart_data_json=chart_data_json,
+                               all_users=get_users())
+
+    @app.route("/api/welcome", methods=["POST"])
+    @login_required
+    @csrf.exempt
+    def api_welcome_done():
+        g.settings["welcome_shown"] = True
+        save_settings(g.settings, current_user.id)
+        return jsonify({"ok": True})
