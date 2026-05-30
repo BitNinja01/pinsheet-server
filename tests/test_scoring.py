@@ -8,11 +8,15 @@ from calc.scoring import (
     calc_clean_card_percent,
     calc_scoring_consistency,
     calc_score_components,
+    calc_per_hole_stats,
+)
+from calc.analysis import (
     calc_penalty_stats,
     calc_momentum_recovery,
+)
+from calc.milestones import (
     calc_personal_bests,
     calc_nemesis_best_holes,
-    calc_per_hole_stats,
 )
 
 
