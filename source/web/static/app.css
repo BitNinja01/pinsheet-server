@@ -406,7 +406,7 @@ body {
 }
 .ps-score.is-under { color: var(--ps-accent); }
 .ps-topar {
-    font-size: var(--ps-fs-micro);
+    font-size: var(--ps-fs-body);
     color: var(--ps-ink-3);
     margin-left: 6px;
 }
