@@ -36,7 +36,7 @@ def register_stats_routes(app):
         l20 = _last_n_rounds(rounds, courses_dict, 20)
 
         now = datetime.now()
-        this_month_rounds = sum(1 for r in all_eligible if r.get("date", "").startswith(now.strftime("%Y-%m")))
+        this_month_rounds = sum(1 for r in all_eligible if r.date.startswith(now.strftime("%Y-%m")))
 
         def fmt_val(val, suffix="", precision=1):
             if val is None:

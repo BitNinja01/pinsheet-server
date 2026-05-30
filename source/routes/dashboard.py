@@ -185,7 +185,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 curr = float(handicap_panel_val)
                 eligible_20 = [r for r in g.all_rounds[:20] if not r.get("excluded") and r.get("differential") and r["differential"] != "0"]
                 eligible_count = len(eligible_20)
-                best_ids = {(r.get("date"), r.get("index")) for r in best_rounds}
+                best_ids = {(r.date, r.index) for r in best_rounds}
                 counting = sum(1 for r in eligible_20 if (r.get("date"), r.get("index")) in best_ids)
                 hi_insight = f"{counting} of your last {eligible_count} rounds counted toward index."
                 target = curr - 0.3
