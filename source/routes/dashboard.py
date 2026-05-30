@@ -9,6 +9,7 @@ from calc import calc_last_year_handicap, get_best_n_rounds
 from web.catalog import STAT_CATALOG, DEFAULT_DASHBOARD_STATS
 
 from source._helpers import _last_n_rounds, _best_n_rounds, _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
+from source.calc.models import dict_to_round, dict_to_course
 
 
 def register_dashboard_routes(app, limiter, csrf):
@@ -19,16 +20,19 @@ def register_dashboard_routes(app, limiter, csrf):
             return render_template("welcome.html", settings=g.settings, all_users=get_users())
         include_9hole = g.settings.get("include_9hole", True)
 
-        l20 = _last_n_rounds(g.all_rounds, g.courses, 20)
-        b8 = _best_n_rounds(g.all_rounds, g.courses, 8)
+        rounds = [dict_to_round(r) for r in g.all_rounds]
+        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+
+        l20 = _last_n_rounds(rounds, courses_dict, 20)
+        b8 = _best_n_rounds(rounds, courses_dict, 8)
 
         panels = {}
         for stat_def in STAT_CATALOG:
             key = stat_def["key"]
             if key not in DEFAULT_DASHBOARD_STATS:
                 continue
-            primary = stat_def["fn_primary"](l20, b8, g.courses, include_9hole)
-            secondary = stat_def["fn_secondary"](l20, b8, g.courses, include_9hole)
+            primary = stat_def["fn_primary"](l20, b8, courses_dict, include_9hole)
+            secondary = stat_def["fn_secondary"](l20, b8, courses_dict, include_9hole)
             panels[key] = {
                 "label": stat_def["label"],
                 "value": f"{primary:.1f}{stat_def['suffix']}" if primary is not None else "--",
@@ -38,7 +42,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 "blank_text": stat_def["blank_text"],
             }
 
-        last_year_hi = calc_last_year_handicap(g.all_rounds, include_9hole)
+        last_year_hi = calc_last_year_handicap(rounds, include_9hole)
         if last_year_hi is not None:
             panels["handicap"]["subtitle"] = f"1y {last_year_hi:.1f}"
 
@@ -76,8 +80,8 @@ def register_dashboard_routes(app, limiter, csrf):
                 "putts": total_putts,
             })
 
-        best_rounds = get_best_n_rounds(g.all_rounds, include_9hole)
-        best_keys = {(r.get("date", ""), r.get("index", 0)) for r in best_rounds}
+        best_rounds = get_best_n_rounds(rounds, include_9hole)
+        best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
                 rd["in_handicap"] = True

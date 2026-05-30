@@ -17,6 +17,7 @@ from calc import (
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
 )
 from source._helpers import _last_n_rounds, _best_n_rounds, requires_own_data, stat_delta
+from source.calc.models import dict_to_round, dict_to_course, HoleDef
 
 
 def register_stats_routes(app):
@@ -25,11 +26,14 @@ def register_stats_routes(app):
     def stats():
         include_9hole = g.settings.get("include_9hole", True)
 
-        all_eligible = [r for r in g.all_rounds if not r.get("excluded")]
-        b8 = _best_n_rounds(g.all_rounds, g.courses, 8)
-        l5 = _last_n_rounds(g.all_rounds, g.courses, 5)
-        l10 = _last_n_rounds(g.all_rounds, g.courses, 10)
-        l20 = _last_n_rounds(g.all_rounds, g.courses, 20)
+        rounds = [dict_to_round(r) for r in g.all_rounds]
+        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+
+        all_eligible = [r for r in rounds if not r.excluded]
+        b8 = _best_n_rounds(rounds, courses_dict, 8)
+        l5 = _last_n_rounds(rounds, courses_dict, 5)
+        l10 = _last_n_rounds(rounds, courses_dict, 10)
+        l20 = _last_n_rounds(rounds, courses_dict, 20)
 
         now = datetime.now()
         this_month_rounds = sum(1 for r in all_eligible if r.get("date", "").startswith(now.strftime("%Y-%m")))
@@ -74,47 +78,41 @@ def register_stats_routes(app):
         def _per_round_stat(rounds, predicate):
             total = 0
             for r in rounds:
-                course = g.courses.get(r.get("course", ""), {})
-                course_holes = course.get("holes", {})
-                for hn, h in r.get("holes", {}).items():
-                    try:
-                        gross = int(h.get("gross", 0))
-                        par = int(course_holes.get(hn, {}).get("par", 0))
-                        if gross and par and predicate(gross, par):
-                            total += 1
-                    except (ValueError, TypeError):
-                        pass
+                course = courses_dict.get(r.course)
+                course_holes = course.holes if course else {}
+                for hn, h in r.holes.items():
+                    gross = h.gross
+                    par = course_holes.get(hn, HoleDef()).par
+                    if gross and par and predicate(gross, par):
+                        total += 1
             return total / len(rounds) if rounds else None
 
         def _hole_pct(rounds, predicate):
             hits = 0
             total = 0
             for r in rounds:
-                course = g.courses.get(r.get("course", ""), {})
-                course_holes = course.get("holes", {})
-                for hn, h in r.get("holes", {}).items():
-                    try:
-                        gross = int(h.get("gross", 0))
-                        par = int(course_holes.get(hn, {}).get("par", 0))
-                        if gross and par:
-                            total += 1
-                            if predicate(gross, par):
-                                hits += 1
-                    except (ValueError, TypeError):
-                        pass
+                course = courses_dict.get(r.course)
+                course_holes = course.holes if course else {}
+                for hn, h in r.holes.items():
+                    gross = h.gross
+                    par = course_holes.get(hn, HoleDef()).par
+                    if gross and par:
+                        total += 1
+                        if predicate(gross, par):
+                            hits += 1
             return (hits / total * 100) if total else None
 
         # ── Stat Strip ──────────────────────────────────────────────────
         _sa_b8 = calc_scoring_average(b8)
         _sa_l20 = calc_scoring_average(l20)
-        _fir_b8 = calc_fir_percent(b8, g.courses)
-        _fir_l20 = calc_fir_percent(l20, g.courses)
+        _fir_b8 = calc_fir_percent(b8, courses_dict)
+        _fir_l20 = calc_fir_percent(l20, courses_dict)
         _gir_b8 = calc_gir_percent(b8)
         _gir_l20 = calc_gir_percent(l20)
         _pt_b8 = calc_putts_per_round(b8)
         _pt_l20 = calc_putts_per_round(l20)
-        _sc_b8 = calc_scramble_percent(b8, g.courses)
-        _sc_l20 = calc_scramble_percent(l20, g.courses)
+        _sc_b8 = calc_scramble_percent(b8, courses_dict)
+        _sc_l20 = calc_scramble_percent(l20, courses_dict)
 
         _sd_sa_cls, _sd_sa_txt, _ = stat_delta(_sa_b8, _sa_l20, False, 1, "")
         _sd_fir_cls, _sd_fir_txt, _ = stat_delta(_fir_b8, _fir_l20, True, 1, "%")
@@ -200,10 +198,10 @@ def register_stats_routes(app):
         }
 
         # ── Section 3: Short Game Statistics ────────────────────────────
-        _sc_b8 = calc_scramble_percent(b8, g.courses)
-        _sc_l5_ = calc_scramble_percent(l5, g.courses)
-        _sc_l10 = calc_scramble_percent(l10, g.courses)
-        _sc_l20_ = calc_scramble_percent(l20, g.courses)
+        _sc_b8 = calc_scramble_percent(b8, courses_dict)
+        _sc_l5_ = calc_scramble_percent(l5, courses_dict)
+        _sc_l10 = calc_scramble_percent(l10, courses_dict)
+        _sc_l20_ = calc_scramble_percent(l20, courses_dict)
 
         _px_b8 = calc_penalties_per_round(b8)
         _px_l5 = calc_penalties_per_round(l5)
@@ -223,20 +221,20 @@ def register_stats_routes(app):
         }
 
         # ── Section 4: Tee to Green Statistics ─────────────────────────
-        _fir_b8 = calc_fir_percent(b8, g.courses)
-        _fir_l5_ = calc_fir_percent(l5, g.courses)
-        _fir_l10 = calc_fir_percent(l10, g.courses)
-        _fir_l20_ = calc_fir_percent(l20, g.courses)
+        _fir_b8 = calc_fir_percent(b8, courses_dict)
+        _fir_l5_ = calc_fir_percent(l5, courses_dict)
+        _fir_l10 = calc_fir_percent(l10, courses_dict)
+        _fir_l20_ = calc_fir_percent(l20, courses_dict)
 
         _gir_b8 = calc_gir_percent(b8)
         _gir_l5_ = calc_gir_percent(l5)
         _gir_l10 = calc_gir_percent(l10)
         _gir_l20_ = calc_gir_percent(l20)
 
-        _p3_b8 = calc_scoring_avg_by_par_type(b8, g.courses).get(3)
-        _p3_l5 = calc_scoring_avg_by_par_type(l5, g.courses).get(3)
-        _p3_l10 = calc_scoring_avg_by_par_type(l10, g.courses).get(3)
-        _p3_l20 = calc_scoring_avg_by_par_type(l20, g.courses).get(3)
+        _p3_b8 = calc_scoring_avg_by_par_type(b8, courses_dict).get(3)
+        _p3_l5 = calc_scoring_avg_by_par_type(l5, courses_dict).get(3)
+        _p3_l10 = calc_scoring_avg_by_par_type(l10, courses_dict).get(3)
+        _p3_l20 = calc_scoring_avg_by_par_type(l20, courses_dict).get(3)
 
         section4 = {
             "label": "Tee to Green",
@@ -253,7 +251,7 @@ def register_stats_routes(app):
         sections_data = [section1, section2, section3, section4]
 
         # ── Bests ───────────────────────────────────────────────────────
-        bests = calc_personal_bests(g.all_rounds, g.courses)
+        bests = calc_personal_bests(rounds, courses_dict)
         bests_data = {
             "label": "Bests",
             "headline": "Your personal best performances.",
@@ -280,30 +278,33 @@ def register_stats_routes(app):
     def season_summary():
         include_9hole = g.settings.get("include_9hole", True)
 
-        if g.settings.get("season_enabled"):
-            season_rounds = calc_season_rounds(g.all_rounds, g.settings)
-        else:
-            season_rounds = g.all_rounds
+        rounds = [dict_to_round(r) for r in g.all_rounds]
+        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
 
-        hi = calc_handicap_index(g.all_rounds, include_9hole)
-        journey = calc_hi_journey(g.all_rounds, season_rounds, hi)
+        if g.settings.get("season_enabled"):
+            season_rounds = calc_season_rounds(rounds, g.settings)
+        else:
+            season_rounds = rounds
+
+        hi = calc_handicap_index(rounds, include_9hole)
+        journey = calc_hi_journey(rounds, season_rounds, hi)
         most_played = calc_most_played_course(season_rounds)
         golfiest = calc_golfiest_month(season_rounds)
         common_day = calc_most_common_day(season_rounds)
         best_round = calc_best_single_round(season_rounds)
         best_stretch = calc_best_3round_stretch(season_rounds)
         biggest_improvement = calc_biggest_improvement(season_rounds)
-        first_score_ms = calc_first_score_milestone(season_rounds, g.all_rounds)
-        first_hi_ms = calc_first_hi_milestone(season_rounds, g.all_rounds)
-        breakdown = calc_score_breakdown(season_rounds, g.courses)
-        hole_in_ones = calc_hole_in_ones(season_rounds, g.courses)
+        first_score_ms = calc_first_score_milestone(season_rounds, rounds)
+        first_hi_ms = calc_first_hi_milestone(season_rounds, rounds)
+        breakdown = calc_score_breakdown(season_rounds, courses_dict)
+        hole_in_ones = calc_hole_in_ones(season_rounds, courses_dict)
         best_gir = calc_best_gir_round(season_rounds)
-        best_fir = calc_best_fir_round(season_rounds, g.courses)
-        walking_miles = calc_season_yardage(season_rounds, g.courses, "walking")
-        riding_miles = calc_season_yardage(season_rounds, g.courses, "riding")
+        best_fir = calc_best_fir_round(season_rounds, courses_dict)
+        walking_miles = calc_season_yardage(season_rounds, courses_dict, "walking")
+        riding_miles = calc_season_yardage(season_rounds, courses_dict, "riding")
         penalty_free = calc_penalty_free_rounds(season_rounds)
         rounds_count = len(season_rounds)
-        total_rounds = calc_rounds_total(g.all_rounds)
+        total_rounds = calc_rounds_total(rounds)
 
         return render_template("season_summary.html",
             settings=g.settings,

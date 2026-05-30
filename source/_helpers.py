@@ -3,12 +3,12 @@ from flask import g
 
 
 def _last_n_rounds(all_rounds, courses, n: int) -> list:
-    return [r for r in all_rounds[:n] if not r.get("excluded")]
+    return [r for r in all_rounds[:n] if not r.excluded]
 
 
 def _best_n_rounds(all_rounds, courses, n: int) -> list:
-    eligible = [r for r in all_rounds if not r.get("excluded") and r.get("differential") and r["differential"] != "0"]
-    eligible.sort(key=lambda r: float(r["differential"]))
+    eligible = [r for r in all_rounds if not r.excluded and r.differential and r.differential != "0"]
+    eligible.sort(key=lambda r: float(r.differential))
     return eligible[:min(n, len(eligible))]
 
 

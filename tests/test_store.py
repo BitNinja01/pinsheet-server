@@ -188,16 +188,18 @@ def test_update_round_handicap(db):
 
 def test_slope_rating_full_18(make_course):
     course = make_course()
-    tee = course["Test GC"]["tees"]["White"]
-    slope, rating = get_slope_rating(tee, "all")
+    tee = course["Test GC"].tees["White"]
+    tee_dict = {"slope": tee.slope, "rating": tee.rating}
+    slope, rating = get_slope_rating(tee_dict, "all")
     assert slope == 128
     assert rating == 71.5
 
 
 def test_slope_rating_front_9_fallback(make_course):
     course = make_course()
-    tee = course["Test GC"]["tees"]["White"]
-    slope, rating = get_slope_rating(tee, "front")
+    tee = course["Test GC"].tees["White"]
+    tee_dict = {"slope": tee.slope, "rating": tee.rating}
+    slope, rating = get_slope_rating(tee_dict, "front")
     assert slope == 128
     assert rating == 71.5
 

@@ -19,6 +19,7 @@ from calc import (
     get_best_n_rounds,
 )
 from source._helpers import requires_own_data, sparkline_svg, per_round_hole_stats
+from source.calc.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
 
 _log = logging.getLogger("pinsheet")
@@ -38,6 +39,8 @@ def register_rounds_routes(app):
     @login_required
     def rounds_list():
         include_9hole = g.settings.get("include_9hole", True)
+
+        rounds_typed = [dict_to_round(r) for r in g.all_rounds]
 
         rounds_data = []
         for r in g.all_rounds:
@@ -73,8 +76,8 @@ def register_rounds_routes(app):
                 "putts": total_putts,
             })
 
-        best_rounds = get_best_n_rounds(g.all_rounds, include_9hole)
-        best_keys = {(r.get("date", ""), r.get("index", 0)) for r in best_rounds}
+        best_rounds = get_best_n_rounds(rounds_typed, include_9hole)
+        best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
                 rd["in_handicap"] = True
@@ -267,27 +270,30 @@ def register_rounds_routes(app):
         if not this_round:
             return "Round not found", 404
 
-        l20 = [r for r in g.all_rounds[:20] if not r.get("excluded")]
-        if this_round not in l20:
-            l20.insert(0, this_round)
+        courses_dict = {name: dict_to_course(name, d) for name, d in g.courses.items()}
+        this_round_typed = dict_to_round(this_round)
+
+        l20 = [dict_to_round(r) for r in g.all_rounds[:20] if not r.get("excluded")]
+        if this_round not in [r.get("date") for r in g.all_rounds[:20]]:
+            l20.insert(0, this_round_typed)
             l20 = l20[:20]
 
         rows = [
-            ("Score vs Par", calc_round_vs_par(this_round, g.courses), calc_avg_vs_par(l20, g.courses), False, "", 1),
-            ("Score vs Rating", calc_round_vs_rating(this_round, g.courses), calc_avg_vs_rating(l20, g.courses), False, "", 1),
-            ("Par or Better %", calc_par_or_better_percent([this_round], g.courses), calc_par_or_better_percent(l20, g.courses), True, "%", 1),
-            ("Blow-up Rate", calc_big_number_rate([this_round], g.courses), calc_big_number_rate(l20, g.courses), False, "%", 1),
-            ("FIR %", calc_fir_percent([this_round], g.courses), calc_fir_percent(l20, g.courses), True, "%", 1),
-            ("GIR %", calc_gir_percent([this_round]), calc_gir_percent(l20), True, "%", 1),
-            ("Putts / Rnd", calc_putts_per_round([this_round]), calc_putts_per_round(l20), False, "", 1),
-            ("1-Putt %", calc_one_putt_percent([this_round]), calc_one_putt_percent(l20), True, "%", 1),
-            ("2-Putt %", calc_two_putt_percent([this_round]), calc_two_putt_percent(l20), True, "%", 1),
-            ("3-Putt %", calc_three_putt_percent([this_round]), calc_three_putt_percent(l20), False, "%", 1),
-            ("Scramble %", calc_scramble_percent([this_round], g.courses), calc_scramble_percent(l20, g.courses), True, "%", 1),
+            ("Score vs Par", calc_round_vs_par(this_round_typed, courses_dict), calc_avg_vs_par(l20, courses_dict), False, "", 1),
+            ("Score vs Rating", calc_round_vs_rating(this_round_typed, courses_dict), calc_avg_vs_rating(l20, courses_dict), False, "", 1),
+            ("Par or Better %", calc_par_or_better_percent([this_round_typed], courses_dict), calc_par_or_better_percent(l20, courses_dict), True, "%", 1),
+            ("Blow-up Rate", calc_big_number_rate([this_round_typed], courses_dict), calc_big_number_rate(l20, courses_dict), False, "%", 1),
+            ("FIR %", calc_fir_percent([this_round_typed], courses_dict), calc_fir_percent(l20, courses_dict), True, "%", 1),
+            ("GIR %", calc_gir_percent([this_round_typed]), calc_gir_percent(l20), True, "%", 1),
+            ("Putts / Rnd", calc_putts_per_round([this_round_typed]), calc_putts_per_round(l20), False, "", 1),
+            ("1-Putt %", calc_one_putt_percent([this_round_typed]), calc_one_putt_percent(l20), True, "%", 1),
+            ("2-Putt %", calc_two_putt_percent([this_round_typed]), calc_two_putt_percent(l20), True, "%", 1),
+            ("3-Putt %", calc_three_putt_percent([this_round_typed]), calc_three_putt_percent(l20), False, "%", 1),
+            ("Scramble %", calc_scramble_percent([this_round_typed], courses_dict), calc_scramble_percent(l20, courses_dict), True, "%", 1),
         ]
 
-        par_this = calc_scoring_avg_by_par_type([this_round], g.courses)
-        par_l20 = calc_scoring_avg_by_par_type(l20, g.courses)
+        par_this = calc_scoring_avg_by_par_type([this_round_typed], courses_dict)
+        par_l20 = calc_scoring_avg_by_par_type(l20, courses_dict)
         for p in [3, 4, 5]:
             rows.append((
                 f"Par {p} Avg",
@@ -296,7 +302,7 @@ def register_rounds_routes(app):
                 False, "", 2,
             ))
 
-        rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round]), calc_penalties_per_round(l20), False, "", 1))
+        rows.append(("Penalties / Rnd", calc_penalties_per_round([this_round_typed]), calc_penalties_per_round(l20), False, "", 1))
 
         return render_template("report_card.html", rows=rows, round=this_round, settings=g.settings, all_users=get_users())
 

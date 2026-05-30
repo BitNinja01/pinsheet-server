@@ -93,7 +93,7 @@ def test_calc_effective_diffs_excluded_round(make_round):
         make_round(gross=80, differential="10.0"),
         make_round(gross=90, differential="20.0"),
     ]
-    rounds[1]["excluded"] = True
+    rounds[1].excluded = True
     diffs = calc_effective_diffs(rounds)
     assert len(diffs) == 1
     assert diffs[0] == 10.0
@@ -139,7 +139,7 @@ def test_get_best_n_rounds_explicit_n(make_round):
 def test_get_best_n_rounds_sorted(make_round):
     rounds = [make_round(gross=g, differential=str(100 - g)) for g in (80, 75, 90, 72, 85)]
     best = get_best_n_rounds(rounds, n=2)
-    diffs = [math.floor(float(r["differential"]) * 10) / 10 for r in best]
+    diffs = [math.floor(float(r.differential) * 10) / 10 for r in best]
     assert diffs == sorted(diffs)
 
 
