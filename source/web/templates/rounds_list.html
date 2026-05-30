@@ -34,7 +34,7 @@
         {% for r in rounds %}
             <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
                 class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}">
-                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em;">{{ r.date }}</td>
+                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ r.date }}</td>
                 <td>
                     <div class="ps-course">{{ r.course }}</div>
                 </td>

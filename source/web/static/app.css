@@ -386,6 +386,7 @@ body {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-table-num);
     letter-spacing: -0.01em;
+    font-weight: var(--ps-fw-label);
 }
 .ps-table .ps-meta {
     font-size: var(--ps-fs-micro);
@@ -871,6 +872,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-table-num);
     letter-spacing: -0.01em;
+    font-weight: var(--ps-fw-label);
 }
 
 
