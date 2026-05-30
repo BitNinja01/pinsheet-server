@@ -1,7 +1,18 @@
-from flask import render_template, request, redirect, url_for
+from functools import wraps
+
+from flask import render_template, request, redirect, url_for, g
 from flask_login import login_user, logout_user, login_required, current_user
 
 from store import verify_user, get_user, real_user_count, create_user, is_invite_code_valid, consume_invite_code
+
+
+def requires_own_data(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not g.is_own_data:
+            return "Forbidden", 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 def register_auth_routes(app, limiter, User):

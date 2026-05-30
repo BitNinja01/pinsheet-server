@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import save_course, delete_course, get_users
-from source._helpers import requires_own_data
+from source.routes.auth import requires_own_data
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 from source.plugin import fire_hook
 

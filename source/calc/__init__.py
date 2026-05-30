@@ -30,6 +30,7 @@ from calc.approach import (
     calc_scramble_by_miss_direction,
     calc_scramble_by_par_type,
     calc_ob_stats,
+    per_round_hole_stats,
 )
 from calc.scoring import (
     calc_historical_window,
@@ -71,6 +72,7 @@ from calc.scoring import (
     calc_big_number_trend,
     calc_per_round_average,
     calc_hole_percentage,
+    stat_delta,
 )
 from calc.analysis import (
     calc_penalty_stats,

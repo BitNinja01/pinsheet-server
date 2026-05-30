@@ -465,3 +465,14 @@ def calc_hole_percentage(rounds: list[RoundData], courses: dict[str, CourseData]
                 if predicate(gross, par):
                     hits += 1
     return (hits / total * 100) if total else None
+
+
+def stat_delta(current, previous, higher_better=False, precision=1, suffix=""):
+    if current is None or previous is None or current == previous:
+        return "", "\u2014", ""
+    raw = current - previous
+    is_up = (raw > 0 and higher_better) or (raw < 0 and not higher_better)
+    cls = "is-up" if is_up else "is-down"
+    cell_cls = "is-improved" if is_up else "is-declined"
+    text = f"{raw:+.{precision}f}{suffix} vs L20"
+    return cls, text, cell_cls

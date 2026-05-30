@@ -18,7 +18,9 @@ from calc import (
     calc_scoring_avg_by_par_type, calc_penalties_per_round,
     get_best_n_rounds, last_n_rounds,
 )
-from source._helpers import requires_own_data, sparkline_svg, per_round_hole_stats
+from source.web.charts import sparkline_svg
+from source.routes.auth import requires_own_data
+from calc import per_round_hole_stats
 from source.calc.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user

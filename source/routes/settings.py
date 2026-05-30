@@ -11,7 +11,7 @@ from store import (
     get_all_rounds, update_round_handicap, get_users,
 )
 from calc import calc_handicap_index
-from source._helpers import requires_own_data
+from source.routes.auth import requires_own_data
 from source.request_data import get_settings, get_courses
 
 

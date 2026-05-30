@@ -11,7 +11,9 @@ from calc import (
     compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
 )
 
-from source._helpers import _make_chart_data, requires_own_data, sparkline_svg, per_round_hole_stats
+from source.web.charts import sparkline_svg, make_chart_data
+from source.routes.auth import requires_own_data
+from calc import per_round_hole_stats
 from source.calc.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user
 
@@ -104,10 +106,10 @@ def register_dashboard_routes(app, limiter, csrf):
         cutoff_2y = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
 
         chart_data = {
-            "3M": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_3m)),
-            "12M": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_12m)),
-            "2Y": _make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_2y)),
-            "All": _make_chart_data(all_hi_vals[::-1]),
+            "3M": make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_3m)),
+            "12M": make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_12m)),
+            "2Y": make_chart_data(calc_handicap_values_in_range(all_rounds, cutoff_2y)),
+            "All": make_chart_data(all_hi_vals[::-1]),
         }
 
         chart = chart_data["12M"]

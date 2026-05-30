@@ -344,3 +344,39 @@ def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> di
         "fir_worst_holes":     fir_worst,
         "gir_worst_holes":     gir_worst,
     }
+
+
+def per_round_hole_stats(holes, course_holes_data):
+    fir_hit = fir_attempts = 0
+    gir_hit = gir_total = 0
+    scr_updown = scr_opps = 0
+    total_putts = 0
+    for hn, h in holes.items():
+        fw = h.fairway
+        if fw and fw != "N":
+            fir_attempts += 1
+            if fw == "H":
+                fir_hit += 1
+        gi = h.gir
+        if gi:
+            gir_total += 1
+            if gi == "H":
+                gir_hit += 1
+            if gi != "H":
+                scr_opps += 1
+                try:
+                    hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
+                    if h.gross <= hole_par:
+                        scr_updown += 1
+                except (ValueError, TypeError):
+                    pass
+        try:
+            total_putts += h.putts
+        except (ValueError, TypeError):
+            pass
+    return {
+        "fir_display": f"{fir_hit}/{fir_attempts}" if fir_attempts > 0 else None,
+        "gir_display": f"{gir_hit}/{gir_total}" if gir_total > 0 else None,
+        "scr_display": f"{scr_updown}/{scr_opps}" if scr_opps > 0 else None,
+        "total_putts": total_putts,
+    }
