@@ -720,6 +720,10 @@ select.hole-input { width: 3rem; appearance: none; }
     margin: 1.5rem 0 0.75rem;
     color: var(--ps-accent);
 }
+.desktop-table, .hole-table-wrap {
+    padding-left: var(--ps-sp-6);
+    padding-right: var(--ps-sp-6);
+}
 .tee-set {
     background: var(--ps-paper-2);
     border: var(--ps-rule) solid var(--ps-rule-c);
@@ -1250,7 +1254,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
-    .hole-table-wrap { overflow-x: auto; }
+    .hole-table-wrap { overflow-x: auto; padding-left: 0; padding-right: 0; }
 }
 
 /* ── Round cards (dashboard + rounds list mobile) ── */
