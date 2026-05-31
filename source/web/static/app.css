@@ -406,6 +406,7 @@ body {
     color: var(--ps-ink);
 }
 .ps-score.is-under { color: var(--ps-accent); }
+.ps-score.is-over { color: var(--ps-warn); }
 .ps-topar {
     font-size: var(--ps-fs-body);
     color: var(--ps-ink-3);

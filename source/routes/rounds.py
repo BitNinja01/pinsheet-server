@@ -17,6 +17,7 @@ from calc import (
     calc_two_putt_percent, calc_three_putt_percent, calc_scramble_percent,
     calc_scoring_avg_by_par_type, calc_penalties_per_round,
     get_best_n_rounds, last_n_rounds,
+    calc_course_handicap,
 )
 from source.web.charts import sparkline_svg
 from source.routes.auth import requires_own_data
@@ -61,6 +62,21 @@ def register_rounds_routes(app):
             raw_mode = r.entry_mode
             display_mode = "normal" if raw_mode == "detailed" else (raw_mode or "score_only")
 
+            net_score = None
+            net_to_par = None
+            if r.computed_handicap:
+                try:
+                    hi = float(r.computed_handicap)
+                    tee_data = course.get("tees", {}).get(r.tees, {}) if r.tees else {}
+                    slope = float(tee_data.get("slope", 0))
+                    rating = float(tee_data.get("rating", 0))
+                    if hi and slope:
+                        ch = calc_course_handicap(hi, played_par, slope, rating)
+                        net_score = int(total) - ch
+                        net_to_par = net_score - played_par
+                except (ValueError, TypeError):
+                    pass
+
             sparkline = sparkline_svg(r.holes)
 
             hs = per_round_hole_stats(r.holes, course.get("holes", {}))
@@ -75,6 +91,8 @@ def register_rounds_routes(app):
                 "tees": r.tees,
                 "total": total,
                 "score_to_par": score_to_par,
+                "net": net_score,
+                "net_to_par": net_to_par,
                 "differential": r.differential,
                 "index": r.index,
                 "in_handicap": False,

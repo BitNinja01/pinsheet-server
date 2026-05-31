@@ -9,6 +9,7 @@ from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
     compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
+    calc_course_handicap,
 )
 
 from source.web.charts import sparkline_svg, make_chart_data
@@ -67,6 +68,21 @@ def register_dashboard_routes(app, limiter, csrf):
 
             sparkline = sparkline_svg(r.holes)
 
+            net_score = None
+            net_to_par = None
+            if r.computed_handicap:
+                try:
+                    hi = float(r.computed_handicap)
+                    tee_data = course.get("tees", {}).get(r.tees, {}) if r.tees else {}
+                    slope = float(tee_data.get("slope", 0))
+                    rating = float(tee_data.get("rating", 0))
+                    if hi and slope:
+                        ch = calc_course_handicap(hi, played_par, slope, rating)
+                        net_score = int(total) - ch
+                        net_to_par = net_score - played_par
+                except (ValueError, TypeError):
+                    pass
+
             hs = per_round_hole_stats(r.holes, course.get("holes", {}))
             fir_display = hs["fir_display"]
             gir_display = hs["gir_display"]
@@ -79,6 +95,8 @@ def register_dashboard_routes(app, limiter, csrf):
                 "tees": r.tees,
                 "total": total,
                 "score_to_par": score_to_par,
+                "net": net_score,
+                "net_to_par": net_to_par,
                 "differential": r.differential,
                 "index": r.index,
                 "in_handicap": False,
