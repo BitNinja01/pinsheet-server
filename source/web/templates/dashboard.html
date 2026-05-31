@@ -144,11 +144,11 @@
                 </td>
                 <td style="color: var(--ps-ink-3);">{{ r.tees }}</td>
                 <td class="r">
-                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    <span class="ps-score{% if r.in_handicap %} is-under{% endif %}">{{ r.total }}</span>
                 </td>
                 <td class="r">
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar{% if r.in_handicap %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% else %}
                         <span class="ps-topar">&mdash;</span>
                     {% endif %}
@@ -183,9 +183,9 @@
                     <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
                 </div>
                 <div class="round-card-score">
-                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    <span class="ps-score{% if r.in_handicap %} is-under{% endif %}">{{ r.total }}</span>
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar{% if r.in_handicap %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
             </div>
