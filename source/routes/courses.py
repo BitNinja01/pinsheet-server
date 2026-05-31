@@ -74,11 +74,14 @@ def register_courses_routes(app):
             for tee_name in tees:
                 td = tees[tee_name]
                 yardages_data = td.get("yardages", {})
-                yardages[tee_name] = yardages_data.get(hn, "")
+                y = yardages_data.get(hn)
+                if y is None:
+                    y = h.get("tees", {}).get(tee_name, "")
+                yardages[tee_name] = y
             hole_rows.append({
                 "num": int(hn),
                 "par": h.get("par", ""),
-                "index": h.get("index", ""),
+                "index": h.get("index", h.get("hole_index", "")),
                 "yardages": yardages,
             })
 
