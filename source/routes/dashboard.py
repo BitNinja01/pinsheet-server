@@ -59,7 +59,12 @@ def register_dashboard_routes(app, limiter, csrf):
             total = r.total_gross
             course_holes = course.get("holes", {})
             if r.holes_selection != "all" and course_holes:
-                played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
+                if r.holes:
+                    played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
+                else:
+                    hole_nums = sorted(course_holes.keys(), key=int)
+                    half = hole_nums[:9] if r.holes_selection == "front" else hole_nums[9:18]
+                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
             else:
                 played_par = int(course.get("par", 0))
             score_to_par = int(total) - played_par if total and played_par and total != "0" else None
