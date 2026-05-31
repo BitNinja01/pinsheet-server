@@ -76,7 +76,8 @@ def register_dashboard_routes(app, limiter, csrf):
                     tee_data = course.get("tees", {}).get(r.tees, {}) if r.tees else {}
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
                     if hi and slope:
-                        ch = calc_course_handicap(hi, played_par, slope, rating)
+                        adj_hi = hi / 2 if r.holes_selection != "all" else hi
+                        ch = calc_course_handicap(adj_hi, played_par, slope, rating)
                         net_score = int(total) - ch
                         net_to_par = net_score - played_par
                 except (ValueError, TypeError):
