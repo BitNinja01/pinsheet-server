@@ -52,8 +52,12 @@ def register_rounds_routes(app):
         for r in all_rounds_for_user:
             course = get_courses().get(r.course, {})
             total = r.total_gross
-            par = course.get("par", 0)
-            score_to_par = int(total) - int(par) if total and par and total != "0" else None
+            course_holes = course.get("holes", {})
+            if r.holes_selection != "all" and course_holes:
+                played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
+            else:
+                played_par = int(course.get("par", 0))
+            score_to_par = int(total) - played_par if total and played_par and total != "0" else None
             raw_mode = r.entry_mode
             display_mode = "normal" if raw_mode == "detailed" else (raw_mode or "score_only")
 
