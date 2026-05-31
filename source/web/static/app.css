@@ -720,10 +720,7 @@ select.hole-input { width: 3rem; appearance: none; }
     margin: 1.5rem 0 0.75rem;
     color: var(--ps-accent);
 }
-.desktop-table, .hole-table-wrap {
-    padding-left: var(--ps-sp-6);
-    padding-right: var(--ps-sp-6);
-}
+
 .tee-set {
     background: var(--ps-paper-2);
     border: var(--ps-rule) solid var(--ps-rule-c);
@@ -1251,6 +1248,7 @@ select.hole-input { width: 3rem; appearance: none; }
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
     .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid { display: none !important; }
+    .desktop-table, .hole-table-wrap { width: fit-content; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
