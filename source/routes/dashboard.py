@@ -4,7 +4,7 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_user_by_id, save_settings
+from store import get_user_by_id, save_settings, get_slope_rating
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
@@ -74,8 +74,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 try:
                     hi = float(r.computed_handicap)
                     tee_data = course.get("tees", {}).get(r.tees, {}) if r.tees else {}
-                    slope = float(tee_data.get("slope", 0))
-                    rating = float(tee_data.get("rating", 0))
+                    slope, rating = get_slope_rating(tee_data, r.holes_selection)
                     if hi and slope:
                         ch = calc_course_handicap(hi, played_par, slope, rating)
                         net_score = int(total) - ch

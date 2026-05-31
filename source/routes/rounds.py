@@ -68,8 +68,7 @@ def register_rounds_routes(app):
                 try:
                     hi = float(r.computed_handicap)
                     tee_data = course.get("tees", {}).get(r.tees, {}) if r.tees else {}
-                    slope = float(tee_data.get("slope", 0))
-                    rating = float(tee_data.get("rating", 0))
+                    slope, rating = get_slope_rating(tee_data, r.holes_selection)
                     if hi and slope:
                         ch = calc_course_handicap(hi, played_par, slope, rating)
                         net_score = int(total) - ch
