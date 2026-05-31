@@ -1550,8 +1550,8 @@ select.hole-input { width: 3rem; appearance: none; }
     font-weight: 600;
 }
 
-/* Zebra striping for data tables on course & round detail */
-.course-detail .data-table tbody tr:nth-child(even) td,
-.round-detail .data-table tbody tr:nth-child(even) td {
+/* Zebra striping for data tables */
+.data-table tbody tr:nth-child(even) td,
+.ps-table tbody tr:nth-child(even) td {
     background: var(--ps-paper-2);
 }
