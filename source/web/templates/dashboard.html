@@ -145,18 +145,18 @@
                 </td>
                 <td style="color: var(--ps-ink-3);">{{ r.tees }}</td>
                 <td class="r">
-                    <span class="ps-score{% if r.in_handicap %} is-under{% endif %}">{{ r.total }}</span>
+                    <span class="ps-score">{{ r.total }}</span>
                 </td>
                 <td class="r">
-                    {% if r.net is not none %}
-                        <span class="ps-score{% if r.net_to_par is not none and r.net_to_par < 0 %} is-under{% elif r.net_to_par is not none and r.net_to_par > 0 %} is-over{% endif %}">{{ r.net }}</span>
+                    {% if r.net_to_par is not none %}
+                        <span class="ps-score{% if r.net_to_par < 0 %} is-under{% elif r.net_to_par > 0 %} is-over{% endif %}">{{ '%+d'|format(r.net_to_par) }}</span>
                     {% else %}
                         <span class="ps-score">&mdash;</span>
                     {% endif %}
                 </td>
                 <td class="r">
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.in_handicap %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% else %}
                         <span class="ps-topar">&mdash;</span>
                     {% endif %}
@@ -191,12 +191,12 @@
                     <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
                 </div>
                 <div class="round-card-score">
-                    <span class="ps-score{% if r.in_handicap %} is-under{% endif %}">{{ r.total }}</span>
-                    {% if r.net is not none %}
-                        <span class="ps-score{% if r.net_to_par is not none and r.net_to_par < 0 %} is-under{% elif r.net_to_par is not none and r.net_to_par > 0 %} is-over{% endif %}" style="font-size:var(--ps-fs-body);margin-left:4px;">({{ r.net }})</span>
+                    <span class="ps-score">{{ r.total }}</span>
+                    {% if r.net_to_par is not none %}
+                        <span class="ps-score{% if r.net_to_par < 0 %} is-under{% elif r.net_to_par > 0 %} is-over{% endif %}" style="font-size:var(--ps-fs-body);margin-left:4px;">({{ '%+d'|format(r.net_to_par) }})</span>
                     {% endif %}
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.in_handicap %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
             </div>
