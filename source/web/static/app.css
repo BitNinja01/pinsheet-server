@@ -1248,7 +1248,7 @@ select.hole-input { width: 3rem; appearance: none; }
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
     .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid { display: none !important; }
-    .desktop-table, .hole-table-wrap { width: fit-content; }
+    .course-detail .desktop-table, .course-detail .hole-table-wrap { width: fit-content; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
