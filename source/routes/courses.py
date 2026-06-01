@@ -51,6 +51,8 @@ def register_courses_routes(app):
         if not course:
             return "Course not found", 404
 
+        edit_mode = request.args.get("edit") == "1"
+
         play_count = 0
         first_played = None
         last_played = None
@@ -88,6 +90,7 @@ def register_courses_routes(app):
         return render_template("course_detail.html", **base_context(
             course=course, name=name, tees=tees, holes=hole_rows,
             play_count=play_count, first_played=first_played, last_played=last_played,
+            edit_mode=edit_mode,
         ))
 
     @app.route("/api/courses", methods=["POST"])
