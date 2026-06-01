@@ -349,6 +349,15 @@ def register_rounds_routes(app):
     @login_required
     @requires_own_data
     def api_rounds_put(date, index):
+        all_rounds_for_user = get_all_rounds_for_user()
+        old_round = None
+        for r in all_rounds_for_user:
+            if r.date == date and str(r.index) == str(index):
+                old_round = r
+                break
+        if not old_round:
+            return jsonify({"error": "Round not found"}), 404
+
         data = request.get_json()
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
@@ -392,8 +401,10 @@ def register_rounds_routes(app):
         differential = calc_round_dif(slope, adjusted_gross, rating)
         golf_round["differential"] = str(differential)
 
+        if data.get("date", date) != date:
+            delete_round(date, index, current_user.id)
+
         golf_round_typed = dict_to_round(golf_round)
-        all_rounds_for_user = get_all_rounds_for_user()
         for i, r in enumerate(all_rounds_for_user):
             if r.date == date and str(r.index) == str(index):
                 all_rounds_for_user[i] = golf_round_typed
