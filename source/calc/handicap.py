@@ -1,7 +1,10 @@
 import bisect
+import logging
 import math
 
 from source.models import RoundData
+
+_log = logging.getLogger("pinsheet")
 
 
 def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
@@ -17,7 +20,11 @@ def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -
 
 
 def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> int:
-    return round(handicap * (course_slope / 113) + (course_rating - course_par))
+    raw = handicap * (course_slope / 113) + (course_rating - course_par)
+    result = round(raw)
+    _log.info("calc_course_handicap(hi=%s, par=%s, slope=%s, rating=%s) = round(%s) = %s",
+              handicap, course_par, course_slope, course_rating, raw, result)
+    return result
 
 
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:

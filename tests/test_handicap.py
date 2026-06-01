@@ -231,3 +231,21 @@ def test_calc_raw_hi_approximate(make_round):
     raw = calc_raw_hi(rounds)
     expected = ((5 + 6 + 7 + 8 + 9) / 5) * 0.96
     assert raw == expected
+
+
+def test_calc_course_handicap_maplewood_white():
+    assert calc_course_handicap(21.7, 72, 120, 67.7) == 19
+
+
+def test_calc_course_handicap_druids_white():
+    assert calc_course_handicap(22.3, 72, 130, 69.3) == 23
+
+
+def test_calc_course_handicap_round_over_int():
+    assert calc_course_handicap(21.7, 72, 120, 67.7) == 19
+    assert calc_course_handicap(21.7, 72, 120, 67.7) != 18
+
+
+def test_calc_course_handicap_near_boundary():
+    assert calc_course_handicap(10.0, 72, 113, 72) == 10
+    assert calc_course_handicap(10.0, 72, 140, 74) == 14
