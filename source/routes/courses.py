@@ -128,10 +128,16 @@ def register_courses_routes(app):
     @login_required
     @requires_own_data
     def api_courses_put(name):
+        if not get_courses().get(name):
+            return jsonify({"error": "Course not found"}), 404
+
         data = request.get_json()
         new_name = data.get("name", "").strip()
         if not new_name:
             return jsonify({"error": "Name is required"}), 400
+
+        if new_name != name and get_courses().get(new_name):
+            return jsonify({"error": "A course with that name already exists"}), 409
 
         location = data.get("location", {})
         if not isinstance(location, dict) or not location.get("city") or not location.get("state/province") or not location.get("country"):
