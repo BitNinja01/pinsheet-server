@@ -345,6 +345,68 @@ def register_rounds_routes(app):
             rows=rows, round=this_round,
         ))
 
+    @app.route("/api/rounds/<date>/<index>", methods=["PUT"])
+    @login_required
+    @requires_own_data
+    def api_rounds_put(date, index):
+        data = request.get_json()
+        course_name = data.get("course", "")
+        tees_name = data.get("tees", "")
+        course = get_courses().get(course_name, {})
+        tees = course.get("tees", {}).get(tees_name, {})
+
+        holes_sel = data.get("holes_played", "18")
+        if holes_sel == "front9":
+            holes_sel = "front"
+        elif holes_sel == "back9":
+            holes_sel = "back"
+        else:
+            holes_sel = "all"
+
+        slope, rating = get_slope_rating(tees, holes_sel)
+
+        golf_round = {
+            "date": data.get("date", date),
+            "course": course_name,
+            "tees": tees_name,
+            "holes_played": data.get("holes_played", "18"),
+            "holes_selection": holes_sel,
+            "transport": data.get("transport", ""),
+            "entry_mode": data.get("entry_mode", "detailed"),
+            "notes": data.get("notes", ""),
+            "holes": data.get("holes", {}),
+            "gross_total": data.get("gross_total", ""),
+        }
+
+        total_gross = 0
+        if data.get("entry_mode") == "score_only":
+            total_gross = int(data.get("gross_total", "0"))
+            golf_round["total_gross"] = str(total_gross)
+        elif data.get("holes"):
+            for h in data["holes"].values():
+                gross = int(h.get("gross", 0))
+                total_gross += gross
+            golf_round["total_gross"] = str(total_gross)
+
+        adjusted_gross = total_gross
+        differential = calc_round_dif(slope, adjusted_gross, rating)
+        golf_round["differential"] = str(differential)
+
+        golf_round_typed = dict_to_round(golf_round)
+        all_rounds_for_user = get_all_rounds_for_user()
+        for i, r in enumerate(all_rounds_for_user):
+            if r.date == date and str(r.index) == str(index):
+                all_rounds_for_user[i] = golf_round_typed
+                break
+        new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+        if new_hi is not None:
+            golf_round["computed_handicap"] = str(new_hi)
+            golf_round_typed.computed_handicap = str(new_hi)
+
+        save_round(golf_round, data.get("date", date), int(index), current_user.id)
+        fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
+        return jsonify({"ok": True, "differential": differential})
+
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
     @requires_own_data
