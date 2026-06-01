@@ -7,7 +7,7 @@
         <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">{{ rounds|length }} rounds</div>
     </div>
     <div class="ps-row">
-    {% if is_own_data %}<a href="/rounds/new" class="ps-btn">Add Round</a>{% endif %}
+    {% if g.is_own_data %}<a href="/rounds/new" class="ps-btn">Add Round</a>{% endif %}
     </div>
 </div>
 
@@ -117,7 +117,7 @@
     {% else %}
     <div class="empty-state">
         <p class="placeholder">No rounds yet.</p>
-    {% if is_own_data %}<a href="/rounds/new" class="ps-btn">Add Round</a>{% endif %}
+    {% if g.is_own_data %}<a href="/rounds/new" class="ps-btn">Add Round</a>{% endif %}
     </div>
     {% endif %}
 </section>

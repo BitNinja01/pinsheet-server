@@ -120,11 +120,6 @@ def inject_plugin_globals():
     }
 
 
-@app.context_processor
-def inject_permissions():
-    return {"is_own_data": getattr(g, "is_own_data", True)}
-
-
 app.jinja_env.globals.setdefault("plugin_info", {})
 
 
