@@ -3,7 +3,7 @@
 <h2>Courses</h2>
 
 <div class="section-actions">
-    <a href="/courses/new" class="btn btn-accent">Add Course</a>
+    {% if g.is_own_data %}<a href="/courses/new" class="btn btn-accent">Add Course</a>{% endif %}
 </div>
 
 {% if courses %}

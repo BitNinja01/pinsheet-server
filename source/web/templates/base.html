@@ -38,20 +38,21 @@
                         </select>
                     </div>
                 </div>
+                {% set user_qs = "?user=" + g.view_user.username if not g.is_own_data else "" %}
                 <nav class="ps-nav">
-                    <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
-                    <a href="/rounds" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
-                    <a href="/stats" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
-                    <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
-                    <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
-                    <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
-                    {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
+                    <a href="/{{ user_qs }}" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
+                    <a href="/rounds{{ user_qs }}" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
+                    <a href="/stats{{ user_qs }}" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
+                    <a href="/courses{{ user_qs }}" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
+                    <a href="/season{{ user_qs }}" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
+                    <a href="/settings{{ user_qs }}" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
+                    {% if current_user.is_admin %}<a href="/admin/invites{{ user_qs }}">Admin</a>{% endif %}
                     <a href="/logout">Logout</a>
                 </nav>
                 {% if plugin_nav %}
                 <nav class="ps-nav ps-nav-plugins">
                     {% for item in plugin_nav %}
-                    <a href="{{ item.url }}" class="{% if current_page == item.page_id %}is-active{% endif %}">
+                    <a href="{{ item.url }}{{ user_qs }}" class="{% if current_page == item.page_id %}is-active{% endif %}">
                         {{ item.label }}
                     </a>
                     {% endfor %}

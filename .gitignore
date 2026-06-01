@@ -31,6 +31,9 @@ data/
 # Import archives
 pinsheet-import.zip
 
+# Example / demo data (not for distribution)
+example_data/
+
 # Design system artifacts (internal)
 design-system/
 open-design/
