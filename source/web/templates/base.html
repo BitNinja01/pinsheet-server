@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PinSheet</title>
     <link rel="stylesheet" href="/static/app.css">
+    {% if plugin_blocks.get("head") %}{{ plugin_blocks["head"]|safe }}{% endif %}
 </head>
 <body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
     <div class="ps-layout">
@@ -47,6 +48,15 @@
                     {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
                     <a href="/logout">Logout</a>
                 </nav>
+                {% if plugin_nav %}
+                <nav class="ps-nav ps-nav-plugins">
+                    {% for item in plugin_nav %}
+                    <a href="{{ item.url }}" class="{% if current_page == item.page_id %}is-active{% endif %}">
+                        {{ item.label }}
+                    </a>
+                    {% endfor %}
+                </nav>
+                {% endif %}
             </div>
         </aside>
         <main class="ps-main">
@@ -62,5 +72,6 @@
         });
     </script>
     <script src="/static/app.js"></script>
+    {% if plugin_blocks.get("foot") %}{{ plugin_blocks["foot"]|safe }}{% endif %}
 </body>
 </html>

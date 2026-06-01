@@ -4,9 +4,12 @@ import os
 import pytest
 
 import main as main_mod
-from main import app, User
+from main import app, User, limiter, csrf
+from source.routes import register_routes
 from database import set_db_path, init_db
 from store import create_user
+
+register_routes(app, limiter, csrf, User)
 
 
 @pytest.fixture
@@ -29,6 +32,7 @@ def test_app(tmp_path, monkeypatch):
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["DB_PATH"] = db_path
 
     return app
 
@@ -147,3 +151,78 @@ def test_course_list_redirects_when_not_logged_in(client):
     resp = client.get("/courses", follow_redirects=True)
     assert resp.status_code == 200
     assert b"login" in resp.data.lower() or b"Login" in resp.data
+
+
+def test_put_course_updates_existing(test_app):
+    create_user("p", "P", "pass1234")
+    client = test_app.test_client()
+    client.post("/login", data={"username": "p", "password": "pass1234"})
+
+    course_data = {
+        "name": "Test Course",
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70.0", "slope": "120"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    resp = client.post("/api/courses", json=course_data)
+    assert resp.status_code == 200
+
+    course_data["name"] = "Test Course Renamed"
+    course_data["location"]["city"] = "New City"
+    resp = client.put("/api/courses/Test Course", json=course_data)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["name"] == "Test Course Renamed"
+
+    from store import get_courses
+    courses = get_courses()
+    assert "Test Course Renamed" in courses
+    assert courses["Test Course Renamed"]["location"]["city"] == "New City"
+
+
+def test_put_round_updates_existing(test_app):
+    create_user("p", "P", "pass1234")
+    client = test_app.test_client()
+    client.post("/login", data={"username": "p", "password": "pass1234"})
+
+    # Create a course first
+    course_data = {
+        "name": "Test GC",
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70.0", "slope": "120"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    client.post("/api/courses", json=course_data)
+
+    # Create a round
+    round_data = {
+        "date": "2026-06-01",
+        "course": "Test GC",
+        "tees": "White",
+        "holes_played": "18",
+        "entry_mode": "score_only",
+        "gross_total": "85",
+        "transport": "Walking",
+        "notes": "First round",
+        "holes": {},
+    }
+    resp = client.post("/api/rounds", json=round_data)
+    assert resp.status_code == 200
+
+    # Update the round — change score and notes
+    round_data["gross_total"] = "80"
+    round_data["notes"] = "Updated round"
+    resp = client.put("/api/rounds/2026-06-01/0", json=round_data)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+
+    # Verify update persisted
+    from store import get_all_rounds
+    rounds = get_all_rounds(1)
+    updated = [r for r in rounds if r.date == "2026-06-01" and str(r.index) == "0"]
+    assert len(updated) == 1
+    assert updated[0].notes == "Updated round"

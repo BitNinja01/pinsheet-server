@@ -1,10 +1,13 @@
 # Custom — Internal tooling and session artifacts
+.scratch/
 PICKUP_PROMPT.md
 AGENTS.md
+CODEBASE_IMPROVEMENTS.md
 .claude/
 .opencode/
 .superpowers/
-plugins/
+/plugins/
+!/plugins/.gitkeep
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md
@@ -24,6 +27,9 @@ scripts/*.py
 # User data (keep only reference data like benchmarks)
 data/
 !data/handicap_benchmarks.json
+
+# Import archives
+pinsheet-import.zip
 
 # Design system artifacts (internal)
 design-system/

@@ -146,8 +146,8 @@ def test_save_and_get_rounds(db):
 
     all_rounds = get_all_rounds(user_id=1)
     assert len(all_rounds) == 2
-    assert all_rounds[0]["date"] == "2026-05-02"
-    assert all_rounds[0]["total_gross"] == "75"
+    assert all_rounds[0].date == "2026-05-02"
+    assert all_rounds[0].total_gross == "75"
     db.close()
 
 
@@ -182,22 +182,24 @@ def test_update_round_handicap(db):
     save_round(r, "2026-05-01", 0, user_id=1)
     update_round_handicap("2026-05-01", 0, 12.5, user_id=1)
     rounds = get_all_rounds(user_id=1)
-    assert rounds[0]["computed_handicap"] == "12.5"
+    assert rounds[0].computed_handicap == "12.5"
     db.close()
 
 
 def test_slope_rating_full_18(make_course):
     course = make_course()
-    tee = course["Test GC"]["tees"]["White"]
-    slope, rating = get_slope_rating(tee, "all")
+    tee = course["Test GC"].tees["White"]
+    tee_dict = {"slope": tee.slope, "rating": tee.rating}
+    slope, rating = get_slope_rating(tee_dict, "all")
     assert slope == 128
     assert rating == 71.5
 
 
 def test_slope_rating_front_9_fallback(make_course):
     course = make_course()
-    tee = course["Test GC"]["tees"]["White"]
-    slope, rating = get_slope_rating(tee, "front")
+    tee = course["Test GC"].tees["White"]
+    tee_dict = {"slope": tee.slope, "rating": tee.rating}
+    slope, rating = get_slope_rating(tee_dict, "front")
     assert slope == 128
     assert rating == 71.5
 

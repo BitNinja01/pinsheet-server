@@ -126,6 +126,7 @@
                 <th>Course</th>
                 <th>Tees</th>
                 <th class="r">Gross</th>
+                <th class="r">Net</th>
                 <th class="r">+/-</th>
                 <th class="r">Diff</th>
                 <th class="r">FIR</th>
@@ -138,23 +139,29 @@
         {% for r in rounds %}
             <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
                 class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}">
-                <td style="font-size: 12px; color: var(--ps-ink-2); letter-spacing: 0.04em;">{{ r.date }}</td>
+                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ r.date }}</td>
                 <td>
                     <div class="ps-course">{{ r.course }}</div>
-                    <div class="ps-meta">round #{{ r.index }} · {{ r.entry_mode_display }}</div>
                 </td>
-                <td style="font-size: 12px; color: var(--ps-ink-3);">{{ r.tees }}</td>
+                <td style="color: var(--ps-ink-3);">{{ r.tees }}</td>
                 <td class="r">
-                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    <span class="ps-score">{{ r.total }}</span>
+                </td>
+                <td class="r">
+                    {% if r.net_to_par is not none %}
+                        <span class="ps-score{% if r.net_to_par < 0 %} is-under{% elif r.net_to_par > 0 %} is-over{% endif %}">{{ '%+d'|format(r.net_to_par) }}</span>
+                    {% else %}
+                        <span class="ps-score">&mdash;</span>
+                    {% endif %}
                 </td>
                 <td class="r">
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% else %}
                         <span class="ps-topar">&mdash;</span>
                     {% endif %}
                 </td>
-                <td class="r" style="font-size: 13px; color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</td>
+                <td class="r" style="color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</td>
                 <td class="r">{{ r.fir_display or '—' }}</td>
                 <td class="r">{{ r.gir_display or '—' }}</td>
                 <td class="r">{{ r.putts or '—' }}</td>
@@ -184,9 +191,12 @@
                     <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
                 </div>
                 <div class="round-card-score">
-                    <span class="ps-score{% if r.score_to_par is not none and r.score_to_par < 1 %} is-under{% endif %}">{{ r.total }}</span>
+                    <span class="ps-score">{{ r.total }}</span>
+                    {% if r.net_to_par is not none %}
+                        <span class="ps-score{% if r.net_to_par < 0 %} is-under{% elif r.net_to_par > 0 %} is-over{% endif %}" style="font-size:var(--ps-fs-body);margin-left:4px;">({{ '%+d'|format(r.net_to_par) }})</span>
+                    {% endif %}
                     {% if r.score_to_par is not none %}
-                        <span class="ps-topar{% if r.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(r.score_to_par) }}</span>
+                        <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
             </div>

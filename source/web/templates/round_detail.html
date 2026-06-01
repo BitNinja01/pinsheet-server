@@ -2,28 +2,140 @@
 {% block content %}
 <div class="round-detail">
     <div class="round-summary">
-        <div class="summary-item"><span class="summary-label">Date</span> {{ round.date }}</div>
-        <div class="summary-item"><span class="summary-label">Course</span> {{ round.course }}</div>
-        <div class="summary-item"><span class="summary-label">Tees</span> {{ round.tees }}</div>
+        {% if edit_mode %}
+        <div class="summary-item">
+            <span class="summary-label">Date</span>
+            <input type="date" id="edit-date" class="step-input" value="{{ round.date }}">
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Course</span>
+            <select id="edit-course" class="edit-course-select step-input">
+                {% for c_name in courses %}
+                <option value="{{ c_name }}" {% if c_name == round.course %}selected{% endif %}>{{ c_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Tees</span>
+            <select id="edit-tees" class="step-input">
+                {% for t_name in course.get('tees', {}).keys() %}
+                <option value="{{ t_name }}" {% if t_name == round.tees %}selected{% endif %}>{{ t_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Transport</span>
+            <select id="edit-transport" class="step-input">
+                <option value="Walking" {% if round.transport == 'Walking' %}selected{% endif %}>Walking</option>
+                <option value="Riding" {% if round.transport == 'Riding' %}selected{% endif %}>Riding</option>
+            </select>
+        </div>
         <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
         <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
         {% if round.computed_handicap %}
         <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
         {% endif %}
+        {% else %}
+        <div class="summary-item"><span class="summary-label">Date</span> {{ round.date }}</div>
+        <div class="summary-item"><span class="summary-label">Course</span> {{ round.course }}</div>
+        <div class="summary-item"><span class="summary-label">Tees</span> {{ round.tees }}</div>
+        {% if round.transport %}
+        <div class="summary-item"><span class="summary-label">Transport</span> {{ round.transport }}</div>
+        {% endif %}
+        <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
+        <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
+        {% if round.computed_handicap %}
+        <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
+        {% endif %}
+        {% endif %}
     </div>
 
     {% if g.is_own_data %}
     <div class="round-actions">
+        {% if edit_mode %}
+        <button class="btn" id="btn-save-round">Save</button>
+        <a href="{{ url_for('round_detail', date=round.date, index=round.index) }}" class="btn">Cancel</a>
+        {% else %}
+        <a href="?edit=1" class="btn" id="btn-edit-round">Edit</a>
         <button class="btn" id="btn-delete">Delete</button>
+        {% endif %}
     </div>
     {% endif %}
 
-    {% if entry_mode == "score_only" %}
+    {% if edit_mode and entry_mode == "score_only" %}
+    <div class="stat-panel score-only-summary">
+        <div class="stat-label">Gross Score</div>
+        <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:2rem;width:6rem;text-align:center;">
+    </div>
+    {% elif entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">
         <div class="stat-value">{{ total.gross }}</div>
         <div class="stat-label">Gross Score</div>
     </div>
-    {% else %}
+    {% endif %}
+
+    {% if edit_mode and entry_mode != "score_only" %}
+    <table class="data-table scorecard-view" id="edit-scorecard">
+        <thead>
+            <tr>
+                <th>Hole</th><th>Par</th><th>Score</th>
+                <th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in holes %}
+            {% if h.num == 10 %}
+            <tr class="subtotal-row">
+                <td colspan="7" class="live-subtotals" id="subtotals-front">
+                    OUT <span class="live-gross">{{ front_nine.gross }}</span> (<span class="live-par">{{ front_nine.par }}</span>) &nbsp;
+                    putts <span class="live-putts">{{ front_nine.putts }}</span>
+                </td>
+            </tr>
+            {% endif %}
+            <tr class="hole-row">
+                <td>{{ h.num }}</td>
+                <td>{{ h.par }}</td>
+                <td><input class="edit-gross hole-input" data-hole="{{ h.num }}" value="{{ h.gross }}"></td>
+                <td>
+                    <select class="edit-fairway hole-input" data-hole="{{ h.num }}">
+                        <option value="" {% if not h.fw %}selected{% endif %}></option>
+                        <option value="H" {% if h.fw == 'H' %}selected{% endif %}>H</option>
+                        <option value="L" {% if h.fw == 'L' %}selected{% endif %}>L</option>
+                        <option value="R" {% if h.fw == 'R' %}selected{% endif %}>R</option>
+                        <option value="OBL" {% if h.fw == 'OBL' %}selected{% endif %}>OBL</option>
+                        <option value="OBR" {% if h.fw == 'OBR' %}selected{% endif %}>OBR</option>
+                        <option value="N" {% if h.fw == 'N' %}selected{% endif %}>N</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="edit-gir hole-input" data-hole="{{ h.num }}">
+                        <option value="" {% if not h.gir %}selected{% endif %}></option>
+                        <option value="H" {% if h.gir == 'H' %}selected{% endif %}>H</option>
+                        <option value="L" {% if h.gir == 'L' %}selected{% endif %}>L</option>
+                        <option value="R" {% if h.gir == 'R' %}selected{% endif %}>R</option>
+                        <option value="S" {% if h.gir == 'S' %}selected{% endif %}>S</option>
+                        <option value="LO" {% if h.gir == 'LO' %}selected{% endif %}>LO</option>
+                        <option value="OBL" {% if h.gir == 'OBL' %}selected{% endif %}>OBL</option>
+                        <option value="OBR" {% if h.gir == 'OBR' %}selected{% endif %}>OBR</option>
+                        <option value="OBS" {% if h.gir == 'OBS' %}selected{% endif %}>OBS</option>
+                        <option value="OBLO" {% if h.gir == 'OBLO' %}selected{% endif %}>OBLO</option>
+                    </select>
+                </td>
+                <td><input class="edit-putts hole-input" data-hole="{{ h.num }}" value="{{ h.putts }}"></td>
+                <td><input class="edit-penalties hole-input" data-hole="{{ h.num }}" value="{{ h.penalties if h.penalties else '0' }}"></td>
+            </tr>
+        {% endfor %}
+        <tr class="subtotal-row">
+            <td colspan="7" class="live-subtotals" id="subtotals-total">
+                IN <span class="live-gross-back">{{ back_nine.gross }}</span> (<span class="live-par-back">{{ back_nine.par }}</span>) &nbsp;
+                putts <span class="live-putts-back">{{ back_nine.putts }}</span> &nbsp;|&nbsp;
+                TOT <span class="live-gross-total">{{ total.gross }}</span> (<span class="live-par-total">{{ total.par }}</span>) &nbsp;
+                putts <span class="live-putts-total">{{ front_nine.putts + back_nine.putts }}</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    {% elif entry_mode != "score_only" %}
     <table class="data-table scorecard-view">
         <thead>
             <tr>
@@ -69,16 +181,133 @@
     </table>
     {% endif %}
 
-    {% if round.notes %}
+    {% if edit_mode %}
+    <div class="round-notes">
+        <textarea id="edit-notes" class="step-input">{{ round.notes }}</textarea>
+    </div>
+    {% elif round.notes %}
     <div class="round-notes">{{ round.notes }}</div>
     {% endif %}
 </div>
 
 <script>
+{% if edit_mode %}
+var _courses = {{ courses | tojson | safe }};
+
+document.getElementById("edit-course")?.addEventListener("change", function() {
+    var courseSel = document.getElementById("edit-course");
+    var teesSel = document.getElementById("edit-tees");
+    var courseName = courseSel.value;
+    var course = _courses[courseName];
+    teesSel.innerHTML = "";
+    if (course && course.tees) {
+        Object.keys(course.tees).forEach(function(t) {
+            var opt = document.createElement("option");
+            opt.value = t;
+            opt.textContent = t;
+            teesSel.appendChild(opt);
+        });
+    }
+});
+
+function updateSubtotals() {
+    var frontGross = 0, backGross = 0;
+    var frontPutts = 0, backPutts = 0;
+    document.querySelectorAll(".edit-gross").forEach(function(inp) {
+        var v = parseInt(inp.value) || 0;
+        var hn = parseInt(inp.dataset.hole);
+        if (hn <= 9) frontGross += v; else backGross += v;
+    });
+    document.querySelectorAll(".edit-putts").forEach(function(inp) {
+        var v = parseInt(inp.value) || 0;
+        var hn = parseInt(inp.dataset.hole);
+        if (hn <= 9) frontPutts += v; else backPutts += v;
+    });
+    var total = frontGross + backGross;
+    var totalPutts = frontPutts + backPutts;
+    var el = document.getElementById("subtotals-front");
+    if (el) {
+        var fg = el.querySelector(".live-gross");
+        var fp = el.querySelector(".live-putts");
+        if (fg) fg.textContent = frontGross;
+        if (fp) fp.textContent = frontPutts;
+    }
+    el = document.getElementById("subtotals-total");
+    if (el) {
+        var bg = el.querySelector(".live-gross-back");
+        var bp = el.querySelector(".live-putts-back");
+        var tg = el.querySelector(".live-gross-total");
+        var tp = el.querySelector(".live-putts-total");
+        if (bg) bg.textContent = backGross;
+        if (bp) bp.textContent = backPutts;
+        if (tg) tg.textContent = total;
+        if (tp) tp.textContent = totalPutts;
+    }
+}
+
+document.querySelectorAll(".edit-gross, .edit-putts, .edit-penalties").forEach(function(inp) {
+    inp.addEventListener("input", updateSubtotals);
+});
+
+document.getElementById("btn-save-round")?.addEventListener("click", function() {
+    var date = document.getElementById("edit-date").value;
+    var course = document.getElementById("edit-course").value;
+    var tees = document.getElementById("edit-tees").value;
+    var transport = document.getElementById("edit-transport").value;
+    var notes = document.getElementById("edit-notes") ? document.getElementById("edit-notes").value : "";
+    var entryMode = "{{ entry_mode }}";
+    var grossTotal = "";
+    var holes = {};
+
+    if (entryMode === "score_only") {
+        grossTotal = document.getElementById("edit-gross-total") ? document.getElementById("edit-gross-total").value : "0";
+    } else {
+        document.querySelectorAll(".edit-gross").forEach(function(inp) {
+            var hn = inp.dataset.hole;
+            var fwEl = document.querySelector(".edit-fairway[data-hole='" + hn + "']");
+            var girEl = document.querySelector(".edit-gir[data-hole='" + hn + "']");
+            var puttsEl = document.querySelector(".edit-putts[data-hole='" + hn + "']");
+            var penEl = document.querySelector(".edit-penalties[data-hole='" + hn + "']");
+            holes[hn] = {
+                gross: inp.value || "0",
+                fairway: fwEl ? fwEl.value : "",
+                gir: girEl ? girEl.value : "",
+                putts: puttsEl ? (puttsEl.value || "0") : "0",
+                penalties: penEl ? (penEl.value || "0") : "0",
+            };
+        });
+    }
+
+    fetch("/api/rounds/{{ round.date }}/{{ round.index }}", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            date: date,
+            course: course,
+            tees: tees,
+            holes_played: "{{ round.holes_played }}",
+            entry_mode: entryMode,
+            transport: transport,
+            notes: notes,
+            holes: holes,
+            gross_total: grossTotal,
+        }),
+    }).then(function(r) {
+        if (r.ok) {
+            window.location.href = "/rounds/{{ round.date }}/{{ round.index }}";
+        } else {
+            return r.json().then(function(d) { alert(d.error || "Save failed"); });
+        }
+    }).catch(function(err) {
+        alert("Save failed: " + err.message);
+    });
+});
+{% else %}
 document.getElementById("btn-delete")?.addEventListener("click", function () {
     if (!confirm("Delete this round?")) return;
     fetch("/api/rounds/{{ round.date }}/{{ round.index }}", { method: "DELETE" })
         .then(function () { window.location.href = "/"; });
 });
+{% endif %}
 </script>
 {% endblock %}

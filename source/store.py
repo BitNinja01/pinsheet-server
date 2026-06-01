@@ -7,6 +7,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
+from source.models import dict_to_round, RoundData
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -103,7 +104,7 @@ def rename_course(old_name: str, new_name: str) -> None:
     _log.info("course renamed: %r -> %r", old_name, new_name)
 
 
-def get_all_rounds(user_id: int = 1, limit: int = None) -> list:
+def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
     db = get_db()
     query = "SELECT * FROM rounds WHERE user_id = ? ORDER BY date DESC, round_index DESC"
     if limit is not None:
@@ -132,7 +133,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list:
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
-        result.append(r)
+        result.append(dict_to_round(r))
     return result
 
 

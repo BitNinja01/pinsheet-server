@@ -1,10 +1,11 @@
 import pytest
 
+from source.models import dict_to_round, dict_to_course, RoundData, CourseData
+
 
 @pytest.fixture
 def make_round():
-    """Factory fixture: returns a function that creates a round dict matching
-    the real data shape. All numeric fields are strings."""
+    """Factory fixture: returns a function that creates a RoundData."""
     def _make_round(
         course="Test GC",
         tees="White",
@@ -55,7 +56,7 @@ def make_round():
                 "penalties": h_pen,
             }
 
-        return {
+        return dict_to_round({
             "date": date,
             "course": course,
             "tees": tees,
@@ -65,14 +66,13 @@ def make_round():
             "differential": differential,
             "computed_handicap": computed_handicap,
             "holes": holes,
-        }
+        })
     return _make_round
 
 
 @pytest.fixture
 def make_course():
-    """Factory fixture: returns a function that creates a course dict
-    in the {name: {...}} shape used by courses dict."""
+    """Factory fixture: returns a function that creates a {name: CourseData} dict."""
     def _make_course(
         name="Test GC",
         par=72,
@@ -96,13 +96,12 @@ def make_course():
             "yardage": str(yardage),
         }
 
-        return {
-            name: {
-                "par": str(par),
-                "holes": holes,
-                "tees": {"White": tee_data},
-            }
+        course_dict = {
+            "par": str(par),
+            "holes": holes,
+            "tees": {"White": tee_data},
         }
+        return {name: dict_to_course(name, course_dict)}
     return _make_course
 
 

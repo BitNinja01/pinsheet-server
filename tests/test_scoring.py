@@ -8,11 +8,15 @@ from calc.scoring import (
     calc_clean_card_percent,
     calc_scoring_consistency,
     calc_score_components,
+    calc_per_hole_stats,
+)
+from calc.analysis import (
     calc_penalty_stats,
     calc_momentum_recovery,
+)
+from calc.milestones import (
     calc_personal_bests,
     calc_nemesis_best_holes,
-    calc_per_hole_stats,
 )
 
 
@@ -33,7 +37,7 @@ def test_scoring_average_normal(make_round):
 
 def test_scoring_average_skips_zero_total(make_round):
     rounds = [make_round(gross=80), make_round(gross=0)]
-    rounds[1]["total_gross"] = "0"
+    rounds[1].total_gross = "0"
     avg = calc_scoring_average(rounds)
     assert avg == 80.0
 
@@ -235,8 +239,8 @@ def test_per_hole_stats_fir_miss_direction(make_round, make_course):
     courses = make_course()
     r1 = make_round(gross=80)
     r2 = make_round(gross=82)
-    r1["holes"]["1"]["fairway"] = "L"
-    r2["holes"]["1"]["fairway"] = "R"
+    r1.holes["1"].fairway = "L"
+    r2.holes["1"].fairway = "R"
     rounds = [r1, r2]
 
     result = calc_per_hole_stats(rounds, courses, "Test GC", 1)
@@ -249,8 +253,8 @@ def test_per_hole_stats_gir_miss_direction(make_round, make_course):
     courses = make_course()
     r1 = make_round(gross=80)
     r2 = make_round(gross=82)
-    r1["holes"]["1"]["gir"] = "S"
-    r2["holes"]["1"]["gir"] = "LO"
+    r1.holes["1"].gir = "S"
+    r2.holes["1"].gir = "LO"
     rounds = [r1, r2]
 
     result = calc_per_hole_stats(rounds, courses, "Test GC", 1)
@@ -265,10 +269,10 @@ def test_per_hole_stats_scramble(make_round, make_course):
     courses = make_course()
     r1 = make_round(gross=80)
     r2 = make_round(gross=82)
-    r1["holes"]["1"]["gir"] = "S"
-    r2["holes"]["1"]["gir"] = "L"
-    r1["holes"]["1"]["gross"] = "4"
-    r2["holes"]["1"]["gross"] = "5"
+    r1.holes["1"].gir = "S"
+    r2.holes["1"].gir = "L"
+    r1.holes["1"].gross = 4
+    r2.holes["1"].gross = 5
     rounds = [r1, r2]
 
     result = calc_per_hole_stats(rounds, courses, "Test GC", 1)

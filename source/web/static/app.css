@@ -53,9 +53,9 @@
     --ps-font-body: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
     --ps-font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
 
-    --ps-fs-eyebrow: 10px;
+    --ps-fs-eyebrow: 13px;
     --ps-fs-micro: 11px;
-    --ps-fs-body: 13px;
+    --ps-fs-body: 18px;
     --ps-fs-body-lg: 14px;
     --ps-fs-table-num: 16px;
     --ps-fs-score: 22px;
@@ -336,7 +336,7 @@ body {
     color: var(--ps-ink-2);
 }
 .ps-stat .ps-stat-delta {
-    font-size: 12px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
@@ -370,7 +370,7 @@ body {
 .ps-table th.r,
 .ps-table td.r { text-align: right; }
 .ps-table td {
-    padding: 7px var(--ps-sp-3);
+    padding: 10px var(--ps-sp-3);
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
     font-size: var(--ps-fs-body);
     vertical-align: middle;
@@ -386,6 +386,7 @@ body {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-table-num);
     letter-spacing: -0.01em;
+    font-weight: var(--ps-fw-label);
 }
 .ps-table .ps-meta {
     font-size: var(--ps-fs-micro);
@@ -405,8 +406,9 @@ body {
     color: var(--ps-ink);
 }
 .ps-score.is-under { color: var(--ps-accent); }
+.ps-score.is-over { color: var(--ps-warn); }
 .ps-topar {
-    font-size: var(--ps-fs-micro);
+    font-size: var(--ps-fs-body);
     color: var(--ps-ink-3);
     margin-left: 6px;
 }
@@ -571,7 +573,14 @@ textarea.step-input { resize: vertical; }
     margin-right: 0.25rem;
     accent-color: var(--ps-accent);
 }
-select.step-input { appearance: none; }
+select.step-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+    cursor: pointer;
+}
 .location-row { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
 .location-row .step-input { flex: 1; }
 
@@ -712,6 +721,7 @@ select.hole-input { width: 3rem; appearance: none; }
     margin: 1.5rem 0 0.75rem;
     color: var(--ps-accent);
 }
+
 .tee-set {
     background: var(--ps-paper-2);
     border: var(--ps-rule) solid var(--ps-rule-c);
@@ -780,7 +790,7 @@ select.hole-input { width: 3rem; appearance: none; }
     color: var(--ps-ink);
 }
 .ps-stat .ps-stat-delta {
-    font-size: 12px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
@@ -833,7 +843,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .stat-cell-delta {
     font-family: var(--ps-font-mono);
-    font-size: 11px;
+    font-size: var(--ps-fs-eyebrow);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.04em;
     margin-bottom: 8px;
@@ -849,7 +859,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .stat-cell-window {
     font-family: var(--ps-font-mono);
-    font-size: 10px;
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
     letter-spacing: 0.04em;
 }
@@ -864,6 +874,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-table-num);
     letter-spacing: -0.01em;
+    font-weight: var(--ps-fw-label);
 }
 
 
@@ -1238,10 +1249,12 @@ select.hole-input { width: 3rem; appearance: none; }
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
     .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid { display: none !important; }
+    .course-detail .desktop-table, .course-detail .hole-table-wrap,
+    .round-detail .data-table { width: fit-content; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
-    .hole-table-wrap { overflow-x: auto; }
+    .hole-table-wrap { overflow-x: auto; padding-left: 0; padding-right: 0; }
 }
 
 /* ── Round cards (dashboard + rounds list mobile) ── */
@@ -1536,4 +1549,10 @@ select.hole-input { width: 3rem; appearance: none; }
 .hole-mini-par {
     font-size: var(--ps-fs-body-lg);
     font-weight: 600;
+}
+
+/* Zebra striping for data tables */
+.data-table tbody tr:nth-child(even) td,
+.ps-table tbody tr:nth-child(even) td {
+    background: var(--ps-paper-2);
 }

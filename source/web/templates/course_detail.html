@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="course-detail">
+    {% if edit_mode %}
+    <div class="edit-field">
+        <input type="text" id="edit-name" class="step-input" value="{{ name }}" placeholder="Course name">
+    </div>
+    {% else %}
     <h2>{{ name }}</h2>
-    {% if course.location %}
+    {% endif %}
+
+    {% if edit_mode %}
+    <div class="location-row">
+        <input type="text" id="edit-city" class="step-input" value="{{ course.location.city if course.location is mapping else '' }}" placeholder="City">
+        <input type="text" id="edit-state" class="step-input" value="{{ course.location.get('state/province', '') if course.location is mapping else '' }}" placeholder="State">
+        <input type="text" id="edit-country" class="step-input" value="{{ course.location.country if course.location is mapping else '' }}" placeholder="Country">
+    </div>
+    {% elif course.location %}
     <p class="course-location">
         {% if course.location is mapping %}
             {{ course.location.city }}, {{ course.location.get("state/province", "") }}, {{ course.location.country }}
@@ -24,13 +37,54 @@
 
     {% if g.is_own_data %}
     <div class="round-actions">
+        {% if edit_mode %}
+        <button class="btn" id="btn-save-course">Save</button>
+        <a href="{{ url_for('course_detail', name=name) }}" class="btn">Cancel</a>
+        {% else %}
+        <a href="?edit=1" class="btn" id="btn-edit-course">Edit</a>
         <button class="btn" id="btn-delete-course">Delete</button>
+        {% endif %}
     </div>
     {% endif %}
 
     {% if tees %}
     <h3>Tees</h3>
     <!-- Desktop table -->
+    {% if edit_mode %}
+    <div class="desktop-table">
+    <table class="data-table tee-table" id="edit-tees-table">
+        <thead>
+            <tr>
+                <th>Tee</th>
+                <th>Yardage</th>
+                <th>Rating</th>
+                <th>Slope</th>
+                <th>Front Rating</th>
+                <th>Front Slope</th>
+                <th>Back Rating</th>
+                <th>Back Slope</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="edit-tees-body">
+        {% for tee_name, t in tees.items() %}
+            <tr class="tee-row">
+                <td><input class="edit-tee-name step-input" value="{{ tee_name }}" placeholder="Name"></td>
+                <td><input class="edit-tee-yardage step-input" value="{{ t.get('yardage', '') }}" placeholder="Yds"></td>
+                <td><input class="edit-tee-rating step-input" value="{{ t.get('rating', '') }}" placeholder="Rt"></td>
+                <td><input class="edit-tee-slope step-input" value="{{ t.get('slope', '') }}" placeholder="Sl"></td>
+                <td><input class="edit-tee-frating step-input" value="{{ t.get('front_rating', '') }}" placeholder="FR"></td>
+                <td><input class="edit-tee-fslope step-input" value="{{ t.get('front_slope', '') }}" placeholder="FS"></td>
+                <td><input class="edit-tee-brating step-input" value="{{ t.get('back_rating', '') }}" placeholder="BR"></td>
+                <td><input class="edit-tee-bslope step-input" value="{{ t.get('back_slope', '') }}" placeholder="BS"></td>
+                <td><button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">✕</button></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <button class="btn btn-add-tee">+ Add Tee Set</button>
+    </div>
+    {% else %}
     <div class="desktop-table">
     <table class="data-table tee-table">
         <thead>
@@ -68,8 +122,29 @@
         </tbody>
     </table>
     </div>
+    {% endif %}
 
     <!-- Mobile tee cards -->
+    {% if edit_mode %}
+    <div class="tee-cards" id="edit-tee-cards">
+    {% for tee_name, t in tees.items() %}
+        <div class="tee-card-item">
+            <div class="tee-card-name"><input class="edit-tee-name step-input" value="{{ tee_name }}"></div>
+            <div class="tee-card-stats">
+                <div class="tee-card-stat">Yardage: <input class="edit-tee-yardage step-input" value="{{ t.get('yardage', '') }}"></div>
+                <div class="tee-card-stat">Rating: <input class="edit-tee-rating step-input" value="{{ t.get('rating', '') }}"></div>
+                <div class="tee-card-stat">Slope: <input class="edit-tee-slope step-input" value="{{ t.get('slope', '') }}"></div>
+                <div class="tee-card-stat">F Rt: <input class="edit-tee-frating step-input" value="{{ t.get('front_rating', '') }}"></div>
+                <div class="tee-card-stat">F Sl: <input class="edit-tee-fslope step-input" value="{{ t.get('front_slope', '') }}"></div>
+                <div class="tee-card-stat">B Rt: <input class="edit-tee-brating step-input" value="{{ t.get('back_rating', '') }}"></div>
+                <div class="tee-card-stat">B Sl: <input class="edit-tee-bslope step-input" value="{{ t.get('back_slope', '') }}"></div>
+            </div>
+            <button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>
+        </div>
+    {% endfor %}
+    <button class="btn btn-add-tee">+ Add Tee Set</button>
+    </div>
+    {% else %}
     <div class="tee-cards">
     {% for tee_name, t in tees.items() %}
         <div class="tee-card-item">
@@ -87,10 +162,39 @@
     {% endfor %}
     </div>
     {% endif %}
+    {% endif %}
 
     {% if holes %}
     <h3>Holes</h3>
     <!-- Desktop table (scrollable on mobile as fallback) -->
+    {% if edit_mode %}
+    <div class="hole-table-wrap">
+    <table class="data-table hole-table" id="edit-holes-table">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>Index</th>
+                {% for tee_name in tees.keys() %}
+                <th class="tee-col" data-tee="{{ tee_name }}">{{ tee_name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in holes %}
+            <tr>
+                <td>{{ h.num }}</td>
+                <td><input class="edit-hole-par step-input" data-hole="{{ h.num }}" value="{{ h.par }}"></td>
+                <td><input class="edit-hole-index step-input" data-hole="{{ h.num }}" value="{{ h.index }}"></td>
+                {% for tee_name in tees.keys() %}
+                <td><input class="edit-hole-yardage step-input" data-hole="{{ h.num }}" data-tee="{{ tee_name }}" value="{{ h.yardages.get(tee_name, '') }}"></td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
     <div class="hole-table-wrap">
     <table class="data-table hole-table">
         <thead>
@@ -117,6 +221,7 @@
         </tbody>
     </table>
     </div>
+    {% endif %}
 
     <!-- Mobile hole mini-grid -->
     <div class="hole-mini-grid">
@@ -133,6 +238,174 @@
 </div>
 
 <script>
+{% if edit_mode %}
+document.getElementById("btn-save-course")?.addEventListener("click", function() {
+    var name = document.getElementById("edit-name").value;
+    var city = document.getElementById("edit-city").value;
+    var state = document.getElementById("edit-state").value;
+    var country = document.getElementById("edit-country").value;
+
+    var tees = {};
+    document.querySelectorAll("#edit-tees-body .tee-row").forEach(function(row) {
+        var teeName = row.querySelector(".edit-tee-name").value;
+        if (!teeName) return;
+        tees[teeName] = {
+            yardage: row.querySelector(".edit-tee-yardage").value,
+            rating: row.querySelector(".edit-tee-rating").value,
+            slope: row.querySelector(".edit-tee-slope").value,
+            front_rating: row.querySelector(".edit-tee-frating").value,
+            front_slope: row.querySelector(".edit-tee-fslope").value,
+            back_rating: row.querySelector(".edit-tee-brating").value,
+            back_slope: row.querySelector(".edit-tee-bslope").value,
+        };
+    });
+
+    var holes = {};
+    document.querySelectorAll(".edit-hole-par").forEach(function(input) {
+        var holeNum = input.getAttribute("data-hole");
+        holes[holeNum] = {
+            par: input.value,
+            index: document.querySelector(".edit-hole-index[data-hole='" + holeNum + "']").value,
+        };
+    });
+
+    var yardageInputs = document.querySelectorAll(".edit-hole-yardage");
+    var teeYardages = {};
+    yardageInputs.forEach(function(input) {
+        var holeNum = input.getAttribute("data-hole");
+        var teeName = input.getAttribute("data-tee");
+        if (!teeYardages[teeName]) teeYardages[teeName] = {};
+        if (input.value) teeYardages[teeName][holeNum] = input.value;
+    });
+    for (var teeName in teeYardages) {
+        if (tees[teeName]) {
+            tees[teeName].yardages = teeYardages[teeName];
+        }
+    }
+
+    var totalPar = 0;
+    document.querySelectorAll(".edit-hole-par").forEach(function(input) {
+        totalPar += parseInt(input.value) || 0;
+    });
+
+    fetch("/api/courses/{{ name }}", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name: name,
+            location: { city: city, "state/province": state, country: country },
+            tees: tees,
+            holes: holes,
+            par: totalPar,
+        }),
+    }).then(function(r) {
+        if (r.ok) {
+            window.location.href = "/courses/" + encodeURIComponent(name);
+        } else {
+            return r.json().then(function(d) { alert(d.error || "Save failed"); });
+        }
+    }).catch(function(err) {
+        alert("Save failed: " + err.message);
+    });
+});
+
+document.querySelectorAll(".btn-add-tee").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+    var tbody = document.getElementById("edit-tees-body");
+    var tr = document.createElement("tr");
+    tr.className = "tee-row";
+    tr.innerHTML = [
+        '<td><input class="edit-tee-name step-input" placeholder="Name"></td>',
+        '<td><input class="edit-tee-yardage step-input" placeholder="Yds"></td>',
+        '<td><input class="edit-tee-rating step-input" placeholder="Rt"></td>',
+        '<td><input class="edit-tee-slope step-input" placeholder="Sl"></td>',
+        '<td><input class="edit-tee-frating step-input" placeholder="FR"></td>',
+        '<td><input class="edit-tee-fslope step-input" placeholder="FS"></td>',
+        '<td><input class="edit-tee-brating step-input" placeholder="BR"></td>',
+        '<td><input class="edit-tee-bslope step-input" placeholder="BS"></td>',
+        '<td><button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">\u2715</button></td>',
+    ].join("");
+    tbody.appendChild(tr);
+
+    var teeCards = document.getElementById("edit-tee-cards");
+    if (teeCards) {
+        var card = document.createElement("div");
+        card.className = "tee-card-item";
+        card.innerHTML = [
+            '<div class="tee-card-name"><input class="edit-tee-name step-input" placeholder="Name"></div>',
+            '<div class="tee-card-stats">',
+            '<div class="tee-card-stat">Yardage: <input class="edit-tee-yardage step-input"></div>',
+            '<div class="tee-card-stat">Rating: <input class="edit-tee-rating step-input"></div>',
+            '<div class="tee-card-stat">Slope: <input class="edit-tee-slope step-input"></div>',
+            '<div class="tee-card-stat">F Rt: <input class="edit-tee-frating step-input"></div>',
+            '<div class="tee-card-stat">F Sl: <input class="edit-tee-fslope step-input"></div>',
+            '<div class="tee-card-stat">B Rt: <input class="edit-tee-brating step-input"></div>',
+            '<div class="tee-card-stat">B Sl: <input class="edit-tee-bslope step-input"></div>',
+            '</div>',
+            '<button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>',
+        ].join("");
+        teeCards.insertBefore(card, teeCards.querySelector(".btn-add-tee"));
+    }
+
+    var holesTable = document.getElementById("edit-holes-table");
+    if (holesTable) {
+        var teeNameInput = tr.querySelector(".edit-tee-name");
+        var onNameChange = function() {
+            var name = teeNameInput.value;
+            if (!name) return;
+            var headerRow = holesTable.querySelector("thead tr");
+            var th = document.createElement("th");
+            th.className = "tee-col";
+            th.setAttribute("data-tee", name);
+            th.textContent = name;
+            headerRow.appendChild(th);
+
+            var rows = holesTable.querySelectorAll("tbody tr");
+            rows.forEach(function(row) {
+                var td = document.createElement("td");
+                var input = document.createElement("input");
+                input.className = "edit-hole-yardage step-input";
+                input.setAttribute("data-hole", row.querySelector("td").textContent);
+                input.setAttribute("data-tee", name);
+                td.appendChild(input);
+                row.appendChild(td);
+            });
+        };
+        teeNameInput.addEventListener("change", onNameChange);
+        teeNameInput.addEventListener("blur", onNameChange);
+    }
+    });
+});
+
+document.addEventListener("click", function(e) {
+    if (e.target.classList.contains("btn-remove-tee")) {
+        if (!confirm("Remove this tee set?")) return;
+        var row = e.target.closest(".tee-row, .tee-card-item");
+        if (row) {
+            var teeName = row.querySelector(".edit-tee-name").value;
+            row.remove();
+
+            if (teeName) {
+                var holesTable = document.getElementById("edit-holes-table");
+                if (holesTable) {
+                    var ths = holesTable.querySelectorAll("thead tr th.tee-col");
+                    ths.forEach(function(th) {
+                        if (th.getAttribute("data-tee") === teeName) {
+                            var idx = Array.from(th.parentNode.children).indexOf(th);
+                            th.remove();
+                            var rows = holesTable.querySelectorAll("tbody tr");
+                            rows.forEach(function(row) {
+                                var cells = row.querySelectorAll("td");
+                                if (cells[idx]) cells[idx].remove();
+                            });
+                        }
+                    });
+                }
+            }
+        }
+    }
+});
+{% else %}
 document.getElementById("btn-delete-course")?.addEventListener("click", function () {
     if (!confirm("Delete course &quot;{{ name }}&quot;? This cannot be undone.")) return;
     fetch("/api/courses/{{ name }}", { method: "DELETE" })
@@ -143,5 +416,6 @@ document.getElementById("btn-delete-course")?.addEventListener("click", function
             window.location.href = "/courses";
         });
 });
+{% endif %}
 </script>
 {% endblock %}

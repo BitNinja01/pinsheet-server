@@ -10,6 +10,8 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    calc_handicap_values_in_range,
+    calc_career_low_handicap,
 )
 from calc.approach import (
     calc_fir_percent,
@@ -28,8 +30,9 @@ from calc.approach import (
     calc_scramble_by_miss_direction,
     calc_scramble_by_par_type,
     calc_ob_stats,
+    per_round_hole_stats,
 )
-from calc.context import (
+from calc.scoring import (
     calc_historical_window,
     calc_last_year_handicap,
     calc_round_vs_par,
@@ -64,18 +67,20 @@ from calc.scoring import (
     calc_clean_card_percent,
     calc_scoring_consistency,
     calc_score_components,
-    calc_penalty_stats,
-    calc_momentum_recovery,
-    calc_personal_bests,
-    calc_nemesis_best_holes,
     calc_pob_trend,
     calc_clean_card_trend,
     calc_big_number_trend,
-    calc_rounds_this_year,
-    calc_rounds_total,
-    calc_golfiest_month,
-    calc_most_common_day,
-    calc_weekly_streak,
+    calc_per_round_average,
+    calc_hole_percentage,
+    stat_delta,
+)
+from calc.analysis import (
+    calc_penalty_stats,
+    calc_momentum_recovery,
+)
+from calc.milestones import (
+    calc_personal_bests,
+    calc_nemesis_best_holes,
     calc_best_single_round,
     calc_best_3round_stretch,
     calc_biggest_improvement,
@@ -86,8 +91,21 @@ from calc.scoring import (
     calc_best_gir_round,
     calc_best_fir_round,
     calc_most_played_course,
-    calc_season_yardage,
     calc_penalty_free_rounds,
+)
+from calc.seasons import (
+    calc_rounds_this_year,
+    calc_rounds_total,
+    calc_golfiest_month,
+    calc_most_common_day,
+    calc_weekly_streak,
+    calc_season_yardage,
     calc_hi_journey,
     calc_season_rounds,
+)
+from calc.composite import (
+    compute_stat_bundle,
+    StatBundle,
+    last_n_rounds,
+    best_n_rounds,
 )
