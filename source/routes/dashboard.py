@@ -210,6 +210,7 @@ def register_dashboard_routes(app, limiter, csrf):
 
     @app.route("/api/welcome", methods=["POST"])
     @login_required
+    @requires_own_data
     @csrf.exempt
     def api_welcome_done():
         settings = get_settings()
