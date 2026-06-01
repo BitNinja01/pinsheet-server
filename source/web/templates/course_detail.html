@@ -82,7 +82,7 @@
         {% endfor %}
         </tbody>
     </table>
-    <button class="btn" id="btn-add-tee">+ Add Tee Set</button>
+    <button class="btn btn-add-tee">+ Add Tee Set</button>
     </div>
     {% else %}
     <div class="desktop-table">
@@ -142,7 +142,7 @@
             <button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>
         </div>
     {% endfor %}
-    <button class="btn" id="btn-add-tee">+ Add Tee Set</button>
+    <button class="btn btn-add-tee">+ Add Tee Set</button>
     </div>
     {% else %}
     <div class="tee-cards">
@@ -283,6 +283,11 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
         }
     }
 
+    var totalPar = 0;
+    document.querySelectorAll(".edit-hole-par").forEach(function(input) {
+        totalPar += parseInt(input.value) || 0;
+    });
+
     fetch("/api/courses/{{ name }}", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -291,7 +296,7 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
             location: { city: city, "state/province": state, country: country },
             tees: tees,
             holes: holes,
-            par: 0,
+            par: totalPar,
         }),
     }).then(function(r) {
         if (r.ok) {
@@ -304,7 +309,7 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
     });
 });
 
-document.getElementById("btn-add-tee")?.addEventListener("click", function() {
+document.querySelector(".btn-add-tee")?.addEventListener("click", function() {
     var tbody = document.getElementById("edit-tees-body");
     var tr = document.createElement("tr");
     tr.className = "tee-row";
@@ -320,6 +325,26 @@ document.getElementById("btn-add-tee")?.addEventListener("click", function() {
         '<td><button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">\u2715</button></td>',
     ].join("");
     tbody.appendChild(tr);
+
+    var teeCards = document.getElementById("edit-tee-cards");
+    if (teeCards) {
+        var card = document.createElement("div");
+        card.className = "tee-card-item";
+        card.innerHTML = [
+            '<div class="tee-card-name"><input class="edit-tee-name" placeholder="Name"></div>',
+            '<div class="tee-card-stats">',
+            '<div class="tee-card-stat">Yardage: <input class="edit-tee-yardage" style="width:4rem"></div>',
+            '<div class="tee-card-stat">Rating: <input class="edit-tee-rating" style="width:3rem"></div>',
+            '<div class="tee-card-stat">Slope: <input class="edit-tee-slope" style="width:3rem"></div>',
+            '<div class="tee-card-stat">F Rt: <input class="edit-tee-frating" style="width:3rem"></div>',
+            '<div class="tee-card-stat">F Sl: <input class="edit-tee-fslope" style="width:3rem"></div>',
+            '<div class="tee-card-stat">B Rt: <input class="edit-tee-brating" style="width:3rem"></div>',
+            '<div class="tee-card-stat">B Sl: <input class="edit-tee-bslope" style="width:3rem"></div>',
+            '</div>',
+            '<button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>',
+        ].join("");
+        teeCards.insertBefore(card, teeCards.querySelector(".btn-add-tee"));
+    }
 
     var holesTable = document.getElementById("edit-holes-table");
     if (holesTable) {
