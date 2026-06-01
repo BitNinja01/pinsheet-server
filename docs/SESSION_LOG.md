@@ -424,3 +424,23 @@
 **Bug**: Net column CH is off by −1 for some 18-hole rounds (Maplewood CH=18 vs expected 19, Druids Glen CH=22 vs expected 23). `calc_course_handicap` uses `round()` and computes correctly in tests, but live server output matches `int()` truncation. `__pycache__` cleared, server restarted — still persists. Needs runtime logging to diagnose.
 
 **Next**: Per HANDOFF.md — port achievements plugin first.
+
+## 2026-05-31 21:30 UTC
+
+**What was done**:
+- Investigated net column -1 rounding bug end-to-end: traced `calc_course_handicap`, all callers, course data loading, and import process
+- Added diagnostic `INFO` logging to `calc_course_handicap` with full input/output trace
+- Wrote 4 regression tests pinning Maplewood white (CH=19), Druids Glen white (CH=23), and round-over-int behavior
+- Ran against re-imported fresh data from pinsheet core; logs proved `round()` computes correctly
+- Identified root cause: source data had stale HIs (e.g. Maplewood HI=21.7 source vs 20.8 after import recalculation). The import correctly recomputes all HIs from scratch
+- Removed diagnostic logging after confirmation; regression tests retained
+- Created `pinsheet-import.zip` from pinsheet core data for re-import; gitignored
+
+**Files touched**:
+- `source/calc/handicap.py` — added diagnostic logging, then reverted
+- `tests/test_handicap.py` — 4 regression tests (retained)
+- `.gitignore` — added `pinsheet-import.zip`
+
+**Bug**: Net column -1 discrepancy was not a code bug. The import recalculates handicap indexes from scratch; source data had stale HIs. No functional changes required.
+
+**Next**: Per HANDOFF.md — port achievements plugin.
