@@ -27,6 +27,9 @@ scripts/*.py
 data/
 !data/handicap_benchmarks.json
 
+# Import archives
+pinsheet-import.zip
+
 # Design system artifacts (internal)
 design-system/
 open-design/
