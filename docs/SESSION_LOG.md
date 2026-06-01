@@ -444,3 +444,56 @@
 **Bug**: Net column -1 discrepancy was not a code bug. The import recalculates handicap indexes from scratch; source data had stale HIs. No functional changes required.
 
 **Next**: Per HANDOFF.md — port achievements plugin.
+
+## 2026-05-31 23:45 UTC
+
+**What was done**:
+- Designed and implemented inline editing for course detail and round detail pages
+- Backend: `PUT /api/courses/<name>` with rename handling, conflict detection (404/409), full validation
+- Backend: `PUT /api/rounds/<date>/<index>` with score recalculation, differential, full handicap index recompute
+- Course edit UI: editable name/location, tee sets table with add/remove (auto-syncs holes columns + mobile cards), editable holes grid
+- Round edit UI: editable metadata (date/course/tees/transport), scorecard with fairway/GIR dropdowns, live subtotals, notes textarea, course→tees cascade
+
+**Files touched**:
+- `source/routes/courses.py` — added PUT route, edit_mode param
+- `source/routes/rounds.py` — added PUT route, edit_mode param + courses context
+- `source/web/templates/course_detail.html` — edit mode blocks + JS (save, add/remove tee, sync)
+- `source/web/templates/round_detail.html` — edit mode blocks + JS (course cascade, live subtotals, save)
+- `tests/test_routes.py` — tests for PUT course and PUT round endpoints
+- `docs/superpowers/specs/2026-05-31-edit-pages-design.md` — design doc
+- `docs/superpowers/plans/2026-05-31-edit-pages.md` — implementation plan
+
+**Test results**: 253/253 pass (1 new test per PUT endpoint)
+
+**Next**: Per HANDOFF.md — port achievements plugin.
+
+## 2026-06-01 00:30 UTC
+
+**What was done**:
+- CSRF fix: PUT routes were being blocked by Flask-WTF CSRFProtect. Exempted both PUT routes via `@csrf.exempt`, matching the existing pattern in `POST /api/welcome`.
+
+**Files touched**:
+- `source/routes/__init__.py` — pass `csrf` to course and round route registration
+- `source/routes/courses.py` — accept `csrf`, exempt PUT route
+- `source/routes/rounds.py` — accept `csrf`, exempt PUT route
+
+**Test results**: 253/253 pass
+
+**Next**: Per HANDOFF.md — port achievements plugin.
+
+## 2026-06-01 08:47 UTC
+
+**What was done**:
+- Initialized issue tracker in `.scratch/issues/` (8 backlog issues created)
+- Applied `.step-input`/`.hole-input` form styling to round and course edit pages
+- Closed P2_002 (edit page styling) after user confirmed testing
+- Added `.scratch/` to `.gitignore` and removed from git tracking
+- Migrated BK-15 from BACKLOG.md to issue P2_001
+
+**Files touched**:
+- `source/web/templates/round_detail.html` — added form classes, removed inline styles
+- `source/web/templates/course_detail.html` — added form classes, removed inline styles, `.edit-location` → `.location-row`
+- `.gitignore` — added `.scratch/`
+- `.scratch/issues/P*.md` — 8 issues created (P1: 2, P2: 5, P3: 1), 1 closed
+
+**Next**: Per HANDOFF.md — port achievements plugin.
