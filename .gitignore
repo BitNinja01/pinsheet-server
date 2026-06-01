@@ -1,4 +1,5 @@
 # Custom — Internal tooling and session artifacts
+.scratch/
 PICKUP_PROMPT.md
 AGENTS.md
 CODEBASE_IMPROVEMENTS.md
