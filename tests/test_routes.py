@@ -32,6 +32,7 @@ def test_app(tmp_path, monkeypatch):
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["DB_PATH"] = db_path
 
     return app
 
@@ -150,3 +151,32 @@ def test_course_list_redirects_when_not_logged_in(client):
     resp = client.get("/courses", follow_redirects=True)
     assert resp.status_code == 200
     assert b"login" in resp.data.lower() or b"Login" in resp.data
+
+
+def test_put_course_updates_existing(test_app):
+    create_user("p", "P", "pass1234")
+    client = test_app.test_client()
+    client.post("/login", data={"username": "p", "password": "pass1234"})
+
+    course_data = {
+        "name": "Test Course",
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70.0", "slope": "120"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    resp = client.post("/api/courses", json=course_data)
+    assert resp.status_code == 200
+
+    course_data["name"] = "Test Course Renamed"
+    course_data["location"]["city"] = "New City"
+    resp = client.put("/api/courses/Test Course", json=course_data)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["name"] == "Test Course Renamed"
+
+    from store import get_courses
+    courses = get_courses()
+    assert "Test Course Renamed" in courses
+    assert courses["Test Course Renamed"]["location"]["city"] == "New City"

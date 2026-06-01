@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import save_course, delete_course
+from store import save_course, delete_course, rename_course
 from source.routes.auth import requires_own_data
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.plugin import fire_hook
@@ -123,3 +123,30 @@ def register_courses_routes(app):
                 return jsonify({"error": "Cannot delete course with existing rounds"}), 409
         delete_course(name)
         return jsonify({"ok": True})
+
+    @app.route("/api/courses/<name>", methods=["PUT"])
+    @login_required
+    @requires_own_data
+    def api_courses_put(name):
+        data = request.get_json()
+        new_name = data.get("name", "").strip()
+        if not new_name:
+            return jsonify({"error": "Name is required"}), 400
+
+        location = data.get("location", {})
+        if not isinstance(location, dict) or not location.get("city") or not location.get("state/province") or not location.get("country"):
+            return jsonify({"error": "City, state/province, and country are required"}), 400
+
+        if new_name != name:
+            rename_course(name, new_name)
+
+        course = {
+            "location": location,
+            "tees": data.get("tees", {}),
+            "holes": data.get("holes", {}),
+            "par": data.get("par", 0),
+        }
+
+        save_course(course, new_name)
+        fire_hook("on_course_saved", course_name=new_name, course_data=course, user_id=current_user.id, db_path=app.config["DB_PATH"])
+        return jsonify({"ok": True, "name": new_name})
