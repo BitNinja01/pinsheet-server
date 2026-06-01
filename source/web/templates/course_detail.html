@@ -355,7 +355,7 @@ document.getElementById("btn-add-tee")?.addEventListener("click", function() {
 document.addEventListener("click", function(e) {
     if (e.target.classList.contains("btn-remove-tee")) {
         if (!confirm("Remove this tee set?")) return;
-        var row = e.target.closest(".tee-row");
+        var row = e.target.closest(".tee-row, .tee-card-item");
         if (row) {
             var teeName = row.querySelector(".edit-tee-name").value;
             row.remove();
