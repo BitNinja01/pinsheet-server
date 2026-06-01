@@ -309,7 +309,8 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
     });
 });
 
-document.querySelector(".btn-add-tee")?.addEventListener("click", function() {
+document.querySelectorAll(".btn-add-tee").forEach(function(btn) {
+    btn.addEventListener("click", function() {
     var tbody = document.getElementById("edit-tees-body");
     var tr = document.createElement("tr");
     tr.className = "tee-row";
@@ -375,6 +376,7 @@ document.querySelector(".btn-add-tee")?.addEventListener("click", function() {
         teeNameInput.addEventListener("change", onNameChange);
         teeNameInput.addEventListener("blur", onNameChange);
     }
+    });
 });
 
 document.addEventListener("click", function(e) {
