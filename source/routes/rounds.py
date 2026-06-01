@@ -131,6 +131,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/drafts/round", methods=["PUT"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_draft_round_put():
         save_round_draft(request.get_json(), current_user.id)
         return jsonify({"ok": True})
@@ -138,6 +139,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/drafts/round", methods=["DELETE"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_draft_round_delete():
         clear_round_draft(current_user.id)
         return jsonify({"ok": True})
@@ -151,6 +153,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/drafts/course", methods=["PUT"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_draft_course_put():
         save_course_draft(request.get_json(), current_user.id)
         return jsonify({"ok": True})
@@ -158,6 +161,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/drafts/course", methods=["DELETE"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_draft_course_delete():
         clear_course_draft(current_user.id)
         return jsonify({"ok": True})
@@ -165,6 +169,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/rounds", methods=["POST"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_rounds_post():
         data = request.get_json()
         date_val = data.get("date", "")
@@ -425,6 +430,7 @@ def register_rounds_routes(app, csrf):
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)
         return jsonify({"ok": True})
