@@ -497,3 +497,28 @@
 - `.scratch/issues/P*.md` — 8 issues created (P1: 2, P2: 5, P3: 1), 1 closed
 
 **Next**: Per HANDOFF.md — port achievements plugin.
+
+## 2026-06-01 02:30 UTC
+
+**What was done**:
+- Created issue tracker system (.scratch/issues/) with 8 backlog issues migrated from backlog/user requests
+- Ported plugin port items from PLUGINS.md to issues: Achievements (P1_007), Printables (P2_010)
+- Released v0.4.0 — plugin system, cartographer, inline edit, net column, mobile responsive, test suite expansion
+- Audited all write routes for user data isolation (P0_011); found and fixed missing @requires_own_data on POST /api/welcome
+- Hid "Add Round"/"Add Course"/"+ Log round" buttons when viewing another user's data via g.is_own_data template guards
+- Preserved ?user= context parameter across all nav links in base.html sidebar
+- Released v0.4.1 — security fixes and multi-user UX polish
+- Created new issues: P0_014 (shorthand keyboard entry), P2_011 (version in footer), P2_012 (weekend date color), P2_013 (teebox sort by distance)
+- Removed accidentally committed example_data/ from git tracking and added to .gitignore
+
+**Files touched**:
+- `source/__init__.py`, `pyproject.toml` — version bumps (0.4.0, 0.4.1)
+- `source/routes/dashboard.py` — added @requires_own_data to api_welcome_done
+- `source/main.py` — removed inject_permissions context processor (unnecessary; g is available in Jinja2)
+- `source/web/templates/base.html` — nav links preserve ?user= param
+- `source/web/templates/dashboard.html`, `rounds_list.html`, `courses.html` — g.is_own_data guards on action buttons
+- `.scratch/issues/P*.md` — 7 new issues (P0: 1, P1: 1, P2: 4, P3: 0), 1 closed
+- `.scratch/issues/done/P0_011_*.md` — user data isolation issue closed
+- `.gitignore` — added example_data/
+
+**Next**: Per HANDOFF.md — shorthand keyboard entry (P0_014) or achievements plugin port (P1_007).
