@@ -8,7 +8,7 @@ def register_routes(app, limiter, csrf, User):
 
     register_auth_routes(app, limiter, User)
     register_dashboard_routes(app, limiter, csrf)
-    register_rounds_routes(app)
-    register_courses_routes(app)
+    register_rounds_routes(app, csrf)
+    register_courses_routes(app, csrf)
     register_settings_routes(app, csrf)
     register_stats_routes(app)

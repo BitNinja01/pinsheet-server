@@ -7,7 +7,7 @@ from source.request_data import get_settings, get_courses, get_all_rounds_for_us
 from source.plugin import fire_hook
 
 
-def register_courses_routes(app):
+def register_courses_routes(app, csrf):
     @app.route("/courses/new")
     @login_required
     def course_entry():
@@ -130,6 +130,7 @@ def register_courses_routes(app):
     @app.route("/api/courses/<name>", methods=["PUT"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_courses_put(name):
         if not get_courses().get(name):
             return jsonify({"error": "Course not found"}), 404

@@ -29,7 +29,7 @@ from source.request_data import get_settings, get_courses, get_all_rounds_for_us
 _log = logging.getLogger("pinsheet")
 
 
-def register_rounds_routes(app):
+def register_rounds_routes(app, csrf):
     @app.route("/rounds/new")
     @login_required
     def round_entry():
@@ -351,6 +351,7 @@ def register_rounds_routes(app):
     @app.route("/api/rounds/<date>/<index>", methods=["PUT"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_rounds_put(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
         old_round = None
