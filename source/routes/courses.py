@@ -96,6 +96,7 @@ def register_courses_routes(app, csrf):
     @app.route("/api/courses", methods=["POST"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_courses_post():
         data = request.get_json()
         name = data.get("name", "").strip()
@@ -120,6 +121,7 @@ def register_courses_routes(app, csrf):
     @app.route("/api/courses/<name>", methods=["DELETE"])
     @login_required
     @requires_own_data
+    @csrf.exempt
     def api_courses_delete(name):
         for r in get_all_rounds_for_user():
             if r.course == name:
