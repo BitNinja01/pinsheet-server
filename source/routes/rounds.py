@@ -248,6 +248,7 @@ def register_rounds_routes(app):
         if not round_data:
             return "Round not found", 404
 
+        edit_mode = request.args.get("edit") == "1"
         course = get_courses().get(round_data.course, {})
         course_holes = course.get("holes", {})
         entry_mode = round_data.entry_mode
@@ -294,6 +295,8 @@ def register_rounds_routes(app):
             back_nine={"gross": back_gross, "par": back_par, "putts": back_putts},
             total={"gross": total_gross, "par": total_par,
                    "diff": total_gross - total_par if total_par else 0},
+            edit_mode=edit_mode,
+            courses=get_courses(),
         ))
 
     @app.route("/rounds/<date>/<index>/report")
