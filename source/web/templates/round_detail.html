@@ -5,11 +5,11 @@
         {% if edit_mode %}
         <div class="summary-item">
             <span class="summary-label">Date</span>
-            <input type="date" id="edit-date" value="{{ round.date }}">
+            <input type="date" id="edit-date" class="step-input" value="{{ round.date }}">
         </div>
         <div class="summary-item">
             <span class="summary-label">Course</span>
-            <select id="edit-course" class="edit-course-select">
+            <select id="edit-course" class="edit-course-select step-input">
                 {% for c_name in courses %}
                 <option value="{{ c_name }}" {% if c_name == round.course %}selected{% endif %}>{{ c_name }}</option>
                 {% endfor %}
@@ -17,7 +17,7 @@
         </div>
         <div class="summary-item">
             <span class="summary-label">Tees</span>
-            <select id="edit-tees">
+            <select id="edit-tees" class="step-input">
                 {% for t_name in course.get('tees', {}).keys() %}
                 <option value="{{ t_name }}" {% if t_name == round.tees %}selected{% endif %}>{{ t_name }}</option>
                 {% endfor %}
@@ -25,7 +25,7 @@
         </div>
         <div class="summary-item">
             <span class="summary-label">Transport</span>
-            <select id="edit-transport">
+            <select id="edit-transport" class="step-input">
                 <option value="Walking" {% if round.transport == 'Walking' %}selected{% endif %}>Walking</option>
                 <option value="Riding" {% if round.transport == 'Riding' %}selected{% endif %}>Riding</option>
             </select>
@@ -65,7 +65,7 @@
     {% if edit_mode and entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">
         <div class="stat-label">Gross Score</div>
-        <input type="number" id="edit-gross-total" value="{{ total.gross }}" style="font-size:2rem;width:6rem;text-align:center;">
+        <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:2rem;width:6rem;text-align:center;">
     </div>
     {% elif entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">
@@ -95,9 +95,9 @@
             <tr class="hole-row">
                 <td>{{ h.num }}</td>
                 <td>{{ h.par }}</td>
-                <td><input class="edit-gross" data-hole="{{ h.num }}" value="{{ h.gross }}" style="width:3rem;text-align:center;"></td>
+                <td><input class="edit-gross hole-input" data-hole="{{ h.num }}" value="{{ h.gross }}"></td>
                 <td>
-                    <select class="edit-fairway" data-hole="{{ h.num }}" style="width:4rem;">
+                    <select class="edit-fairway hole-input" data-hole="{{ h.num }}">
                         <option value="" {% if not h.fw %}selected{% endif %}></option>
                         <option value="H" {% if h.fw == 'H' %}selected{% endif %}>H</option>
                         <option value="L" {% if h.fw == 'L' %}selected{% endif %}>L</option>
@@ -108,7 +108,7 @@
                     </select>
                 </td>
                 <td>
-                    <select class="edit-gir" data-hole="{{ h.num }}" style="width:4rem;">
+                    <select class="edit-gir hole-input" data-hole="{{ h.num }}">
                         <option value="" {% if not h.gir %}selected{% endif %}></option>
                         <option value="H" {% if h.gir == 'H' %}selected{% endif %}>H</option>
                         <option value="L" {% if h.gir == 'L' %}selected{% endif %}>L</option>
@@ -121,8 +121,8 @@
                         <option value="OBLO" {% if h.gir == 'OBLO' %}selected{% endif %}>OBLO</option>
                     </select>
                 </td>
-                <td><input class="edit-putts" data-hole="{{ h.num }}" value="{{ h.putts }}" style="width:2.5rem;text-align:center;"></td>
-                <td><input class="edit-penalties" data-hole="{{ h.num }}" value="{{ h.penalties if h.penalties else '0' }}" style="width:2.5rem;text-align:center;"></td>
+                <td><input class="edit-putts hole-input" data-hole="{{ h.num }}" value="{{ h.putts }}"></td>
+                <td><input class="edit-penalties hole-input" data-hole="{{ h.num }}" value="{{ h.penalties if h.penalties else '0' }}"></td>
             </tr>
         {% endfor %}
         <tr class="subtotal-row">
@@ -183,7 +183,7 @@
 
     {% if edit_mode %}
     <div class="round-notes">
-        <textarea id="edit-notes" style="width:100%;">{{ round.notes }}</textarea>
+        <textarea id="edit-notes" class="step-input">{{ round.notes }}</textarea>
     </div>
     {% elif round.notes %}
     <div class="round-notes">{{ round.notes }}</div>

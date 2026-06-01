@@ -3,17 +3,17 @@
 <div class="course-detail">
     {% if edit_mode %}
     <div class="edit-field">
-        <input type="text" id="edit-name" value="{{ name }}" placeholder="Course name">
+        <input type="text" id="edit-name" class="step-input" value="{{ name }}" placeholder="Course name">
     </div>
     {% else %}
     <h2>{{ name }}</h2>
     {% endif %}
 
     {% if edit_mode %}
-    <div class="edit-location">
-        <input type="text" id="edit-city" value="{{ course.location.city if course.location is mapping else '' }}" placeholder="City">
-        <input type="text" id="edit-state" value="{{ course.location.get('state/province', '') if course.location is mapping else '' }}" placeholder="State">
-        <input type="text" id="edit-country" value="{{ course.location.country if course.location is mapping else '' }}" placeholder="Country">
+    <div class="location-row">
+        <input type="text" id="edit-city" class="step-input" value="{{ course.location.city if course.location is mapping else '' }}" placeholder="City">
+        <input type="text" id="edit-state" class="step-input" value="{{ course.location.get('state/province', '') if course.location is mapping else '' }}" placeholder="State">
+        <input type="text" id="edit-country" class="step-input" value="{{ course.location.country if course.location is mapping else '' }}" placeholder="Country">
     </div>
     {% elif course.location %}
     <p class="course-location">
@@ -69,14 +69,14 @@
         <tbody id="edit-tees-body">
         {% for tee_name, t in tees.items() %}
             <tr class="tee-row">
-                <td><input class="edit-tee-name" value="{{ tee_name }}" placeholder="Name"></td>
-                <td><input class="edit-tee-yardage" value="{{ t.get('yardage', '') }}" placeholder="Yds" style="width:5rem"></td>
-                <td><input class="edit-tee-rating" value="{{ t.get('rating', '') }}" placeholder="Rt" style="width:4rem"></td>
-                <td><input class="edit-tee-slope" value="{{ t.get('slope', '') }}" placeholder="Sl" style="width:4rem"></td>
-                <td><input class="edit-tee-frating" value="{{ t.get('front_rating', '') }}" placeholder="FR" style="width:4rem"></td>
-                <td><input class="edit-tee-fslope" value="{{ t.get('front_slope', '') }}" placeholder="FS" style="width:4rem"></td>
-                <td><input class="edit-tee-brating" value="{{ t.get('back_rating', '') }}" placeholder="BR" style="width:4rem"></td>
-                <td><input class="edit-tee-bslope" value="{{ t.get('back_slope', '') }}" placeholder="BS" style="width:4rem"></td>
+                <td><input class="edit-tee-name step-input" value="{{ tee_name }}" placeholder="Name"></td>
+                <td><input class="edit-tee-yardage step-input" value="{{ t.get('yardage', '') }}" placeholder="Yds"></td>
+                <td><input class="edit-tee-rating step-input" value="{{ t.get('rating', '') }}" placeholder="Rt"></td>
+                <td><input class="edit-tee-slope step-input" value="{{ t.get('slope', '') }}" placeholder="Sl"></td>
+                <td><input class="edit-tee-frating step-input" value="{{ t.get('front_rating', '') }}" placeholder="FR"></td>
+                <td><input class="edit-tee-fslope step-input" value="{{ t.get('front_slope', '') }}" placeholder="FS"></td>
+                <td><input class="edit-tee-brating step-input" value="{{ t.get('back_rating', '') }}" placeholder="BR"></td>
+                <td><input class="edit-tee-bslope step-input" value="{{ t.get('back_slope', '') }}" placeholder="BS"></td>
                 <td><button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">✕</button></td>
             </tr>
         {% endfor %}
@@ -129,15 +129,15 @@
     <div class="tee-cards" id="edit-tee-cards">
     {% for tee_name, t in tees.items() %}
         <div class="tee-card-item">
-            <div class="tee-card-name"><input class="edit-tee-name" value="{{ tee_name }}"></div>
+            <div class="tee-card-name"><input class="edit-tee-name step-input" value="{{ tee_name }}"></div>
             <div class="tee-card-stats">
-                <div class="tee-card-stat">Yardage: <input class="edit-tee-yardage" value="{{ t.get('yardage', '') }}" style="width:4rem"></div>
-                <div class="tee-card-stat">Rating: <input class="edit-tee-rating" value="{{ t.get('rating', '') }}" style="width:3rem"></div>
-                <div class="tee-card-stat">Slope: <input class="edit-tee-slope" value="{{ t.get('slope', '') }}" style="width:3rem"></div>
-                <div class="tee-card-stat">F Rt: <input class="edit-tee-frating" value="{{ t.get('front_rating', '') }}" style="width:3rem"></div>
-                <div class="tee-card-stat">F Sl: <input class="edit-tee-fslope" value="{{ t.get('front_slope', '') }}" style="width:3rem"></div>
-                <div class="tee-card-stat">B Rt: <input class="edit-tee-brating" value="{{ t.get('back_rating', '') }}" style="width:3rem"></div>
-                <div class="tee-card-stat">B Sl: <input class="edit-tee-bslope" value="{{ t.get('back_slope', '') }}" style="width:3rem"></div>
+                <div class="tee-card-stat">Yardage: <input class="edit-tee-yardage step-input" value="{{ t.get('yardage', '') }}"></div>
+                <div class="tee-card-stat">Rating: <input class="edit-tee-rating step-input" value="{{ t.get('rating', '') }}"></div>
+                <div class="tee-card-stat">Slope: <input class="edit-tee-slope step-input" value="{{ t.get('slope', '') }}"></div>
+                <div class="tee-card-stat">F Rt: <input class="edit-tee-frating step-input" value="{{ t.get('front_rating', '') }}"></div>
+                <div class="tee-card-stat">F Sl: <input class="edit-tee-fslope step-input" value="{{ t.get('front_slope', '') }}"></div>
+                <div class="tee-card-stat">B Rt: <input class="edit-tee-brating step-input" value="{{ t.get('back_rating', '') }}"></div>
+                <div class="tee-card-stat">B Sl: <input class="edit-tee-bslope step-input" value="{{ t.get('back_slope', '') }}"></div>
             </div>
             <button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>
         </div>
@@ -184,10 +184,10 @@
         {% for h in holes %}
             <tr>
                 <td>{{ h.num }}</td>
-                <td><input class="edit-hole-par" data-hole="{{ h.num }}" value="{{ h.par }}" style="width:2.5rem;text-align:center;"></td>
-                <td><input class="edit-hole-index" data-hole="{{ h.num }}" value="{{ h.index }}" style="width:2.5rem;text-align:center;"></td>
+                <td><input class="edit-hole-par step-input" data-hole="{{ h.num }}" value="{{ h.par }}"></td>
+                <td><input class="edit-hole-index step-input" data-hole="{{ h.num }}" value="{{ h.index }}"></td>
                 {% for tee_name in tees.keys() %}
-                <td><input class="edit-hole-yardage" data-hole="{{ h.num }}" data-tee="{{ tee_name }}" value="{{ h.yardages.get(tee_name, '') }}" style="width:4rem;text-align:center;"></td>
+                <td><input class="edit-hole-yardage step-input" data-hole="{{ h.num }}" data-tee="{{ tee_name }}" value="{{ h.yardages.get(tee_name, '') }}"></td>
                 {% endfor %}
             </tr>
         {% endfor %}
@@ -315,14 +315,14 @@ document.querySelectorAll(".btn-add-tee").forEach(function(btn) {
     var tr = document.createElement("tr");
     tr.className = "tee-row";
     tr.innerHTML = [
-        '<td><input class="edit-tee-name" placeholder="Name"></td>',
-        '<td><input class="edit-tee-yardage" placeholder="Yds" style="width:5rem"></td>',
-        '<td><input class="edit-tee-rating" placeholder="Rt" style="width:4rem"></td>',
-        '<td><input class="edit-tee-slope" placeholder="Sl" style="width:4rem"></td>',
-        '<td><input class="edit-tee-frating" placeholder="FR" style="width:4rem"></td>',
-        '<td><input class="edit-tee-fslope" placeholder="FS" style="width:4rem"></td>',
-        '<td><input class="edit-tee-brating" placeholder="BR" style="width:4rem"></td>',
-        '<td><input class="edit-tee-bslope" placeholder="BS" style="width:4rem"></td>',
+        '<td><input class="edit-tee-name step-input" placeholder="Name"></td>',
+        '<td><input class="edit-tee-yardage step-input" placeholder="Yds"></td>',
+        '<td><input class="edit-tee-rating step-input" placeholder="Rt"></td>',
+        '<td><input class="edit-tee-slope step-input" placeholder="Sl"></td>',
+        '<td><input class="edit-tee-frating step-input" placeholder="FR"></td>',
+        '<td><input class="edit-tee-fslope step-input" placeholder="FS"></td>',
+        '<td><input class="edit-tee-brating step-input" placeholder="BR"></td>',
+        '<td><input class="edit-tee-bslope step-input" placeholder="BS"></td>',
         '<td><button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">\u2715</button></td>',
     ].join("");
     tbody.appendChild(tr);
@@ -332,15 +332,15 @@ document.querySelectorAll(".btn-add-tee").forEach(function(btn) {
         var card = document.createElement("div");
         card.className = "tee-card-item";
         card.innerHTML = [
-            '<div class="tee-card-name"><input class="edit-tee-name" placeholder="Name"></div>',
+            '<div class="tee-card-name"><input class="edit-tee-name step-input" placeholder="Name"></div>',
             '<div class="tee-card-stats">',
-            '<div class="tee-card-stat">Yardage: <input class="edit-tee-yardage" style="width:4rem"></div>',
-            '<div class="tee-card-stat">Rating: <input class="edit-tee-rating" style="width:3rem"></div>',
-            '<div class="tee-card-stat">Slope: <input class="edit-tee-slope" style="width:3rem"></div>',
-            '<div class="tee-card-stat">F Rt: <input class="edit-tee-frating" style="width:3rem"></div>',
-            '<div class="tee-card-stat">F Sl: <input class="edit-tee-fslope" style="width:3rem"></div>',
-            '<div class="tee-card-stat">B Rt: <input class="edit-tee-brating" style="width:3rem"></div>',
-            '<div class="tee-card-stat">B Sl: <input class="edit-tee-bslope" style="width:3rem"></div>',
+            '<div class="tee-card-stat">Yardage: <input class="edit-tee-yardage step-input"></div>',
+            '<div class="tee-card-stat">Rating: <input class="edit-tee-rating step-input"></div>',
+            '<div class="tee-card-stat">Slope: <input class="edit-tee-slope step-input"></div>',
+            '<div class="tee-card-stat">F Rt: <input class="edit-tee-frating step-input"></div>',
+            '<div class="tee-card-stat">F Sl: <input class="edit-tee-fslope step-input"></div>',
+            '<div class="tee-card-stat">B Rt: <input class="edit-tee-brating step-input"></div>',
+            '<div class="tee-card-stat">B Sl: <input class="edit-tee-bslope step-input"></div>',
             '</div>',
             '<button class="btn-remove-tee" style="color:var(--destructive);cursor:pointer;background:none;border:none;">Remove</button>',
         ].join("");
@@ -364,11 +364,9 @@ document.querySelectorAll(".btn-add-tee").forEach(function(btn) {
             rows.forEach(function(row) {
                 var td = document.createElement("td");
                 var input = document.createElement("input");
-                input.className = "edit-hole-yardage";
+                input.className = "edit-hole-yardage step-input";
                 input.setAttribute("data-hole", row.querySelector("td").textContent);
                 input.setAttribute("data-tee", name);
-                input.style.width = "4rem";
-                input.style.textAlign = "center";
                 td.appendChild(input);
                 row.appendChild(td);
             });
