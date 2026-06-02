@@ -6,9 +6,10 @@ CODEBASE_IMPROVEMENTS.md
 .claude/
 .opencode/
 .superpowers/
-/plugins/
+/plugins/*
 !/plugins/.gitkeep
 !/plugins/printables/
+!/plugins/printables/**
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md

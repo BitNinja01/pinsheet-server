@@ -1,0 +1,39 @@
+.printables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--ps-sp-4);
+}
+
+.printables-card {
+    background: var(--ps-paper-2);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ps-sp-2);
+}
+
+.printables-card-name {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-body);
+    font-weight: var(--ps-fw-label);
+    word-break: break-all;
+}
+
+.printables-card-desc {
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    text-transform: uppercase;
+    letter-spacing: var(--ps-tracking-eyebrow);
+}
+
+.printables-card-meta {
+    font-size: var(--ps-fs-body);
+    color: var(--ps-ink-2);
+    margin-bottom: auto;
+}
+
+.printables-card .ps-btn {
+    align-self: flex-start;
+    margin-top: var(--ps-sp-2);
+}
