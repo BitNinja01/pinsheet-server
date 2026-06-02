@@ -447,22 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function _saveScorecardData() {
-        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-            var num = row.dataset.hole;
-            var gross = row.querySelector('.score-gross');
-            var fwy = row.querySelector('.score-fwy');
-            var gir = row.querySelector('.score-gir');
-            var putts = row.querySelector('.score-putts');
-            var pen = row.querySelector('.score-pen');
-            if (!gross) return;
-            scorecardData[num] = {
-                gross: gross.value,
-                fairway: fwy ? fwy.value : '',
-                gir: gir ? gir.value : '',
-                putts: putts ? putts.value : '',
-                penalties: pen ? pen.value : '0',
-            };
-        });
+        /* No-op: data is maintained by shorthand entry. Called by legacy event handlers for compatibility. */
     }
 
     function _currentHoleNum() {
@@ -693,19 +678,32 @@ document.addEventListener('DOMContentLoaded', function () {
         if (puttsEl) puttsEl.textContent = parsed.putts || '\u2014';
         scorecardData[holeNum] = parsed;
 
-        /* Sync to desktop table inputs */
+        /* Sync to desktop table text cells */
         var desktopRow = document.querySelector('#scorecard-area tr[data-hole="' + holeNum + '"]');
         if (desktopRow) {
-            var gEl = desktopRow.querySelector('.score-gross');
-            var fEl = desktopRow.querySelector('.score-fwy');
-            var giEl = desktopRow.querySelector('.score-gir');
-            var pEl = desktopRow.querySelector('.score-putts');
-            var penEl = desktopRow.querySelector('.score-pen');
-            if (gEl) gEl.value = parsed.gross;
-            if (fEl) fEl.value = parsed.fairway;
-            if (giEl) giEl.value = parsed.gir;
-            if (pEl) pEl.value = parsed.putts;
-            if (penEl) penEl.value = parsed.penalties;
+            var gEl = desktopRow.querySelector('.sd-gross');
+            var fEl = desktopRow.querySelector('.sd-fwy');
+            var giEl = desktopRow.querySelector('.sd-gir');
+            var pEl = desktopRow.querySelector('.sd-putts');
+            var penEl = desktopRow.querySelector('.sd-pen');
+            var parEl = desktopRow.querySelector('.hole-par');
+            if (gEl) {
+                gEl.textContent = parsed.gross || '\u2014';
+                var parVal = parEl ? parseInt(parEl.textContent) : 0;
+                if (parVal && parsed.gross) {
+                    var diff = parseInt(parsed.gross) - parVal;
+                    gEl.className = 'sd-gross';
+                    if (diff <= -2) gEl.classList.add('is-eagle');
+                    else if (diff === -1) gEl.classList.add('is-birdie');
+                    else if (diff === 1) gEl.classList.add('is-bogey');
+                    else if (diff === 2) gEl.classList.add('is-double');
+                    if (diff >= 3) gEl.classList.add('is-blowup');
+                }
+            }
+            if (fEl) fEl.textContent = parsed.fairway || '\u2014';
+            if (giEl) giEl.textContent = parsed.gir || '\u2014';
+            if (pEl) pEl.textContent = parsed.putts || '\u2014';
+            if (penEl) penEl.textContent = parsed.penalties || '\u2014';
             updateSubtotals();
         }
 
@@ -914,6 +912,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 found = true;
             }
         });
+        updateDesktopProgressDots();
     }
 
     function navigateToHole(holeNum) {
@@ -1001,26 +1000,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateSubtotals() {
-        var rows = document.querySelectorAll('#scorecard-area tr[data-hole]');
+        var range = getScorecardRange();
         var outGross = 0, inGross = 0, outPutts = 0, inPutts = 0, outPen = 0, inPen = 0;
         var hasOut = false, hasIn = false;
 
-        rows.forEach(function (row) {
-            var holeNum = parseInt(row.dataset.hole);
-            var gross = parseInt(row.querySelector('.score-gross').value);
-            var putts = parseInt(row.querySelector('.score-putts').value);
-            var pen = parseInt(row.querySelector('.score-pen').value);
+        range.forEach(function (num) {
+            var d = scorecardData[num] || {};
+            var gross = parseInt(d.gross);
+            var putts = parseInt(d.putts);
+            var pen = parseInt(d.penalties);
 
             if (gross && !isNaN(gross)) {
-                if (holeNum <= 9) { outGross += gross; hasOut = true; }
+                if (num <= 9) { outGross += gross; hasOut = true; }
                 else { inGross += gross; hasIn = true; }
             }
             if (putts && !isNaN(putts)) {
-                if (holeNum <= 9) outPutts += putts;
+                if (num <= 9) outPutts += putts;
                 else inPutts += putts;
             }
             if (pen && !isNaN(pen)) {
-                if (holeNum <= 9) outPen += pen;
+                if (num <= 9) outPen += pen;
                 else inPen += pen;
             }
         });
@@ -1157,23 +1156,18 @@ document.addEventListener('DOMContentLoaded', function () {
             var allFilled = true;
             var total = 0;
 
-            document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-                var holeNum = row.dataset.hole;
-                var gross = row.querySelector('.score-gross').value;
-                var fwyEl = row.querySelector('.score-fwy');
-                var girEl = row.querySelector('.score-gir');
-                var putts = row.querySelector('.score-putts').value;
-                var pen = row.querySelector('.score-pen').value;
-
+            var range = getScorecardRange();
+            range.forEach(function (num) {
+                var data = scorecardData[num] || {};
+                var gross = data.gross || '';
                 if (!gross) allFilled = false;
                 total += parseInt(gross) || 0;
-
-                holes[holeNum] = {
-                    gross: gross || '',
-                    fairway: fwyEl ? fwyEl.value : '',
-                    gir: girEl ? girEl.value : '',
-                    putts: putts || '',
-                    penalties: pen || '0',
+                holes[num] = {
+                    gross: gross,
+                    fairway: data.fairway || '',
+                    gir: data.gir || '',
+                    putts: data.putts || '',
+                    penalties: data.penalties || '0',
                 };
             });
 
