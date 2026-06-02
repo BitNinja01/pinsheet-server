@@ -712,6 +712,123 @@ document.addEventListener('DOMContentLoaded', function () {
         updateProgressDots();
     }
 
+    function updateShorthandBar() {
+        var label = document.getElementById('shorthand-hole-label');
+        var counter = document.getElementById('shorthand-counter');
+        var input = document.getElementById('shorthand-input');
+        var error = document.getElementById('shorthand-error');
+        if (!label || !counter) return;
+
+        var range = getScorecardRange();
+        var holeNum = _currentHoleNum();
+        if (holeNum === null) {
+            label.textContent = 'Done';
+            counter.textContent = 'All holes entered';
+            if (error) error.style.display = 'none';
+            if (input) { input.value = ''; input.disabled = true; }
+            return;
+        }
+
+        var idx = range.indexOf(holeNum);
+        label.textContent = 'Hole ' + holeNum;
+        counter.textContent = (idx + 1) + ' of ' + range.length;
+
+        if (input) {
+            input.disabled = false;
+            var saved = scorecardData[holeNum] || {};
+            if (saved.gross) {
+                input.value = buildShorthand(saved);
+            } else {
+                input.value = '';
+            }
+        }
+        if (error) error.style.display = 'none';
+    }
+
+    function handleShorthandEnter() {
+        var input = document.getElementById('shorthand-input');
+        var error = document.getElementById('shorthand-error');
+        if (!input) return;
+
+        var raw = input.value.trim();
+        if (!raw) return;
+
+        var parsed = parseShorthand(raw);
+        var gross = parseInt(parsed.gross);
+        if (!gross || isNaN(gross) || gross < 1 || gross > 30) {
+            if (error) {
+                error.textContent = 'Invalid gross score. Must be 1-30.';
+                error.style.display = 'block';
+            }
+            input.classList.add('is-error');
+            return;
+        }
+        var putts = parseInt(parsed.putts);
+        if (parsed.putts && (isNaN(putts) || putts < 0 || putts > 10)) {
+            if (error) {
+                error.textContent = 'Invalid putts. Must be 0-10.';
+                error.style.display = 'block';
+            }
+            input.classList.add('is-error');
+            return;
+        }
+        input.classList.remove('is-error');
+        if (error) error.style.display = 'none';
+
+        var range = getScorecardRange();
+        var holeNum = _currentHoleNum();
+        if (holeNum === null) return;
+
+        scorecardData[holeNum] = parsed;
+
+        var row = document.querySelector('#scorecard-area tr[data-hole="' + holeNum + '"]');
+        if (row) {
+            var grossEl = row.querySelector('.sd-gross');
+            var fwyEl = row.querySelector('.sd-fwy');
+            var girEl = row.querySelector('.sd-gir');
+            var puttsEl = row.querySelector('.sd-putts');
+            var penEl = row.querySelector('.sd-pen');
+
+            if (grossEl) grossEl.textContent = parsed.gross;
+            if (fwyEl && parsed.fairway) fwyEl.textContent = parsed.fairway;
+            if (girEl && parsed.gir) girEl.textContent = parsed.gir;
+            if (puttsEl) puttsEl.textContent = parsed.putts || '0';
+            if (penEl) penEl.textContent = parsed.penalties || '0';
+
+            var parCell = row.querySelector('.hole-par');
+            var parVal = parCell ? parseInt(parCell.textContent) : 0;
+            if (grossEl && parVal) {
+                var diff = gross - parVal;
+                grossEl.className = 'sd-gross';
+                if (diff <= -2) grossEl.classList.add('is-eagle');
+                else if (diff === -1) grossEl.classList.add('is-birdie');
+                else if (diff === 1) grossEl.classList.add('is-bogey');
+                else if (diff === 2) grossEl.classList.add('is-double');
+                if (diff >= 3) grossEl.classList.add('is-blowup');
+            }
+
+            row.classList.remove('is-current');
+        }
+
+        updateSubtotals();
+        updateRunningStats();
+        updateDesktopProgressDots();
+
+        syncDesktopToMobile(holeNum);
+
+        input.value = '';
+        var nextHole = _currentHoleNum();
+        if (nextHole !== null) {
+            var nextRow = document.querySelector('#scorecard-area tr[data-hole="' + nextHole + '"]');
+            if (nextRow) {
+                nextRow.classList.add('is-current');
+                nextRow.scrollIntoView({ block: 'nearest' });
+            }
+        }
+        updateShorthandBar();
+        saveDraft();
+    }
+
     function updateProgressDots() {
         var progressBar = document.getElementById('hole-progress-bar');
         if (!progressBar) return;
