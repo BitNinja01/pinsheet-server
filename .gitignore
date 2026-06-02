@@ -6,7 +6,7 @@ CODEBASE_IMPROVEMENTS.md
 .claude/
 .opencode/
 .superpowers/
-/plugins/
+/plugins/*
 !/plugins/.gitkeep
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)

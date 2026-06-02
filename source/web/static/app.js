@@ -413,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'notes'];
     var draftTimer = null;
     var scorecardData = {};
+    var _editingHole = null;
 
     function showStep(step) {
         var el = document.querySelector('.wizard-step[data-step="' + step + '"]');
@@ -447,22 +448,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function _saveScorecardData() {
-        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-            var num = row.dataset.hole;
-            var gross = row.querySelector('.score-gross');
-            var fwy = row.querySelector('.score-fwy');
-            var gir = row.querySelector('.score-gir');
-            var putts = row.querySelector('.score-putts');
-            var pen = row.querySelector('.score-pen');
-            if (!gross) return;
-            scorecardData[num] = {
-                gross: gross.value,
-                fairway: fwy ? fwy.value : '',
-                gir: gir ? gir.value : '',
-                putts: putts ? putts.value : '',
-                penalties: pen ? pen.value : '0',
-            };
-        });
+        /* No-op: data is maintained by shorthand entry. Called by legacy event handlers for compatibility. */
+    }
+
+    function _currentHoleNum() {
+        var range = getScorecardRange();
+        for (var i = 0; i < range.length; i++) {
+            var n = range[i];
+            var d = scorecardData[n] || {};
+            if (!d.gross) return n;
+        }
+        return null;
     }
 
     function buildScorecardGrid() {
@@ -470,28 +466,52 @@ document.addEventListener('DOMContentLoaded', function () {
         var courseName = document.getElementById('round-course').value;
         var course = window._courses[courseName];
         var holesData = course ? course.holes || {} : {};
+        var currentHole = (_editingHole !== null) ? _editingHole : _currentHoleNum();
+        if (currentHole === null) currentHole = holesRange[holesRange.length - 1];
 
         var html = '<table class="data-table scorecard-input"><thead><tr>' +
-            '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>Fairway</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
+            '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
             '</tr></thead><tbody>';
 
         var holeRow = function (num) {
             var hole = holesData[String(num)] || {};
             var par = hole.par || '';
             var saved = scorecardData[num] || {};
-            var r = '<tr data-hole="' + num + '">';
+            var isCurrent = (num === currentHole);
+            var isComplete = !!saved.gross;
+            var cls = isCurrent ? ' class="is-current"' : '';
+            var r = '<tr data-hole="' + num + '"' + cls + '>';
             r += '<td>' + num + '</td>';
             r += '<td class="hole-par">' + par + '</td>';
             r += '<td>' + (hole.index || hole.hole_index || '') + '</td>';
-            r += '<td><input type="number" class="hole-input score-gross" min="1" max="20" value="' + (saved.gross || '') + '"></td>';
-            if (par === '3') {
-                r += '<td>\u2014</td>';
+
+            if (isCurrent) {
+                var savedShorthand = buildShorthand(saved);
+                r += '<td colspan="5">';
+                r += '<input type="text" class="inline-shorthand" value="' + savedShorthand + '" placeholder="gross fw gir putts pen" autocomplete="off">';
+                r += '</td>';
             } else {
-                r += '<td><select class="hole-input score-fwy"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>OBL</option><option>OBR</option><option>N</option></select></td>';
+                var grossDisplay = isComplete ? saved.gross : '\u2014';
+                var grossCls = 'sd-gross';
+                if (isComplete && par) {
+                    var diff = parseInt(saved.gross) - parseInt(par);
+                    if (diff <= -2) grossCls += ' is-eagle';
+                    else if (diff === -1) grossCls += ' is-birdie';
+                    else if (diff === 1) grossCls += ' is-bogey';
+                    else if (diff === 2) grossCls += ' is-double';
+                    if (diff >= 3) grossCls += ' is-blowup';
+                }
+                r += '<td class="' + grossCls + '">' + grossDisplay + '</td>';
+
+                if (par === '3') {
+                    r += '<td class="sd-fwy">\u2014</td>';
+                } else {
+                    r += '<td class="sd-fwy">' + (isComplete ? (saved.fairway || '\u2014') : '\u2014') + '</td>';
+                }
+                r += '<td class="sd-gir">' + (isComplete ? (saved.gir || '\u2014') : '\u2014') + '</td>';
+                r += '<td class="sd-putts">' + (isComplete ? (saved.putts || '\u2014') : '\u2014') + '</td>';
+                r += '<td class="sd-pen">' + (isComplete ? (saved.penalties || '\u2014') : '\u2014') + '</td>';
             }
-            r += '<td><select class="hole-input score-gir"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>S</option><option>LO</option><option>OBL</option><option>OBR</option><option>OBS</option><option>OBLO</option><option>N</option></select></td>';
-            r += '<td><input type="number" class="hole-input score-putts" min="0" max="10" value="' + (saved.putts || '') + '"></td>';
-            r += '<td><input type="number" class="hole-input score-pen" min="0" max="20" value="' + (saved.penalties || '0') + '"></td>';
             r += '</tr>';
             return r;
         };
@@ -524,21 +544,32 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '</tbody></table>';
         document.getElementById('scorecard-area').innerHTML = html;
 
-        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-            var grossInput = row.querySelector('.score-gross');
-            var parEl = row.querySelector('.hole-par');
-            if (grossInput && grossInput.value && parEl) {
-                var par = parseInt(parEl.textContent);
-                if (par) colorizeGross(grossInput, par);
-            }
-        });
-        updateSubtotals();
+        if (currentHole) {
+            var currentRow = document.querySelector('#scorecard-area tr[data-hole="' + currentHole + '"]');
+            if (currentRow) currentRow.scrollIntoView({ block: 'nearest' });
+        }
 
-        /* Also render mobile hole cards */
-        var courseNameForHoles = document.getElementById('round-course').value;
-        var courseForHoles = window._courses[courseNameForHoles];
-        var holesDataForCards = courseForHoles ? courseForHoles.holes || {} : {};
-        renderHoleCards(getScorecardRange(), holesDataForCards);
+        var inlineInput = document.querySelector('.inline-shorthand');
+        if (inlineInput) {
+            inlineInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleInlineEnter();
+                }
+            });
+            inlineInput.addEventListener('input', function () {
+                this.classList.remove('is-error');
+                var err = document.getElementById('inline-error');
+                if (err) err.style.display = 'none';
+            });
+            inlineInput.focus();
+        }
+
+        updateSubtotals();
+        updateRunningStats();
+        updateDesktopProgressDots();
+
+        renderHoleCards(getScorecardRange(), holesData);
     }
 
     /* ── Shorthand parser ── */
@@ -670,23 +701,142 @@ document.addEventListener('DOMContentLoaded', function () {
         if (puttsEl) puttsEl.textContent = parsed.putts || '\u2014';
         scorecardData[holeNum] = parsed;
 
-        /* Sync to desktop table inputs */
+        /* Sync to desktop table text cells */
         var desktopRow = document.querySelector('#scorecard-area tr[data-hole="' + holeNum + '"]');
         if (desktopRow) {
-            var gEl = desktopRow.querySelector('.score-gross');
-            var fEl = desktopRow.querySelector('.score-fwy');
-            var giEl = desktopRow.querySelector('.score-gir');
-            var pEl = desktopRow.querySelector('.score-putts');
-            var penEl = desktopRow.querySelector('.score-pen');
-            if (gEl) gEl.value = parsed.gross;
-            if (fEl) fEl.value = parsed.fairway;
-            if (giEl) giEl.value = parsed.gir;
-            if (pEl) pEl.value = parsed.putts;
-            if (penEl) penEl.value = parsed.penalties;
+            var gEl = desktopRow.querySelector('.sd-gross');
+            var fEl = desktopRow.querySelector('.sd-fwy');
+            var giEl = desktopRow.querySelector('.sd-gir');
+            var pEl = desktopRow.querySelector('.sd-putts');
+            var penEl = desktopRow.querySelector('.sd-pen');
+            var parEl = desktopRow.querySelector('.hole-par');
+            if (gEl) {
+                gEl.textContent = parsed.gross || '\u2014';
+                var parVal = parEl ? parseInt(parEl.textContent) : 0;
+                if (parVal && parsed.gross) {
+                    var diff = parseInt(parsed.gross) - parVal;
+                    gEl.className = 'sd-gross';
+                    if (diff <= -2) gEl.classList.add('is-eagle');
+                    else if (diff === -1) gEl.classList.add('is-birdie');
+                    else if (diff === 1) gEl.classList.add('is-bogey');
+                    else if (diff === 2) gEl.classList.add('is-double');
+                    if (diff >= 3) gEl.classList.add('is-blowup');
+                }
+            }
+            if (fEl) fEl.textContent = parsed.fairway || '\u2014';
+            if (giEl) giEl.textContent = parsed.gir || '\u2014';
+            if (pEl) pEl.textContent = parsed.putts || '\u2014';
+            if (penEl) penEl.textContent = parsed.penalties || '\u2014';
             updateSubtotals();
         }
 
         updateProgressDots();
+    }
+
+    function handleInlineEnter() {
+        var input = document.querySelector('.inline-shorthand');
+        var error = document.getElementById('inline-error');
+        if (!input) return;
+
+        var raw = input.value.trim();
+        if (!raw) return;
+
+        var parsed = parseShorthand(raw);
+        var gross = parseInt(parsed.gross);
+        if (!gross || isNaN(gross) || gross < 1 || gross > 30) {
+            if (error) {
+                error.textContent = 'Invalid gross score. Must be 1-30.';
+                error.style.display = 'block';
+            }
+            input.classList.add('is-error');
+            return;
+        }
+        var putts = parseInt(parsed.putts);
+        if (parsed.putts && (isNaN(putts) || putts < 0 || putts > 10)) {
+            if (error) {
+                error.textContent = 'Invalid putts. Must be 0-10.';
+                error.style.display = 'block';
+            }
+            input.classList.add('is-error');
+            return;
+        }
+        input.classList.remove('is-error');
+        if (error) error.style.display = 'none';
+
+        var holeNum = (_editingHole !== null) ? _editingHole : _currentHoleNum();
+        if (holeNum === null) return;
+
+        _editingHole = null;
+        scorecardData[holeNum] = parsed;
+
+        buildScorecardGrid();
+        saveDraft();
+    }
+
+    function updateRunningStats() {
+        var range = getScorecardRange();
+        var courseName = document.getElementById('round-course').value;
+        var course = window._courses[courseName];
+        var holesData = course ? course.holes || {} : {};
+        var totalGross = 0, totalPutts = 0, girHits = 0, girTotal = 0, firHits = 0, firTotal = 0;
+        var hasData = false;
+
+        range.forEach(function (num) {
+            var d = scorecardData[num] || {};
+            if (!d.gross) return;
+            hasData = true;
+            var gross = parseInt(d.gross) || 0;
+            totalGross += gross;
+            var putts = parseInt(d.putts) || 0;
+            totalPutts += putts;
+
+            var par = (holesData[String(num)] || {}).par || '';
+            if (par) {
+                var parInt = parseInt(par);
+                var isGir = false;
+                if (parInt === 3) isGir = gross <= parInt + 1;
+                else if (parInt === 5) isGir = gross <= parInt - 1;
+                else isGir = gross <= parInt;
+                girTotal++;
+                if (isGir) girHits++;
+
+                if (parInt !== 3) {
+                    firTotal++;
+                    if (d.fairway === 'H') firHits++;
+                }
+            }
+        });
+
+        var setText = function (id, val) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+
+        if (hasData) {
+            setText('rs-gross', String(totalGross));
+            setText('rs-putts', String(totalPutts));
+            setText('rs-gir', girTotal ? (girHits + '/' + girTotal) : '\u2014');
+            setText('rs-fir', firTotal ? (firHits + '/' + firTotal) : '\u2014');
+        } else {
+            setText('rs-gross', '\u2014');
+            setText('rs-putts', '\u2014');
+            setText('rs-gir', '\u2014');
+            setText('rs-fir', '\u2014');
+        }
+    }
+
+    function updateDesktopProgressDots() {
+        var bar = document.getElementById('desktop-hole-progress');
+        if (!bar) return;
+        var range = getScorecardRange();
+        var current = _currentHoleNum();
+        var ph = '';
+        range.forEach(function (n) {
+            var d = scorecardData[n] || {};
+            var cls = d.gross ? ' completed' : (n === current ? ' current' : '');
+            ph += '<div class="hole-progress-dot' + cls + '">' + n + '</div>';
+        });
+        bar.innerHTML = ph;
     }
 
     function updateProgressDots() {
@@ -708,6 +858,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 found = true;
             }
         });
+        updateDesktopProgressDots();
     }
 
     function navigateToHole(holeNum) {
@@ -738,83 +889,27 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     window._navigateHole = navigateToHole;
 
-    function colorizeGross(input, par) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.backgroundColor = '';
-            input.style.color = '';
-            input.style.fontWeight = '';
-            input.style.opacity = '';
-            return;
-        }
-        var diff = val - par;
-        input.style.color = '';
-        input.style.fontWeight = '';
-        input.style.backgroundColor = '';
-        input.style.opacity = '';
-        if (diff <= -2) {
-            input.style.color = '#ffd700';
-            input.style.fontWeight = 'bold';
-        } else if (diff === -1) {
-            input.style.color = '#90ee90';
-            input.style.fontWeight = 'bold';
-        } else if (diff === 1) {
-            input.style.color = '#aaaaaa';
-        } else if (diff >= 2) {
-            input.style.color = '#ff4444';
-            if (diff >= 3) {
-                input.style.fontWeight = 'bold';
-            }
-        }
-    }
-
-    function colorizePutts(input) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.color = '';
-            input.style.fontWeight = '';
-            return;
-        }
-        input.style.color = '';
-        input.style.fontWeight = '';
-        if (val === 1) {
-            input.style.color = '#90ee90';
-            input.style.fontWeight = 'bold';
-        } else if (val >= 3) {
-            input.style.color = '#ff4444';
-        }
-    }
-
-    function colorizePen(input) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.color = '';
-            return;
-        }
-        input.style.color = val > 0 ? '#ff4444' : '';
-    }
-
     function updateSubtotals() {
-        var rows = document.querySelectorAll('#scorecard-area tr[data-hole]');
+        var range = getScorecardRange();
         var outGross = 0, inGross = 0, outPutts = 0, inPutts = 0, outPen = 0, inPen = 0;
         var hasOut = false, hasIn = false;
 
-        rows.forEach(function (row) {
-            var holeNum = parseInt(row.dataset.hole);
-            var gross = parseInt(row.querySelector('.score-gross').value);
-            var putts = parseInt(row.querySelector('.score-putts').value);
-            var pen = parseInt(row.querySelector('.score-pen').value);
+        range.forEach(function (num) {
+            var d = scorecardData[num] || {};
+            var gross = parseInt(d.gross);
+            var putts = parseInt(d.putts);
+            var pen = parseInt(d.penalties);
 
             if (gross && !isNaN(gross)) {
-                if (holeNum <= 9) { outGross += gross; hasOut = true; }
+                if (num <= 9) { outGross += gross; hasOut = true; }
                 else { inGross += gross; hasIn = true; }
             }
             if (putts && !isNaN(putts)) {
-                if (holeNum <= 9) outPutts += putts;
+                if (num <= 9) outPutts += putts;
                 else inPutts += putts;
             }
             if (pen && !isNaN(pen)) {
-                if (holeNum <= 9) outPen += pen;
+                if (num <= 9) outPen += pen;
                 else inPen += pen;
             }
         });
@@ -846,6 +941,7 @@ document.addEventListener('DOMContentLoaded', function () {
             course: document.getElementById('round-course').value,
             tees: document.getElementById('round-tee').value,
             notes: document.getElementById('round-notes').value,
+            scorecardData: scorecardData,
         };
         if (isStepVisible('holes')) {
             draft.holes_played = (document.querySelector('input[name="holes_played"]:checked') || {}).value || '';
@@ -915,6 +1011,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (draft.entry_mode === 'detailed') {
+            if (draft.scorecardData) {
+                scorecardData = draft.scorecardData;
+            }
             buildScorecardGrid();
         } else if (draft.entry_mode === 'score_only') {
             addGrossScoreInput();
@@ -951,23 +1050,18 @@ document.addEventListener('DOMContentLoaded', function () {
             var allFilled = true;
             var total = 0;
 
-            document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-                var holeNum = row.dataset.hole;
-                var gross = row.querySelector('.score-gross').value;
-                var fwyEl = row.querySelector('.score-fwy');
-                var girEl = row.querySelector('.score-gir');
-                var putts = row.querySelector('.score-putts').value;
-                var pen = row.querySelector('.score-pen').value;
-
+            var range = getScorecardRange();
+            range.forEach(function (num) {
+                var data = scorecardData[num] || {};
+                var gross = data.gross || '';
                 if (!gross) allFilled = false;
                 total += parseInt(gross) || 0;
-
-                holes[holeNum] = {
-                    gross: gross || '',
-                    fairway: fwyEl ? fwyEl.value : '',
-                    gir: girEl ? girEl.value : '',
-                    putts: putts || '',
-                    penalties: pen || '0',
+                holes[num] = {
+                    gross: gross,
+                    fairway: data.fairway || '',
+                    gir: data.gir || '',
+                    putts: data.putts || '',
+                    penalties: data.penalties || '0',
                 };
             });
 
@@ -1053,40 +1147,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // --- Scorecard event delegation ---
-    document.getElementById('scorecard-area').addEventListener('input', function (e) {
-        if (e.target.classList.contains('score-gross')) {
-            var row = e.target.closest('tr');
-            var parEl = row ? row.querySelector('.hole-par') : null;
-            var par = parseInt(parEl ? parEl.textContent : '');
-            if (par) colorizeGross(e.target, par);
-            updateSubtotals();
-        } else if (e.target.classList.contains('score-putts')) {
-            colorizePutts(e.target);
-            updateSubtotals();
-        } else if (e.target.classList.contains('score-pen')) {
-            colorizePen(e.target);
-            updateSubtotals();
-        }
-        _saveScorecardData();
+    /* Input delegation removed — desktop table is read-only. Click-to-edit is wired below. */
 
-        /* Sync back to mobile hole card */
-        var row = e.target.closest('tr');
-        if (row && row.dataset.hole) {
-            syncDesktopToMobile(parseInt(row.dataset.hole));
-        }
-    });
-
-    document.getElementById('scorecard-area').addEventListener('focusout', function (e) {
-        if (!e.target.classList.contains('score-gross')) return;
-        var allFilled = true;
-        var inputs = document.querySelectorAll('#scorecard-area .score-gross');
-        inputs.forEach(function (inp) {
-            if (!inp.value) allFilled = false;
-        });
-        if (allFilled && inputs.length > 0) {
-            showStep('notes');
-        }
-    });
+    /* Removed: focusout auto-advance to notes — shorthand entry controls advancement */
 
     // --- Draft save (debounced) ---
     function debouncedDraftSave() {
@@ -1099,6 +1162,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Submit ---
     document.getElementById('submit-round').addEventListener('click', submitRound);
+
+    /* ── Click-to-edit on desktop table rows ── */
+    document.getElementById('scorecard-area').addEventListener('click', function (e) {
+        var row = e.target.closest('tr[data-hole]');
+        if (!row) return;
+        if (row.classList.contains('subtotal-row')) return;
+        var holeNum = parseInt(row.dataset.hole);
+        var range = getScorecardRange();
+        if (range.indexOf(holeNum) === -1) return;
+
+        var d = scorecardData[holeNum] || {};
+        if (!d.gross) return;
+
+        _editingHole = holeNum;
+        buildScorecardGrid();
+    });
 
     // --- Draft resume / discard ---
     fetch('/api/drafts/round')

@@ -70,8 +70,22 @@ window._courses = {{ courses|tojson }};
 
     <div class="wizard-step" data-step="holes_detail" style="display:none">
         <label class="step-label">Hole Scores</label>
+
+        <div class="desktop-hole-progress" id="desktop-hole-progress"></div>
+
         <div class="hole-progress mobile-cards" id="hole-progress-bar"></div>
+
         <div id="scorecard-area"></div>
+
+        <div class="inline-error" id="inline-error" style="display:none"></div>
+
+        <div class="desktop-running-stats" id="desktop-running-stats">
+            <span>Gross: <strong id="rs-gross">&mdash;</strong></span>
+            <span>Putts: <strong id="rs-putts">&mdash;</strong></span>
+            <span>GIR: <strong id="rs-gir">&mdash;</strong></span>
+            <span>FIR: <strong id="rs-fir">&mdash;</strong></span>
+        </div>
+
         <div class="hole-cards" id="hole-cards-area"></div>
     </div>
 

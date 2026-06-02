@@ -220,6 +220,19 @@ body {
     font-weight: var(--ps-fw-label);
 }
 
+/* ── User switcher ──────────────────────────────────────────────────── */
+.ps-user-switch {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    background: transparent;
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-1) var(--ps-sp-2);
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+}
+
 /* ── Topbar ────────────────────────────────────────────────────────── */
 .ps-topbar {
     display: flex;
@@ -1248,12 +1261,15 @@ select.hole-input { width: 3rem; appearance: none; }
 
 /* ── Show/hide helpers ── */
 @media (min-width: 769px) {
-    .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid { display: none !important; }
+    .mobile-cards, .hole-cards, .hole-progress, .tee-cards, .hole-mini-grid {
+        display: none !important;
+    }
     .course-detail .desktop-table, .course-detail .hole-table-wrap,
     .round-detail .data-table { width: fit-content; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
+    .desktop-hole-progress, .inline-error, .desktop-running-stats { display: none !important; }
     .hole-table-wrap { overflow-x: auto; padding-left: 0; padding-right: 0; }
 }
 
@@ -1464,6 +1480,67 @@ select.hole-input { width: 3rem; appearance: none; }
 .hole-progress-dot.current {
     border-color: var(--ps-accent);
     color: var(--ps-accent);
+}
+
+/* ── Desktop inline shorthand entry (step 7) ── */
+.desktop-hole-progress {
+    display: flex;
+    gap: 3px;
+    padding: var(--ps-sp-2) 0;
+    margin-bottom: var(--ps-sp-3);
+}
+
+.inline-shorthand {
+    width: 100%;
+    padding: 6px 10px;
+    font-family: var(--ps-font-mono);
+    font-size: 0.85rem;
+    background: var(--ps-paper);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    color: var(--ps-ink);
+    letter-spacing: 1px;
+    outline: none;
+    box-sizing: border-box;
+}
+.inline-shorthand:focus {
+    border-color: var(--ps-accent);
+}
+.inline-shorthand.is-error {
+    border-color: var(--ps-warn);
+}
+
+.inline-error {
+    margin-top: var(--ps-sp-2);
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    color: var(--ps-warn);
+}
+
+.desktop-running-stats {
+    display: flex;
+    gap: var(--ps-sp-5);
+    margin-top: var(--ps-sp-2);
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    color: var(--ps-ink-3);
+    letter-spacing: 0.04em;
+}
+.desktop-running-stats strong {
+    color: var(--ps-ink);
+    font-weight: var(--ps-fw-label);
+}
+
+.scorecard-input .sd-gross {
+    font-weight: 500;
+}
+.sd-gross.is-eagle { color: var(--ps-accent); font-weight: 700; }
+.sd-gross.is-birdie { color: var(--ps-accent); font-weight: 700; }
+.sd-gross.is-bogey { color: #b08844; }
+.sd-gross.is-double { color: var(--ps-warn); }
+.sd-gross.is-blowup { color: var(--ps-warn); font-weight: 700; }
+
+.scorecard-input tr.is-current td {
+    background: var(--ps-accent-dim);
 }
 
 /* ── Season summary cards ── */
