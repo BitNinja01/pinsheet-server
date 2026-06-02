@@ -220,6 +220,19 @@ body {
     font-weight: var(--ps-fw-label);
 }
 
+/* ── User switcher ──────────────────────────────────────────────────── */
+.ps-user-switch {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    background: transparent;
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    padding: var(--ps-sp-1) var(--ps-sp-2);
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+}
+
 /* ── Topbar ────────────────────────────────────────────────────────── */
 .ps-topbar {
     display: flex;
