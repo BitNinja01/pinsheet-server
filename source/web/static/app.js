@@ -413,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'notes'];
     var draftTimer = null;
     var scorecardData = {};
+    var _editingHole = null;
 
     function showStep(step) {
         var el = document.querySelector('.wizard-step[data-step="' + step + '"]');
@@ -465,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var courseName = document.getElementById('round-course').value;
         var course = window._courses[courseName];
         var holesData = course ? course.holes || {} : {};
-        var currentHole = _currentHoleNum();
+        var currentHole = (_editingHole !== null) ? _editingHole : _currentHoleNum();
         if (currentHole === null) currentHole = holesRange[holesRange.length - 1];
 
         var html = '<table class="data-table scorecard-input"><thead><tr>' +
@@ -484,26 +485,33 @@ document.addEventListener('DOMContentLoaded', function () {
             r += '<td class="hole-par">' + par + '</td>';
             r += '<td>' + (hole.index || hole.hole_index || '') + '</td>';
 
-            var grossDisplay = isComplete ? saved.gross : '\u2014';
-            var grossCls = 'sd-gross';
-            if (isComplete && par) {
-                var diff = parseInt(saved.gross) - parseInt(par);
-                if (diff <= -2) grossCls += ' is-eagle';
-                else if (diff === -1) grossCls += ' is-birdie';
-                else if (diff === 1) grossCls += ' is-bogey';
-                else if (diff === 2) grossCls += ' is-double';
-                if (diff >= 3) grossCls += ' is-blowup';
-            }
-            r += '<td class="' + grossCls + '">' + grossDisplay + '</td>';
-
-            if (par === '3') {
-                r += '<td class="sd-fwy">\u2014</td>';
+            if (isCurrent) {
+                var savedShorthand = buildShorthand(saved);
+                r += '<td colspan="5">';
+                r += '<input type="text" class="inline-shorthand" value="' + savedShorthand + '" placeholder="gross fw gir putts pen" autocomplete="off">';
+                r += '</td>';
             } else {
-                r += '<td class="sd-fwy">' + (isComplete ? (saved.fairway || '\u2014') : '\u2014') + '</td>';
+                var grossDisplay = isComplete ? saved.gross : '\u2014';
+                var grossCls = 'sd-gross';
+                if (isComplete && par) {
+                    var diff = parseInt(saved.gross) - parseInt(par);
+                    if (diff <= -2) grossCls += ' is-eagle';
+                    else if (diff === -1) grossCls += ' is-birdie';
+                    else if (diff === 1) grossCls += ' is-bogey';
+                    else if (diff === 2) grossCls += ' is-double';
+                    if (diff >= 3) grossCls += ' is-blowup';
+                }
+                r += '<td class="' + grossCls + '">' + grossDisplay + '</td>';
+
+                if (par === '3') {
+                    r += '<td class="sd-fwy">\u2014</td>';
+                } else {
+                    r += '<td class="sd-fwy">' + (isComplete ? (saved.fairway || '\u2014') : '\u2014') + '</td>';
+                }
+                r += '<td class="sd-gir">' + (isComplete ? (saved.gir || '\u2014') : '\u2014') + '</td>';
+                r += '<td class="sd-putts">' + (isComplete ? (saved.putts || '\u2014') : '\u2014') + '</td>';
+                r += '<td class="sd-pen">' + (isComplete ? (saved.penalties || '\u2014') : '\u2014') + '</td>';
             }
-            r += '<td class="sd-gir">' + (isComplete ? (saved.gir || '\u2014') : '\u2014') + '</td>';
-            r += '<td class="sd-putts">' + (isComplete ? (saved.putts || '\u2014') : '\u2014') + '</td>';
-            r += '<td class="sd-pen">' + (isComplete ? (saved.penalties || '\u2014') : '\u2014') + '</td>';
             r += '</tr>';
             return r;
         };
@@ -541,8 +549,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentRow) currentRow.scrollIntoView({ block: 'nearest' });
         }
 
+        var inlineInput = document.querySelector('.inline-shorthand');
+        if (inlineInput) {
+            inlineInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleInlineEnter();
+                }
+            });
+            inlineInput.addEventListener('input', function () {
+                this.classList.remove('is-error');
+                var err = document.getElementById('inline-error');
+                if (err) err.style.display = 'none';
+            });
+            inlineInput.focus();
+        }
+
         updateSubtotals();
-        updateShorthandBar();
         updateRunningStats();
         updateDesktopProgressDots();
 
@@ -710,42 +733,9 @@ document.addEventListener('DOMContentLoaded', function () {
         updateProgressDots();
     }
 
-    function updateShorthandBar() {
-        var label = document.getElementById('shorthand-hole-label');
-        var counter = document.getElementById('shorthand-counter');
-        var input = document.getElementById('shorthand-input');
-        var error = document.getElementById('shorthand-error');
-        if (!label || !counter) return;
-
-        var range = getScorecardRange();
-        var holeNum = _currentHoleNum();
-        if (holeNum === null) {
-            label.textContent = 'Done';
-            counter.textContent = 'All holes entered';
-            if (error) error.style.display = 'none';
-            if (input) { input.value = ''; input.disabled = true; }
-            return;
-        }
-
-        var idx = range.indexOf(holeNum);
-        label.textContent = 'Hole ' + holeNum;
-        counter.textContent = (idx + 1) + ' of ' + range.length;
-
-        if (input) {
-            input.disabled = false;
-            var saved = scorecardData[holeNum] || {};
-            if (saved.gross) {
-                input.value = buildShorthand(saved);
-            } else {
-                input.value = '';
-            }
-        }
-        if (error) error.style.display = 'none';
-    }
-
-    function handleShorthandEnter() {
-        var input = document.getElementById('shorthand-input');
-        var error = document.getElementById('shorthand-error');
+    function handleInlineEnter() {
+        var input = document.querySelector('.inline-shorthand');
+        var error = document.getElementById('inline-error');
         if (!input) return;
 
         var raw = input.value.trim();
@@ -773,57 +763,13 @@ document.addEventListener('DOMContentLoaded', function () {
         input.classList.remove('is-error');
         if (error) error.style.display = 'none';
 
-        var range = getScorecardRange();
-        var holeNum = _currentHoleNum();
+        var holeNum = (_editingHole !== null) ? _editingHole : _currentHoleNum();
         if (holeNum === null) return;
 
+        _editingHole = null;
         scorecardData[holeNum] = parsed;
 
-        var row = document.querySelector('#scorecard-area tr[data-hole="' + holeNum + '"]');
-        if (row) {
-            var grossEl = row.querySelector('.sd-gross');
-            var fwyEl = row.querySelector('.sd-fwy');
-            var girEl = row.querySelector('.sd-gir');
-            var puttsEl = row.querySelector('.sd-putts');
-            var penEl = row.querySelector('.sd-pen');
-
-            if (grossEl) grossEl.textContent = parsed.gross;
-            if (fwyEl && parsed.fairway) fwyEl.textContent = parsed.fairway;
-            if (girEl && parsed.gir) girEl.textContent = parsed.gir;
-            if (puttsEl) puttsEl.textContent = parsed.putts || '0';
-            if (penEl) penEl.textContent = parsed.penalties || '0';
-
-            var parCell = row.querySelector('.hole-par');
-            var parVal = parCell ? parseInt(parCell.textContent) : 0;
-            if (grossEl && parVal) {
-                var diff = gross - parVal;
-                grossEl.className = 'sd-gross';
-                if (diff <= -2) grossEl.classList.add('is-eagle');
-                else if (diff === -1) grossEl.classList.add('is-birdie');
-                else if (diff === 1) grossEl.classList.add('is-bogey');
-                else if (diff === 2) grossEl.classList.add('is-double');
-                if (diff >= 3) grossEl.classList.add('is-blowup');
-            }
-
-            row.classList.remove('is-current');
-        }
-
-        updateSubtotals();
-        updateRunningStats();
-        updateDesktopProgressDots();
-
-        syncDesktopToMobile(holeNum);
-
-        input.value = '';
-        var nextHole = _currentHoleNum();
-        if (nextHole !== null) {
-            var nextRow = document.querySelector('#scorecard-area tr[data-hole="' + nextHole + '"]');
-            if (nextRow) {
-                nextRow.classList.add('is-current');
-                nextRow.scrollIntoView({ block: 'nearest' });
-            }
-        }
-        updateShorthandBar();
+        buildScorecardGrid();
         saveDraft();
     }
 
@@ -1217,36 +1163,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Submit ---
     document.getElementById('submit-round').addEventListener('click', submitRound);
 
-    // --- Desktop shorthand entry events ---
-    var shorthandInput = document.getElementById('shorthand-input');
-    var shorthandBtn = document.getElementById('shorthand-enter-btn');
-
-    if (shorthandInput) {
-        shorthandInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleShorthandEnter();
-            }
-        });
-        shorthandInput.addEventListener('input', function () {
-            this.classList.remove('is-error');
-            var err = document.getElementById('shorthand-error');
-            if (err) err.style.display = 'none';
-        });
-    }
-
-    if (shorthandBtn) {
-        shorthandBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            handleShorthandEnter();
-        });
-    }
-
     /* ── Click-to-edit on desktop table rows ── */
     document.getElementById('scorecard-area').addEventListener('click', function (e) {
         var row = e.target.closest('tr[data-hole]');
         if (!row) return;
-        /* Ignore clicks on subtotal rows */
         if (row.classList.contains('subtotal-row')) return;
         var holeNum = parseInt(row.dataset.hole);
         var range = getScorecardRange();
@@ -1255,23 +1175,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var d = scorecardData[holeNum] || {};
         if (!d.gross) return;
 
-        var input = document.getElementById('shorthand-input');
-        if (!input) return;
-        input.value = buildShorthand(d);
-        input.focus();
-
-        document.querySelectorAll('#scorecard-area tr.is-current').forEach(function (r) {
-            r.classList.remove('is-current');
-        });
-        row.classList.add('is-current');
-
-        var error = document.getElementById('shorthand-error');
-        if (error) error.style.display = 'none';
-
-        var label = document.getElementById('shorthand-hole-label');
-        if (label) label.textContent = 'Hole ' + holeNum;
-        var counter = document.getElementById('shorthand-counter');
-        if (counter) counter.textContent = 'Editing';
+        _editingHole = holeNum;
+        buildScorecardGrid();
     });
 
     // --- Draft resume / discard ---

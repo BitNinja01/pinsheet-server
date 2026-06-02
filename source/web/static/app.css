@@ -1256,7 +1256,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
-    .desktop-hole-progress, .desktop-shorthand-bar, .desktop-running-stats { display: none !important; }
+    .desktop-hole-progress, .inline-error, .desktop-running-stats { display: none !important; }
     .hole-table-wrap { overflow-x: auto; padding-left: 0; padding-right: 0; }
 }
 
@@ -1469,7 +1469,7 @@ select.hole-input { width: 3rem; appearance: none; }
     color: var(--ps-accent);
 }
 
-/* ── Desktop shorthand entry (step 7) ── */
+/* ── Desktop inline shorthand entry (step 7) ── */
 .desktop-hole-progress {
     display: flex;
     gap: 3px;
@@ -1477,68 +1477,26 @@ select.hole-input { width: 3rem; appearance: none; }
     margin-bottom: var(--ps-sp-3);
 }
 
-.desktop-shorthand-bar {
-    margin-top: var(--ps-sp-3);
-}
-
-.shorthand-input-row {
-    display: flex;
-    align-items: center;
-    gap: var(--ps-sp-3);
-}
-
-.shorthand-hole-label {
+.inline-shorthand {
+    width: 100%;
+    padding: 6px 10px;
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-h2);
-    font-weight: var(--ps-fw-display);
-    color: var(--ps-accent);
-    white-space: nowrap;
-    min-width: 60px;
-}
-
-.shorthand-input {
-    flex: 1;
-    padding: 10px 12px;
-    font-family: var(--ps-font-mono);
-    font-size: 18px;
+    font-size: 0.85rem;
     background: var(--ps-paper);
     border: var(--ps-rule) solid var(--ps-rule-c);
     color: var(--ps-ink);
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     outline: none;
+    box-sizing: border-box;
 }
-.shorthand-input:focus {
+.inline-shorthand:focus {
     border-color: var(--ps-accent);
 }
-.shorthand-input.is-error {
+.inline-shorthand.is-error {
     border-color: var(--ps-warn);
 }
 
-.shorthand-enter-btn {
-    padding: 10px 18px;
-    font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-eyebrow);
-    font-weight: var(--ps-fw-label);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    background: var(--ps-accent);
-    color: #0a0a0a;
-    border: var(--ps-rule) solid var(--ps-accent);
-    cursor: pointer;
-    white-space: nowrap;
-}
-.shorthand-enter-btn:hover {
-    opacity: 0.88;
-}
-
-.shorthand-counter {
-    font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-eyebrow);
-    color: var(--ps-ink-3);
-    white-space: nowrap;
-}
-
-.shorthand-error {
+.inline-error {
     margin-top: var(--ps-sp-2);
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-eyebrow);
