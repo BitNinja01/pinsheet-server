@@ -829,6 +829,72 @@ document.addEventListener('DOMContentLoaded', function () {
         saveDraft();
     }
 
+    function updateRunningStats() {
+        var range = getScorecardRange();
+        var courseName = document.getElementById('round-course').value;
+        var course = window._courses[courseName];
+        var holesData = course ? course.holes || {} : {};
+        var totalGross = 0, totalPutts = 0, girHits = 0, girTotal = 0, firHits = 0, firTotal = 0;
+        var hasData = false;
+
+        range.forEach(function (num) {
+            var d = scorecardData[num] || {};
+            if (!d.gross) return;
+            hasData = true;
+            var gross = parseInt(d.gross) || 0;
+            totalGross += gross;
+            var putts = parseInt(d.putts) || 0;
+            totalPutts += putts;
+
+            var par = (holesData[String(num)] || {}).par || '';
+            if (par) {
+                var parInt = parseInt(par);
+                var isGir = false;
+                if (parInt === 3) isGir = gross <= parInt + 1;
+                else if (parInt === 5) isGir = gross <= parInt - 1;
+                else isGir = gross <= parInt;
+                girTotal++;
+                if (isGir) girHits++;
+
+                if (parInt !== 3) {
+                    firTotal++;
+                    if (d.fairway === 'H') firHits++;
+                }
+            }
+        });
+
+        var setText = function (id, val) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+
+        if (hasData) {
+            setText('rs-gross', String(totalGross));
+            setText('rs-putts', String(totalPutts));
+            setText('rs-gir', girTotal ? (girHits + '/' + girTotal) : '\u2014');
+            setText('rs-fir', firTotal ? (firHits + '/' + firTotal) : '\u2014');
+        } else {
+            setText('rs-gross', '\u2014');
+            setText('rs-putts', '\u2014');
+            setText('rs-gir', '\u2014');
+            setText('rs-fir', '\u2014');
+        }
+    }
+
+    function updateDesktopProgressDots() {
+        var bar = document.getElementById('desktop-hole-progress');
+        if (!bar) return;
+        var range = getScorecardRange();
+        var current = _currentHoleNum();
+        var ph = '';
+        range.forEach(function (n) {
+            var d = scorecardData[n] || {};
+            var cls = d.gross ? ' completed' : (n === current ? ' current' : '');
+            ph += '<div class="hole-progress-dot' + cls + '">' + n + '</div>';
+        });
+        bar.innerHTML = ph;
+    }
+
     function updateProgressDots() {
         var progressBar = document.getElementById('hole-progress-bar');
         if (!progressBar) return;
