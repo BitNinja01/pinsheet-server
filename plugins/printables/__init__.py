@@ -73,7 +73,13 @@ def register(app):
     else:
         log.info("printables: PDFs already exist, skipping generation")
 
-    # 3. Add nav link
+    # 3. Inject CSS
+    head_tag = '<link rel="stylesheet" href="/plugins/printables/static/printables.css">'
+    app._plugin_blocks["head"] = (
+        (app._plugin_blocks.get("head", "") + "\n" + head_tag).strip()
+    )
+
+    # 4. Add nav link
     if not hasattr(app, "_plugin_nav"):
         app._plugin_nav = []
     app._plugin_nav.append({
@@ -92,4 +98,7 @@ def unregister(app):
             output_dir.rmdir()
         except OSError:
             pass
+    head_tag = '<link rel="stylesheet" href="/plugins/printables/static/printables.css">'
+    current_head = app._plugin_blocks.get("head", "")
+    app._plugin_blocks["head"] = current_head.replace(head_tag, "").strip()
     app._plugin_nav[:] = [n for n in app._plugin_nav if n.get("page_id") != "printables"]
