@@ -59,10 +59,12 @@ def register(app):
     # 2. Generate PDFs if missing
     output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
     expected = [
-        "scorecard_shorthand.pdf",
-        "scorecard_shorthand_letter.pdf",
         "bingo.pdf",
+        "bingo_double.pdf",
         "bingo_letter.pdf",
+        "scorecard_shorthand_double.pdf",
+        "scorecard_shorthand_letter.pdf",
+        "scorecard_shorthand_single.pdf",
     ]
     if not all((output_dir / name).exists() for name in expected):
         try:
@@ -92,7 +94,7 @@ def register(app):
 def unregister(app):
     output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
     if output_dir.exists():
-        for name in ["scorecard_shorthand.pdf", "scorecard_shorthand_letter.pdf", "bingo.pdf", "bingo_letter.pdf"]:
+        for name in ["bingo.pdf", "bingo_double.pdf", "bingo_letter.pdf", "scorecard_shorthand_double.pdf", "scorecard_shorthand_letter.pdf", "scorecard_shorthand_single.pdf"]:
             (output_dir / name).unlink(missing_ok=True)
         try:
             output_dir.rmdir()

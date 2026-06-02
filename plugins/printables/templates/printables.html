@@ -23,17 +23,9 @@
             <div class="printables-card-name">{{ pdf.name }}</div>
             <div class="printables-card-desc">
                 {% if "scorecard" in pdf.name %}
-                    {% if "letter" in pdf.name %}
-                        Blank scorecard (letter format)
-                    {% else %}
-                        Blank scorecard (tall format)
-                    {% endif %}
+                    Blank scorecard{% if "letter" in pdf.name %} (letter){% elif "double" in pdf.name %} (double, tall){% else %} (single, tall){% endif %}
                 {% elif "bingo" in pdf.name %}
-                    {% if "letter" in pdf.name %}
-                        Par bingo card (letter format)
-                    {% else %}
-                        Par bingo card (tall format)
-                    {% endif %}
+                    Par bingo card{% if "letter" in pdf.name %} (letter){% elif "double" in pdf.name %} (double, tall){% else %} (single, tall){% endif %}
                 {% endif %}
             </div>
             <div class="printables-card-meta">

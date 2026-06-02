@@ -24,9 +24,11 @@ def printables_page():
     output_dir = Path(current_app.config["DATA_DIR"]) / "plugins" / "printables"
     pdfs = []
     for name in [
-        "scorecard_shorthand.pdf",
+        "scorecard_shorthand_single.pdf",
+        "scorecard_shorthand_double.pdf",
         "scorecard_shorthand_letter.pdf",
         "bingo.pdf",
+        "bingo_double.pdf",
         "bingo_letter.pdf",
     ]:
         path = output_dir / name

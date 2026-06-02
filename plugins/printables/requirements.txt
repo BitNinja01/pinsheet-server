@@ -1,0 +1,4 @@
+svgwrite
+cairosvg
+Pillow
+pypdf
