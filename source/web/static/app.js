@@ -465,33 +465,60 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function _currentHoleNum() {
+        var range = getScorecardRange();
+        for (var i = 0; i < range.length; i++) {
+            var n = range[i];
+            var d = scorecardData[n] || {};
+            if (!d.gross) return n;
+        }
+        return null;
+    }
+
     function buildScorecardGrid() {
         var holesRange = getScorecardRange();
         var courseName = document.getElementById('round-course').value;
         var course = window._courses[courseName];
         var holesData = course ? course.holes || {} : {};
+        var currentHole = _currentHoleNum();
+        if (currentHole === null) currentHole = holesRange[holesRange.length - 1];
 
         var html = '<table class="data-table scorecard-input"><thead><tr>' +
-            '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>Fairway</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
+            '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
             '</tr></thead><tbody>';
 
         var holeRow = function (num) {
             var hole = holesData[String(num)] || {};
             var par = hole.par || '';
             var saved = scorecardData[num] || {};
-            var r = '<tr data-hole="' + num + '">';
+            var isCurrent = (num === currentHole);
+            var isComplete = !!saved.gross;
+            var cls = isCurrent ? ' class="is-current"' : '';
+            var r = '<tr data-hole="' + num + '"' + cls + '>';
             r += '<td>' + num + '</td>';
             r += '<td class="hole-par">' + par + '</td>';
             r += '<td>' + (hole.index || hole.hole_index || '') + '</td>';
-            r += '<td><input type="number" class="hole-input score-gross" min="1" max="20" value="' + (saved.gross || '') + '"></td>';
-            if (par === '3') {
-                r += '<td>\u2014</td>';
-            } else {
-                r += '<td><select class="hole-input score-fwy"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>OBL</option><option>OBR</option><option>N</option></select></td>';
+
+            var grossDisplay = isComplete ? saved.gross : '\u2014';
+            var grossCls = 'sd-gross';
+            if (isComplete && par) {
+                var diff = parseInt(saved.gross) - parseInt(par);
+                if (diff <= -2) grossCls += ' is-eagle';
+                else if (diff === -1) grossCls += ' is-birdie';
+                else if (diff === 1) grossCls += ' is-bogey';
+                else if (diff === 2) grossCls += ' is-double';
+                if (diff >= 3) grossCls += ' is-blowup';
             }
-            r += '<td><select class="hole-input score-gir"><option value="">--</option><option>H</option><option>L</option><option>R</option><option>S</option><option>LO</option><option>OBL</option><option>OBR</option><option>OBS</option><option>OBLO</option><option>N</option></select></td>';
-            r += '<td><input type="number" class="hole-input score-putts" min="0" max="10" value="' + (saved.putts || '') + '"></td>';
-            r += '<td><input type="number" class="hole-input score-pen" min="0" max="20" value="' + (saved.penalties || '0') + '"></td>';
+            r += '<td class="' + grossCls + '">' + grossDisplay + '</td>';
+
+            if (par === '3') {
+                r += '<td class="sd-fwy">\u2014</td>';
+            } else {
+                r += '<td class="sd-fwy">' + (isComplete ? (saved.fairway || '\u2014') : '\u2014') + '</td>';
+            }
+            r += '<td class="sd-gir">' + (isComplete ? (saved.gir || '\u2014') : '\u2014') + '</td>';
+            r += '<td class="sd-putts">' + (isComplete ? (saved.putts || '\u2014') : '\u2014') + '</td>';
+            r += '<td class="sd-pen">' + (isComplete ? (saved.penalties || '\u2014') : '\u2014') + '</td>';
             r += '</tr>';
             return r;
         };
@@ -524,21 +551,17 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '</tbody></table>';
         document.getElementById('scorecard-area').innerHTML = html;
 
-        document.querySelectorAll('#scorecard-area tr[data-hole]').forEach(function (row) {
-            var grossInput = row.querySelector('.score-gross');
-            var parEl = row.querySelector('.hole-par');
-            if (grossInput && grossInput.value && parEl) {
-                var par = parseInt(parEl.textContent);
-                if (par) colorizeGross(grossInput, par);
-            }
-        });
-        updateSubtotals();
+        if (currentHole) {
+            var currentRow = document.querySelector('#scorecard-area tr[data-hole="' + currentHole + '"]');
+            if (currentRow) currentRow.scrollIntoView({ block: 'nearest' });
+        }
 
-        /* Also render mobile hole cards */
-        var courseNameForHoles = document.getElementById('round-course').value;
-        var courseForHoles = window._courses[courseNameForHoles];
-        var holesDataForCards = courseForHoles ? courseForHoles.holes || {} : {};
-        renderHoleCards(getScorecardRange(), holesDataForCards);
+        updateSubtotals();
+        updateShorthandBar();
+        updateRunningStats();
+        updateDesktopProgressDots();
+
+        renderHoleCards(getScorecardRange(), holesData);
     }
 
     /* ── Shorthand parser ── */
