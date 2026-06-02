@@ -8,8 +8,6 @@ CODEBASE_IMPROVEMENTS.md
 .superpowers/
 /plugins/*
 !/plugins/.gitkeep
-!/plugins/printables/
-!/plugins/printables/**
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md
