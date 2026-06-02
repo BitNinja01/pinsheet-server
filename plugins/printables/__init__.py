@@ -1,0 +1,88 @@
+"""Printables plugin for PinSheet Server.
+
+Generates printable golf forms (blank scorecards, par bingo cards) as PDFs.
+"""
+
+from __future__ import annotations
+
+import logging
+import shutil
+import subprocess
+from pathlib import Path
+
+from .blueprint import bp
+
+log = logging.getLogger("pinsheet")
+
+plugin_info = {
+    "name": "printables",
+    "version": "0.3.0",
+    "description": "Printable golf forms (scorecards, bingo cards)",
+    "author": "PinSheet",
+}
+
+
+def _install_fonts() -> None:
+    fonts_dir = Path(__file__).parent / "fonts" / "JetBrainsMono"
+    target_dir = Path.home() / ".local" / "share" / "fonts" / "pinsheet"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    needs_cache = False
+    for ttf in fonts_dir.glob("*.ttf"):
+        dst = target_dir / ttf.name
+        if not dst.exists() or dst.stat().st_size != ttf.stat().st_size:
+            shutil.copy2(ttf, dst)
+            needs_cache = True
+    if needs_cache and shutil.which("fc-cache"):
+        subprocess.run(["fc-cache", "-f"], check=False)
+
+
+def generate_pdfs(output_dir: Path) -> None:
+    from .scorecard import generate_scorecard_pdf, generate_scorecard_letter_pdf
+    from .bingo import generate_bingo_pdf, generate_bingo_letter_pdf
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generate_scorecard_pdf(output_dir)
+    generate_scorecard_letter_pdf(output_dir)
+    generate_bingo_pdf(output_dir)
+    generate_bingo_letter_pdf(output_dir)
+
+
+def register(app):
+    app.register_blueprint(bp, url_prefix="/printables")
+
+    # 1. Install fonts (best-effort)
+    try:
+        _install_fonts()
+    except Exception:
+        log.warning("printables: font installation failed", exc_info=True)
+
+    # 2. Generate PDFs if missing
+    output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
+    expected = [
+        "scorecard_shorthand.pdf",
+        "scorecard_shorthand_letter.pdf",
+        "bingo.pdf",
+        "bingo_letter.pdf",
+    ]
+    if not all((output_dir / name).exists() for name in expected):
+        try:
+            generate_pdfs(output_dir)
+            log.info("printables: generated startup PDFs")
+        except Exception:
+            log.warning("printables: PDF generation failed", exc_info=True)
+    else:
+        log.info("printables: PDFs already exist, skipping generation")
+
+    # 3. Add nav link
+    app._plugin_nav.append({
+        "label": "Printables",
+        "url": "/printables",
+        "page_id": "printables",
+    })
+
+
+def unregister(app):
+    output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    app._plugin_nav[:] = [n for n in app._plugin_nav if n.get("page_id") != "printables"]
