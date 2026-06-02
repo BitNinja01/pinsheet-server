@@ -60,9 +60,9 @@ def regenerate():
     from . import generate_pdfs
 
     output_dir = Path(current_app.config["DATA_DIR"]) / "plugins" / "printables"
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
     try:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
         generate_pdfs(output_dir)
         return jsonify({"ok": True})
     except Exception as e:
