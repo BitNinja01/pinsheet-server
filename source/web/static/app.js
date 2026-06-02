@@ -995,6 +995,7 @@ document.addEventListener('DOMContentLoaded', function () {
             course: document.getElementById('round-course').value,
             tees: document.getElementById('round-tee').value,
             notes: document.getElementById('round-notes').value,
+            scorecardData: scorecardData,
         };
         if (isStepVisible('holes')) {
             draft.holes_played = (document.querySelector('input[name="holes_played"]:checked') || {}).value || '';
@@ -1064,6 +1065,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (draft.entry_mode === 'detailed') {
+            if (draft.scorecardData) {
+                scorecardData = draft.scorecardData;
+            }
             buildScorecardGrid();
         } else if (draft.entry_mode === 'score_only') {
             addGrossScoreInput();
