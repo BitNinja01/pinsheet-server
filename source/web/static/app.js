@@ -943,62 +943,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     window._navigateHole = navigateToHole;
 
-    function colorizeGross(input, par) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.backgroundColor = '';
-            input.style.color = '';
-            input.style.fontWeight = '';
-            input.style.opacity = '';
-            return;
-        }
-        var diff = val - par;
-        input.style.color = '';
-        input.style.fontWeight = '';
-        input.style.backgroundColor = '';
-        input.style.opacity = '';
-        if (diff <= -2) {
-            input.style.color = '#ffd700';
-            input.style.fontWeight = 'bold';
-        } else if (diff === -1) {
-            input.style.color = '#90ee90';
-            input.style.fontWeight = 'bold';
-        } else if (diff === 1) {
-            input.style.color = '#aaaaaa';
-        } else if (diff >= 2) {
-            input.style.color = '#ff4444';
-            if (diff >= 3) {
-                input.style.fontWeight = 'bold';
-            }
-        }
-    }
-
-    function colorizePutts(input) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.color = '';
-            input.style.fontWeight = '';
-            return;
-        }
-        input.style.color = '';
-        input.style.fontWeight = '';
-        if (val === 1) {
-            input.style.color = '#90ee90';
-            input.style.fontWeight = 'bold';
-        } else if (val >= 3) {
-            input.style.color = '#ff4444';
-        }
-    }
-
-    function colorizePen(input) {
-        var val = parseInt(input.value);
-        if (!val || isNaN(val)) {
-            input.style.color = '';
-            return;
-        }
-        input.style.color = val > 0 ? '#ff4444' : '';
-    }
-
     function updateSubtotals() {
         var range = getScorecardRange();
         var outGross = 0, inGross = 0, outPutts = 0, inPutts = 0, outPen = 0, inPen = 0;
@@ -1253,40 +1197,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // --- Scorecard event delegation ---
-    document.getElementById('scorecard-area').addEventListener('input', function (e) {
-        if (e.target.classList.contains('score-gross')) {
-            var row = e.target.closest('tr');
-            var parEl = row ? row.querySelector('.hole-par') : null;
-            var par = parseInt(parEl ? parEl.textContent : '');
-            if (par) colorizeGross(e.target, par);
-            updateSubtotals();
-        } else if (e.target.classList.contains('score-putts')) {
-            colorizePutts(e.target);
-            updateSubtotals();
-        } else if (e.target.classList.contains('score-pen')) {
-            colorizePen(e.target);
-            updateSubtotals();
-        }
-        _saveScorecardData();
+    /* Input delegation removed — desktop table is read-only. Click-to-edit is wired below. */
 
-        /* Sync back to mobile hole card */
-        var row = e.target.closest('tr');
-        if (row && row.dataset.hole) {
-            syncDesktopToMobile(parseInt(row.dataset.hole));
-        }
-    });
-
-    document.getElementById('scorecard-area').addEventListener('focusout', function (e) {
-        if (!e.target.classList.contains('score-gross')) return;
-        var allFilled = true;
-        var inputs = document.querySelectorAll('#scorecard-area .score-gross');
-        inputs.forEach(function (inp) {
-            if (!inp.value) allFilled = false;
-        });
-        if (allFilled && inputs.length > 0) {
-            showStep('notes');
-        }
-    });
+    /* Removed: focusout auto-advance to notes — shorthand entry controls advancement */
 
     // --- Draft save (debounced) ---
     function debouncedDraftSave() {
@@ -1299,6 +1212,63 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Submit ---
     document.getElementById('submit-round').addEventListener('click', submitRound);
+
+    // --- Desktop shorthand entry events ---
+    var shorthandInput = document.getElementById('shorthand-input');
+    var shorthandBtn = document.getElementById('shorthand-enter-btn');
+
+    if (shorthandInput) {
+        shorthandInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleShorthandEnter();
+            }
+        });
+        shorthandInput.addEventListener('input', function () {
+            this.classList.remove('is-error');
+            var err = document.getElementById('shorthand-error');
+            if (err) err.style.display = 'none';
+        });
+    }
+
+    if (shorthandBtn) {
+        shorthandBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            handleShorthandEnter();
+        });
+    }
+
+    /* ── Click-to-edit on desktop table rows ── */
+    document.getElementById('scorecard-area').addEventListener('click', function (e) {
+        var row = e.target.closest('tr[data-hole]');
+        if (!row) return;
+        /* Ignore clicks on subtotal rows */
+        if (row.classList.contains('subtotal-row')) return;
+        var holeNum = parseInt(row.dataset.hole);
+        var range = getScorecardRange();
+        if (range.indexOf(holeNum) === -1) return;
+
+        var d = scorecardData[holeNum] || {};
+        if (!d.gross) return;
+
+        var input = document.getElementById('shorthand-input');
+        if (!input) return;
+        input.value = buildShorthand(d);
+        input.focus();
+
+        document.querySelectorAll('#scorecard-area tr.is-current').forEach(function (r) {
+            r.classList.remove('is-current');
+        });
+        row.classList.add('is-current');
+
+        var error = document.getElementById('shorthand-error');
+        if (error) error.style.display = 'none';
+
+        var label = document.getElementById('shorthand-hole-label');
+        if (label) label.textContent = 'Hole ' + holeNum;
+        var counter = document.getElementById('shorthand-counter');
+        if (counter) counter.textContent = 'Editing';
+    });
 
     // --- Draft resume / discard ---
     fetch('/api/drafts/round')
