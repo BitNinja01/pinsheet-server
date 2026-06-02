@@ -74,6 +74,8 @@ def register(app):
         log.info("printables: PDFs already exist, skipping generation")
 
     # 3. Add nav link
+    if not hasattr(app, "_plugin_nav"):
+        app._plugin_nav = []
     app._plugin_nav.append({
         "label": "Printables",
         "url": "/printables",
@@ -84,5 +86,10 @@ def register(app):
 def unregister(app):
     output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
     if output_dir.exists():
-        shutil.rmtree(output_dir)
+        for name in ["scorecard_shorthand.pdf", "scorecard_shorthand_letter.pdf", "bingo.pdf", "bingo_letter.pdf"]:
+            (output_dir / name).unlink(missing_ok=True)
+        try:
+            output_dir.rmdir()
+        except OSError:
+            pass
     app._plugin_nav[:] = [n for n in app._plugin_nav if n.get("page_id") != "printables"]
