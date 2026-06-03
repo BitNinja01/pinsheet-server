@@ -3,7 +3,6 @@
 <div class="ps-topbar">
     <div>
         <div class="ps-eyebrow">Admin</div>
-        <h1 class="ps-headline">Invite Codes</h1>
     </div>
 </div>
 
@@ -22,6 +21,7 @@
 
 <div class="ps-card" style="margin-top: 24px;">
     <div style="padding: 24px;">
+        <h2 class="ps-headline" style="margin: 0 0 16px;">Invite Codes</h2>
         <form method="POST" style="margin-bottom: 24px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn-accent">Generate New Code</button>
