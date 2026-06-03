@@ -1274,3 +1274,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+(function () {
+    var toggles = document.querySelectorAll('.plugin-toggle');
+    if (!toggles.length) return;
+
+    toggles.forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            var pluginName = this.dataset.plugin;
+            var enabled = this.checked;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/admin/plugin-state', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    var row = toggle.closest('.plugin-row');
+                    if (row) {
+                        var badge = row.querySelector('.restart-badge');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'restart-badge';
+                            badge.style.cssText = 'font-size: 11px; color: var(--ps-warning); background: rgba(255,165,0,0.1); padding: 2px 8px; border-radius: 4px;';
+                            badge.textContent = 'Restart required';
+                            var container = row.querySelector('div:last-child');
+                            if (container) container.insertBefore(badge, container.querySelector('.ps-toggle'));
+                        }
+                    }
+                } else {
+                    this.checked = !enabled;
+                }
+            }.bind(this);
+            xhr.send(JSON.stringify({plugin_name: pluginName, enabled: enabled}));
+        });
+    });
+})();
