@@ -20,36 +20,6 @@
 </div>
 {% endif %}
 
-{% if discovered_plugins %}
-<div class="ps-card" style="margin-top: 24px;">
-    <div style="padding: 24px;">
-        <h2 class="ps-headline" style="margin: 0 0 16px;">Plugins</h2>
-        {% for plugin in discovered_plugins %}
-        {% set pname = plugin.plugin_info["name"] %}
-        {% set pver = plugin.plugin_info.get("version", "?") %}
-        {% set pdesc = plugin.plugin_info.get("description", "") %}
-        {% set enabled = plugin_states.get(pname, true) %}
-        {% set needs_restart = plugin_states_at_startup.get(pname) != enabled %}
-        <div class="plugin-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: var(--ps-rule) solid var(--ps-rule-c);">
-            <div>
-                <div style="font-weight: 500;">{{ pname }} <span style="color: var(--ps-ink-3); font-size: 12px;">v{{ pver }}</span></div>
-                {% if pdesc %}<div style="color: var(--ps-ink-2); font-size: 13px; margin-top: 2px;">{{ pdesc }}</div>{% endif %}
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                {% if needs_restart %}
-                <span class="restart-badge" style="font-size: 11px; color: var(--ps-warn); background: rgba(255, 165, 0, 0.1); padding: 2px 8px; border-radius: 4px;">Restart required</span>
-                {% endif %}
-                <label class="settings-toggle" style="padding: 0; gap: 0;">
-                    <input type="checkbox" class="plugin-toggle" data-plugin="{{ pname }}" {% if enabled %}checked{% endif %}>
-                </label>
-            </div>
-        </div>
-        {% endfor %}
-        <p style="color: var(--ps-ink-3); font-size: 12px; margin: 12px 0 0;">Changes take effect on server restart.</p>
-    </div>
-</div>
-{% endif %}
-
 <div class="ps-card" style="margin-top: 24px;">
     <div style="padding: 24px;">
         <form method="POST" style="margin-bottom: 24px;">
@@ -84,4 +54,34 @@
         </table>
     </div>
 </div>
+
+{% if discovered_plugins %}
+<div class="ps-card" style="margin-top: 24px;">
+    <div style="padding: 24px;">
+        <h2 class="ps-headline" style="margin: 0 0 16px;">Plugins</h2>
+        {% for plugin in discovered_plugins %}
+        {% set pname = plugin.plugin_info["name"] %}
+        {% set pver = plugin.plugin_info.get("version", "?") %}
+        {% set pdesc = plugin.plugin_info.get("description", "") %}
+        {% set enabled = plugin_states.get(pname, true) %}
+        {% set needs_restart = plugin_states_at_startup.get(pname) != enabled %}
+        <div class="plugin-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: var(--ps-rule) solid var(--ps-rule-c);">
+            <div>
+                <div style="font-weight: 500;">{{ pname }} <span style="color: var(--ps-ink-3); font-size: 12px;">v{{ pver }}</span></div>
+                {% if pdesc %}<div style="color: var(--ps-ink-2); font-size: 13px; margin-top: 2px;">{{ pdesc }}</div>{% endif %}
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                {% if needs_restart %}
+                <span class="restart-badge" style="font-size: 11px; color: var(--ps-warn); background: rgba(255, 165, 0, 0.1); padding: 2px 8px; border-radius: 4px;">Restart required</span>
+                {% endif %}
+                <label class="settings-toggle" style="padding: 0; gap: 0;">
+                    <input type="checkbox" class="plugin-toggle" data-plugin="{{ pname }}" {% if enabled %}checked{% endif %}>
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+        <p style="color: var(--ps-ink-3); font-size: 12px; margin: 12px 0 0;">Changes take effect on server restart.</p>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
