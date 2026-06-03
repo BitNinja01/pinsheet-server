@@ -97,6 +97,11 @@ def init_db() -> None:
             used_at     TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS plugin_states (
+            plugin_name TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1
+        );
+
     """)
     db.commit()
     db.close()

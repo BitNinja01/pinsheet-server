@@ -276,3 +276,38 @@ def test_rounds_isolated_by_user(db):
     assert len(get_all_rounds(user_id=1)) == 1
     assert len(get_all_rounds(user_id=2)) == 1
     db.close()
+
+
+class TestPluginStates:
+    def test_seed_creates_enabled_row(self, db):
+        from source.store import seed_plugin_state, get_plugin_states, set_plugin_state
+        seed_plugin_state("test-plugin")
+        states = get_plugin_states()
+        assert states["test-plugin"] is True
+
+    def test_seed_is_idempotent(self, db):
+        from source.store import seed_plugin_state, get_plugin_states
+        seed_plugin_state("test-plugin")
+        seed_plugin_state("test-plugin")
+        states = get_plugin_states()
+        assert states["test-plugin"] is True
+
+    def test_set_plugin_state_disables(self, db):
+        from source.store import seed_plugin_state, set_plugin_state, get_plugin_states
+        seed_plugin_state("test-plugin")
+        set_plugin_state("test-plugin", False)
+        states = get_plugin_states()
+        assert states["test-plugin"] is False
+
+    def test_set_plugin_state_re_enables(self, db):
+        from source.store import seed_plugin_state, set_plugin_state, get_plugin_states
+        seed_plugin_state("test-plugin")
+        set_plugin_state("test-plugin", False)
+        set_plugin_state("test-plugin", True)
+        states = get_plugin_states()
+        assert states["test-plugin"] is True
+
+    def test_get_plugin_states_returns_empty_dict_when_no_rows(self, db):
+        from source.store import get_plugin_states
+        states = get_plugin_states()
+        assert states == {}

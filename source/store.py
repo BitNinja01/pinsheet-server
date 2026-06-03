@@ -354,6 +354,33 @@ def consume_invite_code(code: str, used_by: int) -> bool:
     return affected > 0
 
 
+def seed_plugin_state(plugin_name: str) -> None:
+    db = get_db()
+    db.execute(
+        "INSERT OR IGNORE INTO plugin_states (plugin_name, enabled) VALUES (?, 1)",
+        (plugin_name,),
+    )
+    db.commit()
+    db.close()
+
+
+def get_plugin_states() -> dict[str, bool]:
+    db = get_db()
+    rows = db.execute("SELECT plugin_name, enabled FROM plugin_states").fetchall()
+    db.close()
+    return {r["plugin_name"]: bool(r["enabled"]) for r in rows}
+
+
+def set_plugin_state(plugin_name: str, enabled: bool) -> None:
+    db = get_db()
+    db.execute(
+        "INSERT OR REPLACE INTO plugin_states (plugin_name, enabled) VALUES (?, ?)",
+        (plugin_name, 1 if enabled else 0),
+    )
+    db.commit()
+    db.close()
+
+
 def get_invite_codes() -> list:
     db = get_db()
     rows = db.execute("""
