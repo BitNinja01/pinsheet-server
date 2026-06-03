@@ -208,6 +208,8 @@ def main():
     app._plugin_blocks = {}
     app._plugin_nav = []
     app._plugin_course_actions = []
+    app._discovered_plugins = []
+    app._plugin_states_at_startup = {}
     discover_plugins(app)
 
     register_routes(app, limiter, csrf, User)
