@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import create_invite_code, get_invite_codes
+from store import create_invite_code, get_invite_codes, get_plugin_states
 from calc import (
     calc_scoring_average, calc_fir_percent, calc_gir_percent,
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
@@ -317,8 +317,14 @@ def register_stats_routes(app):
             base_url = request.host_url.rstrip("/")
             return render_template("admin_invites.html", **base_context(
                 codes=get_invite_codes(), new_code=code, base_url=base_url,
+                plugin_states=get_plugin_states(),
+                discovered_plugins=getattr(current_app, "_discovered_plugins", []),
+                plugin_states_at_startup=getattr(current_app, "_plugin_states_at_startup", {}),
             ))
 
         return render_template("admin_invites.html", **base_context(
             codes=get_invite_codes(), new_code=None, base_url=None,
+            plugin_states=get_plugin_states(),
+            discovered_plugins=getattr(current_app, "_discovered_plugins", []),
+            plugin_states_at_startup=getattr(current_app, "_plugin_states_at_startup", {}),
         ))
