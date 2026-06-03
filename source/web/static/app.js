@@ -1297,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             badge.style.cssText = 'font-size: 11px; color: var(--ps-warn); background: rgba(255,165,0,0.1); padding: 2px 8px; border-radius: 4px;';
                             badge.textContent = 'Restart required';
                             var container = row.querySelector('div:last-child');
-                            if (container) container.insertBefore(badge, container.querySelector('.ps-toggle'));
+                            if (container) container.insertBefore(badge, container.querySelector('.settings-toggle'));
                         }
                     }
                 } else {
