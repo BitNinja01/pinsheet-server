@@ -1,9 +1,9 @@
 import logging
 
-from flask import request, jsonify, current_app
+from flask import request, jsonify
 from flask_login import login_required, current_user
 
-from source.store import set_plugin_state, get_plugin_states
+from store import set_plugin_state
 
 _log = logging.getLogger("pinsheet")
 
@@ -16,7 +16,9 @@ def register_admin_routes(app, csrf):
         if not current_user.is_admin:
             return "Forbidden", 403
 
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "Invalid JSON"}), 400
         plugin_name = data.get("plugin_name", "")
         enabled = bool(data.get("enabled", True))
 
