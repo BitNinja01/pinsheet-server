@@ -1304,6 +1304,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.checked = !enabled;
                 }
             }.bind(this);
+            xhr.onerror = function () {
+                toggle.checked = !enabled;
+            };
             xhr.send(JSON.stringify({plugin_name: pluginName, enabled: enabled}));
         });
     });
