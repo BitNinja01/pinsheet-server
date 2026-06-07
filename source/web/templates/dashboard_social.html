@@ -16,27 +16,66 @@
             <div class="ps-eyebrow">Leaderboard</div>
             <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">All players ranked</div>
         </div>
+        <form method="get" action="/" class="ps-filters">
+            <input type="hidden" name="tab" value="board">
+            <input type="hidden" name="sort" value="{{ current_sort }}">
+            <input type="hidden" name="desc" value="{{ '1' if current_desc else '0' }}">
+            <input type="date" name="from" value="{{ date_from }}" style="font-family:var(--ps-font-mono);font-size:11px;padding:4px 8px;border:1px solid var(--ps-rule-c);background:transparent;color:var(--ps-ink-2);text-transform:uppercase;letter-spacing:0.08em;">
+            <input type="date" name="to" value="{{ date_to }}" style="font-family:var(--ps-font-mono);font-size:11px;padding:4px 8px;border:1px solid var(--ps-rule-c);background:transparent;color:var(--ps-ink-2);text-transform:uppercase;letter-spacing:0.08em;">
+            <button type="submit" class="ps-btn">Filter</button>
+            {% if date_from or date_to %}
+            <a href="?tab=board&sort={{ current_sort }}&desc={{ '1' if current_desc else '0' }}" class="ps-btn ps-btn--ghost">Clear</a>
+            {% endif %}
+        </form>
     </div>
     <table class="ps-table">
         <thead>
             <tr>
                 <th>Player</th>
-                <th class="r">Handicap</th>
-                <th class="r">Avg Score</th>
-                <th class="r">FIR%</th>
-                <th class="r">GIR%</th>
-                <th class="r">Putts</th>
-                <th class="r">Scramble%</th>
+                {% for key in board_stats %}
+                {% set meta = stat_meta[key] %}
+                {% set new_desc = '0' if current_sort != key else ('0' if current_desc else '1') %}
+                <th class="r">
+                    <a href="?tab=board&sort={{ key }}&desc={{ new_desc }}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+                       style="color:{% if current_sort == key %}var(--ps-accent){% else %}inherit{% endif %};text-decoration:none;">
+                        {{ meta.label }}
+                        {% if current_sort == key %}
+                        <span>{{ '▲' if not current_desc else '▼' }}</span>
+                        {% endif %}
+                    </a>
+                </th>
+                {% endfor %}
             </tr>
         </thead>
         <tbody>
+            {% if rankings %}
+            {% for entry in rankings %}
             <tr>
-                <td colspan="7">
+                <td>
+                    <div class="ps-course">{{ entry.display_name }}</div>
+                </td>
+                {% for key in board_stats %}
+                {% set val = entry.stats[key] %}
+                <td class="r">
+                    {% if val is not none %}
+                    {% set meta = stat_meta[key] %}
+                    {{ '%.1f'|format(val) }}{{ meta.suffix }}
+                    {% else %}
+                    <span style="color:var(--ps-ink-3);">&mdash;</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="{{ 1 + board_stats|length }}">
                     <div class="empty-state">
                         <p class="placeholder">No data yet — log some rounds to populate The Board.</p>
                     </div>
                 </td>
             </tr>
+            {% endif %}
         </tbody>
     </table>
 </section>

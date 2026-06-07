@@ -10,6 +10,7 @@ from calc import (
     calc_handicap_values_in_range, calc_career_low_handicap,
     compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
     calc_course_handicap,
+    compute_rankings, STAT_META, BOARD_STATS,
 )
 
 from source.web.charts import sparkline_svg, make_chart_data
@@ -212,7 +213,29 @@ def register_dashboard_routes(app, limiter, csrf):
     def dashboard():
         if not get_settings().get("welcome_shown"):
             return render_template("welcome.html", **base_context())
-        return render_template("dashboard_social.html", **base_context(current_page="dashboard"))
+        sort_key = request.args.get("sort", "handicap")
+        sort_desc = request.args.get("desc", "0") == "1"
+        date_start = request.args.get("from") or None
+        date_end = request.args.get("to") or None
+        rankings = compute_rankings(
+            sort_key=sort_key,
+            sort_desc=sort_desc,
+            date_start=date_start,
+            date_end=date_end,
+        )
+        return render_template(
+            "dashboard_social.html",
+            **base_context(
+                current_page="dashboard",
+                rankings=rankings,
+                current_sort=sort_key,
+                current_desc=sort_desc,
+                date_from=date_start or "",
+                date_to=date_end or "",
+                stat_meta=STAT_META,
+                board_stats=BOARD_STATS,
+            ),
+        )
 
     @app.route("/profile")
     @login_required
