@@ -9,6 +9,7 @@
 </div>
 
 <form method="post" class="settings-form" style="margin-top: 24px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if error %}
     <div style="color:var(--ps-warn);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);margin-bottom:16px;">{{ error }}</div>
     {% endif %}
