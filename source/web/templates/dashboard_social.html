@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% set active_tab = request.args.get('tab', 'board') %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">PinSheet</div>
+        <h1 class="ps-h1">The social tee sheet</h1>
+    </div>
+</div>
+
+<div class="ps-tabs">
+    <a href="/?tab=board" class="ps-tab {% if active_tab == 'board' %}is-active{% endif %}">The Board</a>
+    <a href="/?tab=matches" class="ps-tab {% if active_tab == 'matches' %}is-active{% endif %}">Matches</a>
+    <a href="/?tab=challenges" class="ps-tab {% if active_tab == 'challenges' %}is-active{% endif %}">Challenges</a>
+</div>
+
+{% if active_tab == 'board' %}
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Leaderboard</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">All players ranked</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th class="r">Handicap</th>
+                <th class="r">Avg Score</th>
+                <th class="r">FIR%</th>
+                <th class="r">GIR%</th>
+                <th class="r">Putts</th>
+                <th class="r">Scramble%</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="7">
+                    <div class="empty-state">
+                        <p class="placeholder">No data yet — log some rounds to populate The Board.</p>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+{% elif active_tab == 'matches' %}
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Head to head</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Your matches</div>
+        </div>
+        <a href="#" class="ps-btn">+ Create Match</a>
+    </div>
+    <div class="empty-state">
+        <p class="placeholder">No matches yet. Create one to challenge another player.</p>
+    </div>
+</section>
+
+{% elif active_tab == 'challenges' %}
+<section>
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Competitions</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Active challenges</div>
+        </div>
+        <a href="#" class="ps-btn">+ Create Challenge</a>
+    </div>
+    <div class="empty-state">
+        <p class="placeholder">No challenges yet. Create one to compete on any stat.</p>
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}

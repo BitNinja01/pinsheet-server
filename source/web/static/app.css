@@ -242,6 +242,35 @@ body {
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
 }
 
+/* ── Tabs ──────────────────────────────────────────────────────────── */
+.ps-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+    margin-bottom: var(--ps-sp-6);
+}
+.ps-tab {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+    text-decoration: none;
+    padding: var(--ps-sp-3) var(--ps-sp-5);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color var(--ps-dur-quick) var(--ps-ease),
+                border-color var(--ps-dur-quick) var(--ps-ease);
+}
+.ps-tab:hover {
+    color: var(--ps-ink);
+}
+.ps-tab.is-active {
+    color: var(--ps-ink);
+    border-bottom-color: var(--ps-accent);
+}
+
 /* ── Eyebrow ───────────────────────────────────────────────────────── */
 .ps-eyebrow {
     font-family: var(--ps-font-mono);

@@ -210,10 +210,9 @@ def register_dashboard_routes(app, limiter, csrf):
     @app.route("/")
     @login_required
     def dashboard():
-        ctx = _build_profile_context()
-        if ctx is None:
+        if not get_settings().get("welcome_shown"):
             return render_template("welcome.html", **base_context())
-        return render_template("dashboard.html", **base_context(current_page="dashboard", **ctx))
+        return render_template("dashboard_social.html", **base_context(current_page="dashboard"))
 
     @app.route("/profile")
     @login_required
