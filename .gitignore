@@ -197,3 +197,7 @@ cython_debug/
 .aider*
 CLAUDE.md
 fonts/
+
+# Standalone social feature demos (source of truth for EPIC_001)
+PinSheet Social - Matches (Standalone).html
+PinSheet Social - The Board (Standalone).html
