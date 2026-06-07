@@ -3,13 +3,6 @@
 
 {% set active_tab = request.args.get('tab', 'board') %}
 
-<div class="ps-topbar">
-    <div>
-        <div class="ps-eyebrow">PinSheet</div>
-        <h1 class="ps-h1">The social tee sheet</h1>
-    </div>
-</div>
-
 <div class="ps-tabs">
     <a href="/?tab=board" class="ps-tab {% if active_tab == 'board' %}is-active{% endif %}">The Board</a>
     <a href="/?tab=matches" class="ps-tab {% if active_tab == 'matches' %}is-active{% endif %}">Matches</a>
