@@ -89,9 +89,36 @@
         </div>
         <a href="/matches/new" class="ps-btn">+ Create Match</a>
     </div>
+    {% if matches %}
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th class="r">Players</th>
+                <th class="r">Rounds</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in matches %}
+            <tr class="clickable-row" data-href="/matches/{{ m.id }}">
+                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ m.date }}</td>
+                <td>
+                    <div class="ps-course">{{ m.course_name }}</div>
+                </td>
+                <td class="r">{{ m.player_count }}</td>
+                <td class="r">{{ m.round_count }}</td>
+                <td style="text-transform:capitalize;">{{ m.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
     <div class="empty-state">
         <p class="placeholder">No matches yet. Create one to challenge another player.</p>
     </div>
+    {% endif %}
 </section>
 
 {% elif active_tab == 'challenges' %}

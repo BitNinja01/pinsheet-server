@@ -4,7 +4,7 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_user_by_id, save_settings, get_slope_rating
+from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
@@ -234,6 +234,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 date_to=date_end or "",
                 stat_meta=STAT_META,
                 board_stats=BOARD_STATS,
+                matches=get_all_matches(),
             ),
         )
 
