@@ -137,6 +137,33 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
     return result
 
 
+def get_round_by_id(round_id: int) -> RoundData | None:
+    db = get_db()
+    row = db.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+    db.close()
+    if not row:
+        return None
+    r = {
+        "date": row["date"],
+        "index": row["round_index"],
+        "user_id": row["user_id"],
+        "course": row["course_name"],
+        "tees": row["tee_name"],
+        "holes_played": row["holes_played"],
+        "holes_selection": _norm_holes(row["holes_played"]),
+        "entry_mode": row["entry_mode"],
+        "holes": json.loads(row["holes"]) if row["holes"] else {},
+        "total_gross": row["total_gross"],
+        "differential": row["differential"],
+        "notes": row["notes"],
+        "excluded": bool(row["excluded"]),
+        "computed_handicap": row["computed_handicap"],
+    }
+    if row["total_putts"]:
+        r["total_putts"] = row["total_putts"]
+    return dict_to_round(r)
+
+
 def save_round(golf_round, date, index, user_id: int = 1) -> None:
     db = get_db()
     total_putts = None

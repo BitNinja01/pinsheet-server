@@ -33,33 +33,64 @@
 <section style="margin-top: 24px;">
     <div class="ps-row ps-between" style="margin-bottom: 16px;">
         <div>
-            <div class="ps-eyebrow">Players</div>
-            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Scoreboard</div>
+            <div class="ps-eyebrow">Scoreboard</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Player results</div>
         </div>
     </div>
     <table class="ps-table">
         <thead>
             <tr>
                 <th>Player</th>
-                <th class="r">Rounds</th>
+                <th>Round</th>
+                <th class="r">Gross</th>
+                <th class="r">Net</th>
+                <th class="r">+/-</th>
+                <th class="r">FIR</th>
+                <th class="r">GIR</th>
+                <th class="r">Putts</th>
                 <th class="r">Total Net</th>
             </tr>
         </thead>
         <tbody>
             {% for p in players %}
-            <tr>
-                <td>
-                    <div class="ps-course">{{ p.user_name }}</div>
+            {% set p_rounds = player_rounds.get(p.user_id, []) %}
+            {% if p_rounds %}
+            {% for rd in p_rounds %}
+            <tr{% if loop.last and p.is_winner %} style="border-bottom: 2px solid var(--ps-accent);"{% endif %}>
+                {% if loop.first %}
+                <td rowspan="{{ p_rounds|length }}" style="vertical-align: middle;">
+                    <div class="ps-course">{{ p.user_name }}{% if p.is_winner %} <span style="color:var(--ps-accent);font-size:11px;">WINNER</span>{% endif %}</div>
                 </td>
-                <td class="r">{{ p.round_count }}</td>
+                {% endif %}
+                <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);">#{{ rd.round_id }}</td>
+                <td class="r">{{ rd.gross }}</td>
+                <td class="r">{{ rd.net }}</td>
                 <td class="r">
-                    {% if p.round_count > 0 %}
-                    <span class="ps-score">{{ '%.0f'|format(p.total_net) }}</span>
+                    {% if rd.score_to_par is not none %}
+                    <span class="ps-topar{% if rd.score_to_par < 0 %} is-under{% endif %}">{{ '%+d'|format(rd.score_to_par) }}</span>
                     {% else %}
                     <span style="color:var(--ps-ink-3);">&mdash;</span>
                     {% endif %}
                 </td>
+                <td class="r">{{ rd.fir_display or '—' }}</td>
+                <td class="r">{{ rd.gir_display or '—' }}</td>
+                <td class="r">{{ rd.putts }}</td>
+                {% if loop.first %}
+                <td rowspan="{{ p_rounds|length }}" class="r" style="vertical-align: middle;">
+                    <span class="ps-score">{{ '%.0f'|format(p.total_net) }}</span>
+                </td>
+                {% endif %}
             </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td>
+                    <div class="ps-course">{{ p.user_name }}</div>
+                </td>
+                <td colspan="7" style="color:var(--ps-ink-3);">No rounds linked</td>
+                <td class="r"><span style="color:var(--ps-ink-3);">&mdash;</span></td>
+            </tr>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>

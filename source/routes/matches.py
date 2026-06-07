@@ -2,9 +2,42 @@ from datetime import date
 from flask import render_template, request, redirect, url_for, g
 from flask_login import login_required, current_user
 from store import (
-    create_match, add_match_player, get_match, get_match_players, get_users,
+    create_match, add_match_player, get_match, get_match_players,
+    get_match_rounds, get_round_by_id, get_users,
 )
 from source.request_data import base_context, get_courses
+from calc import per_round_hole_stats
+
+
+def _build_round_details(match_rounds):
+    courses_dict = get_courses()
+    details = []
+    for mr in match_rounds:
+        rd = get_round_by_id(mr["round_id"])
+        if not rd:
+            continue
+        course_data = courses_dict.get(rd.course, {})
+        hs = per_round_hole_stats(rd.holes, course_data.get("holes", {})) if course_data else {}
+        gross = int(rd.total_gross) if rd.total_gross else 0
+        net = int(mr["net"]) if mr["net"] else 0
+        score_to_par = None
+        if course_data and gross:
+            played_par = int(course_data.get("par", 72))
+            score_to_par = gross - played_par
+        details.append({
+            "user_id": mr["user_id"],
+            "user_name": mr["user_name"],
+            "round_id": mr["round_id"],
+            "gross": gross,
+            "net": net,
+            "fir_display": hs.get("fir_display", "--"),
+            "gir_display": hs.get("gir_display", "--"),
+            "putts": hs.get("total_putts", "--"),
+            "score_to_par": score_to_par,
+            "date": rd.date,
+            "course": rd.course,
+        })
+    return details
 
 
 def register_matches_routes(app):
@@ -55,6 +88,16 @@ def register_matches_routes(app):
         if not match:
             return "Match not found.", 404
         players = get_match_players(match_id)
+        match_rounds = get_match_rounds(match_id)
+        round_details = _build_round_details(match_rounds)
+        if players:
+            min_net = min(p["total_net"] for p in players)
+            for p in players:
+                p["is_winner"] = p["total_net"] == min_net and p["round_count"] > 0
+        player_rounds = {}
+        for rd in round_details:
+            player_rounds.setdefault(rd["user_id"], []).append(rd)
         return render_template("match_detail.html", **base_context(
             current_page="matches", match=match, players=players,
+            round_details=round_details, player_rounds=player_rounds,
         ))
