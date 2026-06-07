@@ -6,6 +6,7 @@ def register_routes(app, limiter, csrf, User):
     from source.routes.settings import register_settings_routes
     from source.routes.stats import register_stats_routes
     from source.routes.admin import register_admin_routes
+    from source.routes.matches import register_matches_routes
 
     register_auth_routes(app, limiter, User)
     register_dashboard_routes(app, limiter, csrf)
@@ -14,3 +15,4 @@ def register_routes(app, limiter, csrf, User):
     register_settings_routes(app, csrf)
     register_stats_routes(app)
     register_admin_routes(app, csrf)
+    register_matches_routes(app)

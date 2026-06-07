@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Match</div>
+        <h1 class="ps-h1">{{ match.course_name }} <em>match</em>.</h1>
+    </div>
+    <div class="ps-row">
+        <a href="/?tab=matches" class="ps-btn ps-btn--ghost">Back to Matches</a>
+    </div>
+</div>
+
+<div class="ps-stat-strip">
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Date</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ match.date }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Status</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);text-transform:capitalize;">{{ match.status }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Players</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ match.player_count }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Rounds</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ match.round_count }}</div>
+    </div>
+</div>
+
+<section style="margin-top: 24px;">
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Players</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Scoreboard</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th class="r">Rounds</th>
+                <th class="r">Total Net</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in players %}
+            <tr>
+                <td>
+                    <div class="ps-course">{{ p.user_name }}</div>
+                </td>
+                <td class="r">{{ p.round_count }}</td>
+                <td class="r">
+                    {% if p.round_count > 0 %}
+                    <span class="ps-score">{{ '%.0f'|format(p.total_net) }}</span>
+                    {% else %}
+                    <span style="color:var(--ps-ink-3);">&mdash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
