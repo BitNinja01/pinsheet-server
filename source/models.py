@@ -52,6 +52,44 @@ class CourseData:
     tees: dict[str, TeeData] = field(default_factory=dict)
 
 
+@dataclass
+class MatchData:
+    id: int = 0
+    created_by: int = 0
+    course_name: str = ""
+    date: str = ""
+    status: str = "active"
+    created_at: str = ""
+
+
+@dataclass
+class MatchPlayerData:
+    id: int = 0
+    match_id: int = 0
+    user_id: int = 0
+
+
+@dataclass
+class MatchRoundData:
+    id: int = 0
+    match_id: int = 0
+    user_id: int = 0
+    round_id: int = 0
+    net: float = 0.0
+
+
+@dataclass
+class ChallengeData:
+    id: int = 0
+    created_by: int = 0
+    title: str = ""
+    stat_key: str = ""
+    start_date: str = ""
+    end_date: str = ""
+    status: str = "active"
+    created_at: str = ""
+
+
 def dict_to_hole(d: dict) -> HoleData:
     return HoleData(
         gross=int(d.get("gross", 0)),

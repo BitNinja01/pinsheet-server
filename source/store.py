@@ -403,3 +403,209 @@ def get_invite_codes() -> list:
             "used_at": r["used_at"],
         })
     return result
+
+
+def create_match(created_by: int, course_name: str, date: str) -> int:
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO matches (created_by, course_name, date) VALUES (?, ?, ?)",
+        (created_by, course_name, date),
+    )
+    db.commit()
+    match_id = cur.lastrowid
+    db.close()
+    _log.info("match created: id=%s", match_id)
+    return match_id
+
+
+def get_match(match_id: int) -> dict | None:
+    db = get_db()
+    row = db.execute(
+        """SELECT m.*,
+           (SELECT COUNT(*) FROM match_players WHERE match_id = m.id) as player_count,
+           (SELECT COUNT(*) FROM match_rounds WHERE match_id = m.id) as round_count
+           FROM matches m WHERE m.id = ?""",
+        (match_id,),
+    ).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
+def get_all_matches() -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        """SELECT m.*,
+           (SELECT COUNT(*) FROM match_players WHERE match_id = m.id) as player_count,
+           (SELECT COUNT(*) FROM match_rounds WHERE match_id = m.id) as round_count
+           FROM matches m ORDER BY m.created_at DESC"""
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def complete_match(match_id: int) -> None:
+    db = get_db()
+    db.execute("UPDATE matches SET status = 'completed' WHERE id = ?", (match_id,))
+    db.commit()
+    db.close()
+    _log.info("match completed: id=%s", match_id)
+
+
+def add_match_player(match_id: int, user_id: int) -> int:
+    db = get_db()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO match_players (match_id, user_id) VALUES (?, ?)",
+        (match_id, user_id),
+    )
+    db.commit()
+    player_id = cur.lastrowid
+    db.close()
+    return player_id
+
+
+def remove_match_player(match_id: int, user_id: int) -> bool:
+    db = get_db()
+    db.execute(
+        "DELETE FROM match_rounds WHERE match_id = ? AND user_id = ?",
+        (match_id, user_id),
+    )
+    cur = db.execute(
+        "DELETE FROM match_players WHERE match_id = ? AND user_id = ?",
+        (match_id, user_id),
+    )
+    db.commit()
+    affected = cur.rowcount
+    db.close()
+    return affected > 0
+
+
+def link_round(match_id: int, user_id: int, round_id: int, net: float) -> int:
+    db = get_db()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO match_rounds (match_id, user_id, round_id, net) VALUES (?, ?, ?, ?)",
+        (match_id, user_id, round_id, net),
+    )
+    db.commit()
+    link_id = cur.lastrowid
+    db.close()
+    return link_id
+
+
+def unlink_round(match_id: int, user_id: int, round_id: int) -> bool:
+    db = get_db()
+    cur = db.execute(
+        "DELETE FROM match_rounds WHERE match_id = ? AND user_id = ? AND round_id = ?",
+        (match_id, user_id, round_id),
+    )
+    db.commit()
+    affected = cur.rowcount
+    db.close()
+    return affected > 0
+
+
+def get_match_rounds(match_id: int) -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        """SELECT mr.*, u.display_name as user_name
+           FROM match_rounds mr
+           JOIN users u ON mr.user_id = u.id
+           WHERE mr.match_id = ?
+           ORDER BY mr.user_id, mr.id""",
+        (match_id,),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def get_match_players(match_id: int) -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        """SELECT mp.*, u.display_name as user_name,
+           COALESCE(SUM(mr.net), 0) as total_net,
+           COUNT(mr.id) as round_count
+           FROM match_players mp
+           JOIN users u ON mp.user_id = u.id
+           LEFT JOIN match_rounds mr ON mr.match_id = mp.match_id AND mr.user_id = mp.user_id
+           WHERE mp.match_id = ?
+           GROUP BY mp.id
+                       ORDER BY total_net ASC""",
+        (match_id,),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def create_challenge(created_by: int, title: str, stat_key: str, start_date: str, end_date: str) -> int:
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO challenges (created_by, title, stat_key, start_date, end_date) VALUES (?, ?, ?, ?, ?)",
+        (created_by, title, stat_key, start_date, end_date),
+    )
+    db.commit()
+    challenge_id = cur.lastrowid
+    db.close()
+    _log.info("challenge created: id=%s title=%s", challenge_id, title)
+    return challenge_id
+
+
+def get_challenge(challenge_id: int) -> dict | None:
+    db = get_db()
+    row = db.execute(
+        """SELECT c.*,
+           (SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = c.id) as participant_count
+           FROM challenges c WHERE c.id = ?""",
+        (challenge_id,),
+    ).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
+def get_all_challenges() -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        """SELECT c.*,
+           (SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = c.id) as participant_count
+           FROM challenges c ORDER BY c.created_at DESC"""
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def add_challenge_participant(challenge_id: int, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "INSERT OR IGNORE INTO challenge_participants (challenge_id, user_id) VALUES (?, ?)",
+        (challenge_id, user_id),
+    )
+    db.commit()
+    db.close()
+
+
+def remove_challenge_participant(challenge_id: int, user_id: int) -> bool:
+    db = get_db()
+    cur = db.execute(
+        "DELETE FROM challenge_participants WHERE challenge_id = ? AND user_id = ?",
+        (challenge_id, user_id),
+    )
+    db.commit()
+    affected = cur.rowcount
+    db.close()
+    return affected > 0
+
+
+def get_challenge_participants(challenge_id: int) -> list[int]:
+    db = get_db()
+    rows = db.execute(
+        "SELECT user_id FROM challenge_participants WHERE challenge_id = ?",
+        (challenge_id,),
+    ).fetchall()
+    db.close()
+    return [r["user_id"] for r in rows]
+
+
+def complete_challenge(challenge_id: int) -> None:
+    db = get_db()
+    db.execute("UPDATE challenges SET status = 'completed' WHERE id = ?", (challenge_id,))
+    db.commit()
+    db.close()
+    _log.info("challenge completed: id=%s", challenge_id)
