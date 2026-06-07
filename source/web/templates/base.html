@@ -36,7 +36,8 @@
                 </div>
                 {% set user_qs = "?user=" + g.view_user.username if not g.is_own_data else "" %}
                 <nav class="ps-nav">
-                    <a href="/{{ user_qs }}" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Dashboard</a>
+                    <a href="/{{ user_qs }}" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Home</a>
+                    <a href="/profile{{ user_qs }}" class="{% if current_page == 'profile' %}is-active{% endif %}">Profile</a>
                     <a href="/rounds{{ user_qs }}" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
                     <a href="/stats{{ user_qs }}" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
                     <a href="/courses{{ user_qs }}" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
