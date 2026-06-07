@@ -109,3 +109,6 @@ from calc.composite import (
     last_n_rounds,
     best_n_rounds,
 )
+from calc.rankings import (
+    compute_rankings,
+)
