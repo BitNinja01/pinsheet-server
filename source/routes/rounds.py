@@ -19,6 +19,7 @@ from calc import (
     calc_scoring_avg_by_par_type, calc_penalties_per_round,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
+    calc_hole_scores,
 )
 from source.web.charts import sparkline_svg
 from source.routes.auth import requires_own_data
@@ -216,12 +217,37 @@ def register_rounds_routes(app, csrf):
                 total_gross += gross
             golf_round["total_gross"] = str(total_gross)
 
+        all_rounds_for_user = get_all_rounds_for_user()
         adjusted_gross = total_gross
+        if data.get("entry_mode") != "score_only" and data.get("holes"):
+            current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+            if current_hi is not None:
+                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    hole_nums = sorted(course_holes.keys(), key=int)
+                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                adjusted_total = 0
+                for hole_num, hole_data in data["holes"].items():
+                    hc_hole = course_holes.get(hole_num, {})
+                    if hc_hole:
+                        par = int(hc_hole.get("par", 0))
+                        stroke_index = int(hc_hole.get("hole_index", 999))
+                        gross = int(hole_data.get("gross", 0))
+                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
+                        adjusted_total += esc_gross
+                    else:
+                        adjusted_total += int(hole_data.get("gross", 0))
+                adjusted_gross = adjusted_total
+
         differential = calc_round_dif(slope, adjusted_gross, rating)
         golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
-        all_rounds_for_user = get_all_rounds_for_user()
         all_rounds_for_user.insert(0, golf_round_typed)
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
@@ -433,6 +459,35 @@ def register_rounds_routes(app, csrf):
             golf_round["total_gross"] = str(total_gross)
 
         adjusted_gross = total_gross
+        if data.get("entry_mode") != "score_only" and data.get("holes"):
+            rounds_before = [
+                r for r in all_rounds_for_user
+                if not (r.date == date and str(r.index) == str(index))
+            ]
+            current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
+            if current_hi is not None:
+                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    hole_nums = sorted(course_holes.keys(), key=int)
+                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                adjusted_total = 0
+                for hole_num, hole_data in data["holes"].items():
+                    hc_hole = course_holes.get(hole_num, {})
+                    if hc_hole:
+                        par = int(hc_hole.get("par", 0))
+                        stroke_index = int(hc_hole.get("hole_index", 999))
+                        gross = int(hole_data.get("gross", 0))
+                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
+                        adjusted_total += esc_gross
+                    else:
+                        adjusted_total += int(hole_data.get("gross", 0))
+                adjusted_gross = adjusted_total
+
         differential = calc_round_dif(slope, adjusted_gross, rating)
         golf_round["differential"] = str(differential)
 
