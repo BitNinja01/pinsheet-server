@@ -50,15 +50,14 @@
         <tbody>
             {% if rankings %}
             {% for entry in rankings %}
-            {% set is_you = (g.view_user.username == entry.username) %}
-            <tr{% if is_you %} class="is-you"{% endif %}>
+            <tr>
                 <td>
                     <div style="display:flex;align-items:center;gap:10px;">
                         {% set initials = [] %}
                         {% for w in entry.display_name.split() %}
                         {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
                         {% endfor %}
-                        <div class="ps-avatar{% if is_you %} is-self{% endif %}">{{ initials | join('') }}</div>
+                        <div class="ps-avatar">{{ initials | join('') }}</div>
                         <div class="ps-course">{{ entry.display_name }}</div>
                     </div>
                 </td>
@@ -80,9 +79,9 @@
                     {% else %}
                       {% set raw = 0.5 %}
                     {% endif %}
-                    <span{% if is_leader %} class="ps-leader{% if is_you %} is-self{% endif %}"{% endif %}>{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}</span>
+                    <span{% if is_leader %} class="ps-leader"{% endif %}>{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}</span>
                     <div class="ps-minibar">
-                        <div class="ps-minibar-fill{% if is_you %} is-self{% endif %}" style="width:{{ (raw * 100) | round }}%;"></div>
+                        <div class="ps-minibar-fill" style="width:{{ (raw * 100) | round }}%;"></div>
                     </div>
                     {% else %}
                     <span style="color:var(--ps-ink-3);">&mdash;</span>
