@@ -1,7 +1,7 @@
 import json
 from datetime import date, timedelta, datetime
 
-from flask import render_template, request, jsonify, g, current_app
+from flask import render_template, request, redirect, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches, get_all_challenges, create_challenge, add_challenge_participant, get_challenge, get_challenge_participants, get_all_rounds, get_users as store_get_users
