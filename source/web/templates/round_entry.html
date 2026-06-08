@@ -89,6 +89,17 @@ window._courses = {{ courses|tojson }};
         <div class="hole-cards" id="hole-cards-area"></div>
     </div>
 
+    <div class="wizard-step" data-step="match" style="display:none">
+        <label class="step-label">Add to Match (optional)</label>
+        <select class="step-input" id="round-match">
+            <option value="">No match</option>
+            {% for m in matches %}
+            <option value="{{ m.id }}">{{ m.course_name }} — {{ m.date }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-accent" id="match-continue" style="margin-top:0.75rem">Continue</button>
+    </div>
+
     <div class="wizard-step" data-step="notes" style="display:none">
         <label class="step-label">Notes</label>
         <textarea class="step-input" id="round-notes" rows="3"

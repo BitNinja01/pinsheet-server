@@ -164,7 +164,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
     return dict_to_round(r)
 
 
-def save_round(golf_round, date, index, user_id: int = 1) -> None:
+def save_round(golf_round, date, index, user_id: int = 1) -> int:
     db = get_db()
     total_putts = None
     holes = golf_round.get("holes", {})
@@ -173,7 +173,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> None:
             int(h.get("putts", 0) or 0)
             for h in holes.values()
         )
-    db.execute(
+    cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
             entry_mode, holes, total_gross, total_putts, differential, notes, excluded, computed_handicap)
@@ -195,9 +195,11 @@ def save_round(golf_round, date, index, user_id: int = 1) -> None:
             golf_round.get("computed_handicap", ""),
         ),
     )
+    round_id = cur.lastrowid
     db.commit()
     db.close()
-    _log.info("round saved: %s #%s course=%s", date, index, golf_round.get("course", "?"))
+    _log.info("round saved: %s #%s course=%s id=%s", date, index, golf_round.get("course", "?"), round_id)
+    return round_id
 
 
 def delete_round(date: str, index: str, user_id: int = 1) -> None:
@@ -465,6 +467,20 @@ def get_all_matches() -> list[dict]:
            (SELECT COUNT(*) FROM match_players WHERE match_id = m.id) as player_count,
            (SELECT COUNT(*) FROM match_rounds WHERE match_id = m.id) as round_count
            FROM matches m ORDER BY m.created_at DESC"""
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def get_matches_for_user(user_id: int) -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        """SELECT m.*
+           FROM matches m
+           JOIN match_players mp ON mp.match_id = m.id
+           WHERE mp.user_id = ? AND m.status = 'active'
+           ORDER BY m.created_at DESC""",
+        (user_id,),
     ).fetchall()
     db.close()
     return [dict(r) for r in rows]

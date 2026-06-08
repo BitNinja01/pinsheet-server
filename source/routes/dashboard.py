@@ -4,7 +4,7 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches
+from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches, get_all_challenges, create_challenge, add_challenge_participant, get_challenge, get_challenge_participants, get_all_rounds, get_users as store_get_users
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
@@ -18,6 +18,7 @@ from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
+from source.web.catalog import STAT_CATALOG
 
 
 def _build_profile_context():
@@ -235,8 +236,73 @@ def register_dashboard_routes(app, limiter, csrf):
                 stat_meta=STAT_META,
                 board_stats=BOARD_STATS,
                 matches=get_all_matches(),
+                challenges=get_all_challenges(),
             ),
         )
+
+    @app.route("/challenges/new", methods=["GET", "POST"])
+    @login_required
+    def challenge_new():
+        if not g.is_own_data:
+            return "You can only create challenges for yourself.", 403
+        if request.method == "POST":
+            title = request.form.get("title", "").strip()
+            participant_ids = request.form.getlist("participants")
+            start_date = request.form.get("start_date", "").strip()
+            end_date = request.form.get("end_date", "").strip()
+            stat_key = request.form.get("stat_key", "").strip()
+
+            all_users = store_get_users()
+            valid_stat_keys = {s["key"] for s in STAT_CATALOG}
+
+            if not title:
+                return render_template("challenge_new.html", **base_context(
+                    current_page="dashboard", users=all_users,
+                    today=date.today().isoformat(), stat_catalog=STAT_CATALOG,
+                    error="Title is required.",
+                ))
+            if len(participant_ids) < 2:
+                return render_template("challenge_new.html", **base_context(
+                    current_page="dashboard", users=all_users,
+                    today=date.today().isoformat(), stat_catalog=STAT_CATALOG,
+                    error="At least 2 participants are required.",
+                ))
+            if not start_date or not end_date:
+                return render_template("challenge_new.html", **base_context(
+                    current_page="dashboard", users=all_users,
+                    today=date.today().isoformat(), stat_catalog=STAT_CATALOG,
+                    error="Start and end dates are required.",
+                ))
+            if start_date > end_date:
+                return render_template("challenge_new.html", **base_context(
+                    current_page="dashboard", users=all_users,
+                    today=date.today().isoformat(), stat_catalog=STAT_CATALOG,
+                    error="End date must be after start date.",
+                ))
+            if stat_key not in valid_stat_keys:
+                return render_template("challenge_new.html", **base_context(
+                    current_page="dashboard", users=all_users,
+                    today=date.today().isoformat(), stat_catalog=STAT_CATALOG,
+                    error="Invalid stat selected.",
+                ))
+
+            challenge_id = create_challenge(
+                created_by=current_user.id,
+                title=title,
+                stat_key=stat_key,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            for uid_str in participant_ids:
+                add_challenge_participant(challenge_id, int(uid_str))
+            return redirect(f"/challenges/{challenge_id}")
+
+        return render_template("challenge_new.html", **base_context(
+            current_page="dashboard",
+            users=store_get_users(),
+            today=date.today().isoformat(),
+            stat_catalog=STAT_CATALOG,
+        ))
 
     @app.route("/profile")
     @login_required
@@ -245,6 +311,60 @@ def register_dashboard_routes(app, limiter, csrf):
         if ctx is None:
             return render_template("welcome.html", **base_context())
         return render_template("dashboard.html", **base_context(current_page="profile", **ctx))
+
+    @app.route("/challenges/<int:challenge_id>")
+    @login_required
+    def challenge_detail(challenge_id):
+        challenge = get_challenge(challenge_id)
+        if not challenge:
+            return "Challenge not found.", 404
+        participant_ids = get_challenge_participants(challenge_id)
+        all_users = store_get_users()
+        user_lookup = {u["id"]: u for u in all_users}
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
+        include_9hole = get_settings().get("include_9hole", True)
+        stat_entry = next((s for s in STAT_CATALOG if s["key"] == challenge["stat_key"]), {})
+        fn_primary = stat_entry.get("fn_primary")
+        higher_better = stat_entry.get("higher_better", True)
+
+        leaderboard = []
+        for uid in participant_ids:
+            user = user_lookup.get(uid, {"display_name": f"User #{uid}"})
+            rounds = get_all_rounds(uid)
+            scoped = [
+                r for r in rounds
+                if r.date >= challenge["start_date"] and r.date <= challenge["end_date"]
+            ]
+            value = None
+            round_count = len(scoped)
+            if scoped and fn_primary:
+                try:
+                    val = fn_primary(scoped, scoped, courses_dict, include_9hole)
+                    if val is not None:
+                        value = round(val, 1)
+                except Exception:
+                    pass
+            leaderboard.append({
+                "user_id": uid,
+                "display_name": user.get("display_name", f"User #{uid}"),
+                "value": value,
+                "round_count": round_count,
+            })
+
+        non_none = [x for x in leaderboard if x["value"] is not None]
+        none_vals = [x for x in leaderboard if x["value"] is None]
+        non_none.sort(key=lambda x: x["value"], reverse=higher_better)
+        leaderboard = non_none + none_vals
+
+        if leaderboard and leaderboard[0]["value"] is not None:
+            leaderboard[0]["is_leader"] = True
+
+        return render_template("challenge_detail.html", **base_context(
+            current_page="dashboard",
+            challenge=challenge,
+            leaderboard=leaderboard,
+            stat_entry=stat_entry,
+        ))
 
     @app.route("/api/welcome", methods=["POST"])
     @login_required

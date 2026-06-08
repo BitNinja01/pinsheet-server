@@ -128,11 +128,40 @@
             <div class="ps-eyebrow">Competitions</div>
             <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Active challenges</div>
         </div>
-        <a href="#" class="ps-btn">+ Create Challenge</a>
+        <a href="/challenges/new" class="ps-btn">+ Create Challenge</a>
     </div>
+    {% if challenges %}
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Stat</th>
+                <th>From</th>
+                <th>To</th>
+                <th class="r">Players</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in challenges %}
+            <tr class="clickable-row" data-href="/challenges/{{ c.id }}">
+                <td>
+                    <div class="ps-course">{{ c.title }}</div>
+                </td>
+                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ c.stat_key }}</td>
+                <td style="color: var(--ps-ink-2);">{{ c.start_date }}</td>
+                <td style="color: var(--ps-ink-2);">{{ c.end_date }}</td>
+                <td class="r">{{ c.participant_count }}</td>
+                <td style="text-transform:capitalize;">{{ c.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
     <div class="empty-state">
         <p class="placeholder">No challenges yet. Create one to compete on any stat.</p>
     </div>
+    {% endif %}
 </section>
 {% endif %}
 

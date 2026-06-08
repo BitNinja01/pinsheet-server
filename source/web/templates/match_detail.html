@@ -36,6 +36,9 @@
             <div class="ps-eyebrow">Scoreboard</div>
             <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Player results</div>
         </div>
+        {% if is_participant %}
+        <a href="/matches/{{ match.id }}/link-round" class="ps-btn">+ Link Round</a>
+        {% endif %}
     </div>
     <table class="ps-table">
         <thead>

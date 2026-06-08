@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var wizard = document.getElementById("round-wizard");
     if (!wizard) return;
 
-    var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'notes'];
+    var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'match', 'notes'];
     var draftTimer = null;
     var scorecardData = {};
     var _editingHole = null;
@@ -771,6 +771,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         buildScorecardGrid();
         saveDraft();
+
+        var range = getScorecardRange();
+        var nextIdx = range.indexOf(holeNum) + 1;
+        if (nextIdx >= range.length) {
+            showStep('match');
+        }
     }
 
     function updateRunningStats() {
@@ -1035,6 +1041,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var entryMode = (document.querySelector('input[name="entry_mode"]:checked') || {}).value || 'detailed';
         var notes = document.getElementById('round-notes').value;
 
+        var matchSelect = document.getElementById('round-match');
+        var matchId = matchSelect ? matchSelect.value : '';
+
         var payload = {
             date: date,
             course: courseName,
@@ -1043,6 +1052,7 @@ document.addEventListener('DOMContentLoaded', function () {
             transport: transport,
             entry_mode: entryMode,
             notes: notes,
+            match_id: matchId || null,
         };
 
         if (entryMode === 'detailed') {
@@ -1141,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showStep('holes_detail');
             } else {
                 addGrossScoreInput();
-                showStep('notes');
+                showStep('match');
             }
         });
     });
@@ -1159,6 +1169,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     wizard.addEventListener('change', debouncedDraftSave);
     wizard.addEventListener('input', debouncedDraftSave);
+
+    // --- Match step ---
+    var matchContinue = document.getElementById('match-continue');
+    if (matchContinue) {
+        matchContinue.addEventListener('click', function () {
+            showStep('notes');
+        });
+    }
 
     // --- Submit ---
     document.getElementById('submit-round').addEventListener('click', submitRound);

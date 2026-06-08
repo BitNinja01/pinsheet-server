@@ -8,6 +8,7 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_slope_rating, save_round, delete_round,
+    get_matches_for_user, link_round,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -37,9 +38,11 @@ def register_rounds_routes(app, csrf):
             return "You can only enter data for yourself.", 403
         today = date.today().isoformat()
         no_courses = len(get_courses()) == 0
+        matches = get_matches_for_user(current_user.id)
         return render_template("round_entry.html", **base_context(
             current_page="round_entry",
             courses=get_courses(), today=today, no_courses=no_courses,
+            matches=matches,
         ))
 
     @app.route("/rounds")
@@ -175,6 +178,7 @@ def register_rounds_routes(app, csrf):
         date_val = data.get("date", "")
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
+        match_id = data.get("match_id")
 
         course = get_courses().get(course_name, {})
         tees = course.get("tees", {}).get(tees_name, {})
@@ -224,9 +228,31 @@ def register_rounds_routes(app, csrf):
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        save_round(golf_round, date_val, 0, current_user.id)
+        round_id = save_round(golf_round, date_val, 0, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
         index = 0
+
+        if match_id and golf_round.get("computed_handicap"):
+            try:
+                match_id = int(match_id)
+                hi = float(golf_round["computed_handicap"])
+                adj_hi = hi / 2 if holes_sel != "all" else hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    if golf_round.get("holes"):
+                        played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in golf_round.get("holes", {}))
+                    else:
+                        hole_nums = sorted(course_holes.keys(), key=int)
+                        half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                        played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                ch = calc_course_handicap(adj_hi, played_par, slope, rating)
+                net = total_gross - ch
+                link_round(match_id, current_user.id, round_id, float(net))
+            except (ValueError, TypeError, Exception) as exc:
+                _log.warning("match linking failed — %s", exc)
+
         redirect_url = None
         for plugin in _plugins:
             fn = getattr(plugin, "post_save_redirect", None)

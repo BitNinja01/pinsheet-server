@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Challenge</div>
+        <h1 class="ps-h1">{{ challenge.title }}</h1>
+    </div>
+    <div class="ps-row">
+        <a href="/?tab=challenges" class="ps-btn ps-btn--ghost">Back to Challenges</a>
+    </div>
+</div>
+
+<div class="ps-stat-strip">
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Stat</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">
+            {{ stat_entry.get('label', challenge.stat_key) }}
+            {% if stat_entry.get('higher_better') %}&#8593;{% else %}&#8595;{% endif %}
+        </div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">From</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.start_date }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">To</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.end_date }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Status</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);text-transform:capitalize;">{{ challenge.status }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Players</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.participant_count }}</div>
+    </div>
+</div>
+
+<section style="margin-top: 24px;">
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Leaderboard</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Ranked by {{ stat_entry.get('label', challenge.stat_key) }}</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th class="r">{{ stat_entry.get('label', challenge.stat_key) }}</th>
+                <th class="r">Rounds</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in leaderboard %}
+            <tr{% if p.get('is_leader') %} style="border-bottom: 2px solid var(--ps-accent);"{% endif %}>
+                <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);">
+                    {{ loop.index }}{% if p.get('is_leader') %}&#9733;{% endif %}
+                </td>
+                <td>
+                    <div class="ps-course{% if p.get('is_leader') %}" style="color:var(--ps-accent);{% endif %}">{{ p.display_name }}{% if p.get('is_leader') %} <span style="color:var(--ps-accent);font-size:11px;">LEADER</span>{% endif %}</div>
+                </td>
+                <td class="r">
+                    {% if p.value is not none %}
+                    <span class="ps-score">{{ '%.1f'|format(p.value) }}{{ stat_entry.get('suffix', '') }}</span>
+                    {% else %}
+                    <span style="color:var(--ps-ink-3);">&mdash;</span>
+                    {% endif %}
+                </td>
+                <td class="r" style="color:var(--ps-ink-2);">{{ p.round_count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
