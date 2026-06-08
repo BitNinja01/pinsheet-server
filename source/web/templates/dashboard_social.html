@@ -129,38 +129,34 @@
         <a href="/matches/new" class="ps-btn">+ Create Match</a>
     </div>
     {% if matches %}
-    <table class="ps-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Course</th>
-                <th class="r">Players</th>
-                <th class="r">Rounds</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in matches %}
-            <tr class="clickable-row" data-href="/matches/{{ m.id }}">
-                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ m.date }}</td>
-                <td>
+    <div class="ps-card-list">
+        {% for m in matches %}
+        <a href="/matches/{{ m.id }}" class="ps-card is-clickable">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
                     <div class="ps-course">{{ m.course_name }}</div>
-                </td>
-                <td class="r">{{ m.player_count }}</td>
-                <td class="r">{{ m.round_count }}</td>
-                <td>
-                    <span class="ps-status">
-                        <span class="ps-status-dot{% if m.status == 'active' %} is-active{% elif m.status == 'completed' %} is-completed{% endif %}"></span>
-                        {{ m.status }}
-                    </span>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    <div style="display:flex;gap:var(--ps-sp-4);margin-top:4px;color:var(--ps-ink-2);font-size:var(--ps-fs-eyebrow);letter-spacing:0.04em;">
+                        <span>{{ m.date }}</span>
+                        <span>{{ m.player_count }} player{{ 's' if m.player_count != 1 }}</span>
+                        <span>{{ m.round_count }} round{{ 's' if m.round_count != 1 }}</span>
+                    </div>
+                </div>
+                <span class="ps-status">
+                    <span class="ps-status-dot{% if m.status == 'active' %} is-active{% elif m.status == 'completed' %} is-completed{% endif %}"></span>
+                    {{ m.status }}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+        <a href="/matches/new" class="ps-card ps-card--create">
+            <div class="ps-card--create-icon">+</div>
+            <div class="ps-card--create-text">Create a match<br>for the crew</div>
+        </a>
+    </div>
     {% else %}
     <div class="empty-state">
         <p class="placeholder">No matches yet. Create one to challenge another player.</p>
+        <a href="/matches/new" class="ps-btn" style="margin-top:var(--ps-sp-3);">+ Create Match</a>
     </div>
     {% endif %}
 </section>
@@ -175,40 +171,34 @@
         <a href="/challenges/new" class="ps-btn">+ Create Challenge</a>
     </div>
     {% if challenges %}
-    <table class="ps-table">
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Stat</th>
-                <th>From</th>
-                <th>To</th>
-                <th class="r">Players</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in challenges %}
-            <tr class="clickable-row" data-href="/challenges/{{ c.id }}">
-                <td>
+    <div class="ps-card-list">
+        {% for c in challenges %}
+        <a href="/challenges/{{ c.id }}" class="ps-card is-clickable">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
                     <div class="ps-course">{{ c.title }}</div>
-                </td>
-                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ c.stat_key }}</td>
-                <td style="color: var(--ps-ink-2);">{{ c.start_date }}</td>
-                <td style="color: var(--ps-ink-2);">{{ c.end_date }}</td>
-                <td class="r">{{ c.participant_count }}</td>
-                <td>
-                    <span class="ps-status">
-                        <span class="ps-status-dot{% if c.status == 'active' %} is-active{% elif c.status == 'completed' %} is-completed{% endif %}"></span>
-                        {{ c.status }}
-                    </span>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    <div style="display:flex;gap:var(--ps-sp-4);margin-top:4px;color:var(--ps-ink-2);font-size:var(--ps-fs-eyebrow);letter-spacing:0.04em;">
+                        <span>{{ c.stat_key }}</span>
+                        <span>{{ c.start_date }} → {{ c.end_date }}</span>
+                        <span>{{ c.participant_count }} player{{ 's' if c.participant_count != 1 }}</span>
+                    </div>
+                </div>
+                <span class="ps-status">
+                    <span class="ps-status-dot{% if c.status == 'active' %} is-active{% elif c.status == 'completed' %} is-completed{% endif %}"></span>
+                    {{ c.status }}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+        <a href="/challenges/new" class="ps-card ps-card--create">
+            <div class="ps-card--create-icon">+</div>
+            <div class="ps-card--create-text">Create a challenge<br>for the crew</div>
+        </a>
+    </div>
     {% else %}
     <div class="empty-state">
         <p class="placeholder">No challenges yet. Create one to compete on any stat.</p>
+        <a href="/challenges/new" class="ps-btn" style="margin-top:var(--ps-sp-3);">+ Create Challenge</a>
     </div>
     {% endif %}
 </section>
