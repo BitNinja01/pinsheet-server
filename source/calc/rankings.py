@@ -84,3 +84,18 @@ def compute_rankings(
     rankings.sort(key=_sort_key, reverse=reverse)
 
     return rankings
+
+
+def compute_board_meta(rankings, board_stats, stat_meta):
+    meta = {}
+    for key in board_stats:
+        vals = [e["stats"][key] for e in rankings if e["stats"][key] is not None]
+        if not vals:
+            meta[key] = {"min": None, "max": None, "avg": None}
+        else:
+            meta[key] = {
+                "min": min(vals),
+                "max": max(vals),
+                "avg": sum(vals) / len(vals),
+            }
+    return meta

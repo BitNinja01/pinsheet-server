@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 
+{# Compute value range for mini bar #}
+{% set vals = leaderboard | map(attribute='value') | select('not none') | list %}
+{% set vmin = (vals | min) if vals else none %}
+{% set vmax = (vals | max) if vals else none %}
+{% set vrange = (vmax - vmin) if (vmin is not none and vmax is not none and vmax > vmin) else 0 %}
+{% set higher_better = stat_entry.get('higher_better', true) %}
+
 <div class="ps-topbar">
     <div>
         <div class="ps-eyebrow">Challenge</div>
@@ -49,22 +56,38 @@
             <tr>
                 <th>Rank</th>
                 <th>Player</th>
-                <th class="r">{{ stat_entry.get('label', challenge.stat_key) }}</th>
+                <th class="r" style="width:120px;">{{ stat_entry.get('label', challenge.stat_key) }}</th>
                 <th class="r">Rounds</th>
             </tr>
         </thead>
         <tbody>
             {% for p in leaderboard %}
-            <tr{% if p.get('is_leader') %} style="border-bottom: 2px solid var(--ps-accent);"{% endif %}>
-                <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);">
-                    {{ loop.index }}{% if p.get('is_leader') %}&#9733;{% endif %}
+            {% set is_leader = p.get('is_leader', false) %}
+            <tr{% if is_leader %} style="border-left:2px solid var(--ps-accent);"{% endif %}>
+                <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);width:40px;">
+                    {{ loop.index }}
                 </td>
                 <td>
-                    <div class="ps-course{% if p.get('is_leader') %}" style="color:var(--ps-accent);{% endif %}">{{ p.display_name }}{% if p.get('is_leader') %} <span style="color:var(--ps-accent);font-size:11px;">LEADER</span>{% endif %}</div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% set initials = [] %}
+                        {% for w in p.display_name.split() %}
+                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+                        {% endfor %}
+                        <div class="ps-avatar" style="{% if is_leader %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+                        <div>
+                            <div class="ps-course" style="{% if is_leader %}color:var(--ps-accent);{% endif %}">{{ p.display_name }}</div>
+                            {% if is_leader %}<div class="ps-eyebrow" style="color:var(--ps-accent);margin-top:2px;">LEADER</div>{% endif %}
+                        </div>
+                    </div>
                 </td>
-                <td class="r">
+                <td class="r" style="vertical-align:middle;">
                     {% if p.value is not none %}
-                    <span class="ps-score">{{ '%.1f'|format(p.value) }}{{ stat_entry.get('suffix', '') }}</span>
+                    {% set raw = ((p.value - vmin) / vrange) if vrange > 0 else 0.5 %}
+                    {% if not higher_better %}{% set raw = 1 - raw %}{% endif %}
+                    <span{% if is_leader %} class="ps-leader"{% endif %}>{{ '%.1f'|format(p.value) }}{{ stat_entry.get('suffix', '') }}</span>
+                    <div class="ps-minibar">
+                        <div class="ps-minibar-fill" style="width:{{ (raw * 100) | round }}%;"></div>
+                    </div>
                     {% else %}
                     <span style="color:var(--ps-ink-3);">&mdash;</span>
                     {% endif %}

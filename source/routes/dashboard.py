@@ -10,7 +10,7 @@ from calc import (
     calc_handicap_values_in_range, calc_career_low_handicap,
     compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
     calc_course_handicap,
-    compute_rankings, STAT_META, BOARD_STATS,
+    compute_rankings, compute_board_meta, STAT_META, BOARD_STATS,
 )
 
 from source.web.charts import sparkline_svg, make_chart_data
@@ -224,11 +224,13 @@ def register_dashboard_routes(app, limiter, csrf):
             date_start=date_start,
             date_end=date_end,
         )
+        board_meta = compute_board_meta(rankings, BOARD_STATS, STAT_META)
         return render_template(
             "dashboard_social.html",
             **base_context(
                 current_page="dashboard",
                 rankings=rankings,
+                board_meta=board_meta,
                 current_sort=sort_key,
                 current_desc=sort_desc,
                 date_from=date_start or "",

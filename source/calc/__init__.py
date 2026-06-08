@@ -111,6 +111,7 @@ from calc.composite import (
 )
 from calc.rankings import (
     compute_rankings,
+    compute_board_meta,
     STAT_META,
     BOARD_STATS,
 )

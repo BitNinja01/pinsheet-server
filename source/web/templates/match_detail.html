@@ -61,8 +61,18 @@
             {% for rd in p_rounds %}
             <tr{% if loop.last and p.is_winner %} style="border-bottom: 2px solid var(--ps-accent);"{% endif %}>
                 {% if loop.first %}
-                <td rowspan="{{ p_rounds|length }}" style="vertical-align: middle;">
-                    <div class="ps-course">{{ p.user_name }}{% if p.is_winner %} <span style="color:var(--ps-accent);font-size:11px;">WINNER</span>{% endif %}</div>
+                <td rowspan="{{ p_rounds|length }}" style="vertical-align: middle;{% if p.is_winner %} border-left: 2px solid var(--ps-accent); padding-left: 10px;{% endif %}">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% set initials = [] %}
+                        {% for w in p.user_name.split() %}
+                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+                        {% endfor %}
+                        <div class="ps-avatar" style="{% if p.is_winner %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+                        <div>
+                            <div class="ps-course" style="{% if p.is_winner %}color:var(--ps-accent);{% endif %}">{{ p.user_name }}</div>
+                            {% if p.is_winner %}<div class="ps-eyebrow" style="color:var(--ps-accent);margin-top:2px;">WINNER</div>{% endif %}
+                        </div>
+                    </div>
                 </td>
                 {% endif %}
                 <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);">#{{ rd.round_id }}</td>
@@ -88,7 +98,14 @@
             {% else %}
             <tr>
                 <td>
-                    <div class="ps-course">{{ p.user_name }}</div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% set initials = [] %}
+                        {% for w in p.user_name.split() %}
+                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+                        {% endfor %}
+                        <div class="ps-avatar">{{ initials | join('') }}</div>
+                        <div class="ps-course">{{ p.user_name }}</div>
+                    </div>
                 </td>
                 <td colspan="7" style="color:var(--ps-ink-3);">No rounds linked</td>
                 <td class="r"><span style="color:var(--ps-ink-3);">&mdash;</span></td>

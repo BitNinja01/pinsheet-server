@@ -839,6 +839,68 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .ps-stat .ps-stat-delta.is-down { color: var(--ps-warn); }
 
+/* ── Avatar ─────────────────────────────────────────────────────────── */
+.ps-avatar {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    background: var(--ps-paper-2);
+    color: var(--ps-ink-2);
+    font-family: var(--ps-font-mono);
+    font-weight: var(--ps-fw-label);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.ps-avatar.is-self {
+    background: var(--ps-ink);
+    color: var(--ps-paper);
+    border-color: var(--ps-ink);
+}
+
+/* ── Mini bar (stat cells in tables) ───────────────────────────────── */
+.ps-minibar {
+    height: 4px;
+    background: var(--ps-rule-c);
+    position: relative;
+    margin-top: 5px;
+    overflow: hidden;
+}
+.ps-minibar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--ps-accent);
+}
+.ps-minibar-fill.is-self {
+    background: var(--ps-paper);
+}
+
+/* ── Leader value ──────────────────────────────────────────────────── */
+.ps-leader { color: var(--ps-accent); font-weight: var(--ps-fw-label); }
+.ps-leader.is-self { color: var(--ps-paper); }
+
+/* ── Status chip ─────────────────────────────────────────────────────── */
+.ps-status-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.ps-status-dot.is-active { background: var(--ps-accent); }
+.ps-status-dot.is-completed { background: var(--ps-ink-3); }
+.ps-status-dot.is-draft { background: var(--ps-ink-3); opacity: 0.5; }
+
+/* ── Self row in tables ────────────────────────────────────────────── */
+.ps-table tbody tr.is-you td {
+    background: var(--ps-ink) !important;
+    color: var(--ps-paper);
+    border-bottom-color: rgba(255,255,255,0.12);
+}
+.ps-table tbody tr.is-you td .ps-course,
+.ps-table tbody tr.is-you td .ps-score,
+.ps-table tbody tr.is-you td a,
+.ps-table tbody tr.is-you td .ps-avatar {
+    color: var(--ps-paper);
+    border-color: var(--ps-paper);
+}
+
 /* Stats grid (3-column numeric cells) */
 .stats-grid {
     display: grid;

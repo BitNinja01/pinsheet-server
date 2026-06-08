@@ -50,16 +50,40 @@
         <tbody>
             {% if rankings %}
             {% for entry in rankings %}
-            <tr>
+            {% set is_you = (g.view_user.username == entry.username) %}
+            <tr{% if is_you %} class="is-you"{% endif %}>
                 <td>
-                    <div class="ps-course">{{ entry.display_name }}</div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% set initials = [] %}
+                        {% for w in entry.display_name.split() %}
+                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+                        {% endfor %}
+                        <div class="ps-avatar{% if is_you %} is-self{% endif %}">{{ initials | join('') }}</div>
+                        <div class="ps-course">{{ entry.display_name }}</div>
+                    </div>
                 </td>
                 {% for key in board_stats %}
                 {% set val = entry.stats[key] %}
-                <td class="r">
+                <td class="r" style="vertical-align:middle;">
                     {% if val is not none %}
-                    {% set meta = stat_meta[key] %}
-                    {{ '%.1f'|format(val) }}{{ meta.suffix }}
+                    {% set cm = board_meta[key] %}
+                    {% set is_leader = (cm.min is not none) and (
+                      (stat_meta[key].higher_better and val >= cm.max) or
+                      (not stat_meta[key].higher_better and val <= cm.min)
+                    ) %}
+                    {% set cm_range = cm.max - cm.min %}
+                    {% if cm_range > 0 %}
+                      {% set raw = (val - cm.min) / cm_range %}
+                      {% if not stat_meta[key].higher_better %}
+                        {% set raw = 1 - raw %}
+                      {% endif %}
+                    {% else %}
+                      {% set raw = 0.5 %}
+                    {% endif %}
+                    <span{% if is_leader %} class="ps-leader{% if is_you %} is-self{% endif %}"{% endif %}>{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}</span>
+                    <div class="ps-minibar">
+                        <div class="ps-minibar-fill{% if is_you %} is-self{% endif %}" style="width:{{ (raw * 100) | round }}%;"></div>
+                    </div>
                     {% else %}
                     <span style="color:var(--ps-ink-3);">&mdash;</span>
                     {% endif %}
@@ -67,6 +91,21 @@
                 {% endfor %}
             </tr>
             {% endfor %}
+            <tr style="border-top:2px solid var(--ps-ink);">
+                <td>
+                    <div class="ps-eyebrow" style="color:var(--ps-ink-2);">Crew average</div>
+                </td>
+                {% for key in board_stats %}
+                {% set cm = board_meta[key] %}
+                <td class="r" style="color:var(--ps-ink-3);font-size:var(--ps-fs-table-num);">
+                    {% if cm.avg is not none %}
+                    {{ '%.1f'|format(cm.avg) }}{{ stat_meta[key].suffix }}
+                    {% else %}
+                    &mdash;
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
             {% else %}
             <tr>
                 <td colspan="{{ 1 + board_stats|length }}">
@@ -109,7 +148,12 @@
                 </td>
                 <td class="r">{{ m.player_count }}</td>
                 <td class="r">{{ m.round_count }}</td>
-                <td style="text-transform:capitalize;">{{ m.status }}</td>
+                <td>
+                    <span class="ps-status">
+                        <span class="ps-status-dot{% if m.status == 'active' %} is-active{% elif m.status == 'completed' %} is-completed{% endif %}"></span>
+                        {{ m.status }}
+                    </span>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -152,7 +196,12 @@
                 <td style="color: var(--ps-ink-2);">{{ c.start_date }}</td>
                 <td style="color: var(--ps-ink-2);">{{ c.end_date }}</td>
                 <td class="r">{{ c.participant_count }}</td>
-                <td style="text-transform:capitalize;">{{ c.status }}</td>
+                <td>
+                    <span class="ps-status">
+                        <span class="ps-status-dot{% if c.status == 'active' %} is-active{% elif c.status == 'completed' %} is-completed{% endif %}"></span>
+                        {{ c.status }}
+                    </span>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
