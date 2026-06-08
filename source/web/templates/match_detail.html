@@ -30,11 +30,32 @@
     </div>
 </div>
 
+{% set podium_players = players | selectattr('round_count', 'gt', 0) | list | sort(attribute='total_net') %}
+{% if podium_players %}
+<section style="margin-top: 20px;">
+    <div class="ps-eyebrow" style="margin-bottom: var(--ps-sp-3);">Standing</div>
+    <div class="ps-podium">
+        {% for pp in podium_players[:3] %}
+        {% set initials = [] %}
+        {% for w in pp.user_name.split() %}
+        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+        {% endfor %}
+        <div class="ps-podium-item{% if loop.first %} is-first{% endif %}">
+            <div class="ps-podium-rank">{{ loop.index }}</div>
+            <div class="ps-avatar" style="margin:0 auto;{% if loop.first %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+            <div class="ps-podium-name">{{ pp.user_name.split() | first }}</div>
+            <div class="ps-podium-value">{{ '%.0f'|format(pp.total_net) }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 <section style="margin-top: 24px;">
     <div class="ps-row ps-between" style="margin-bottom: 16px;">
         <div>
             <div class="ps-eyebrow">Scoreboard</div>
-            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Player results</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">All rounds</div>
         </div>
         {% if is_participant %}
         <a href="/matches/{{ match.id }}/link-round" class="ps-btn">+ Link Round</a>

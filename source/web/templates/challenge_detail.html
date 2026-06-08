@@ -44,6 +44,27 @@
     </div>
 </div>
 
+{% set podium_top = leaderboard | selectattr('value', 'ne', none) | list[:3] %}
+{% if podium_top %}
+<section style="margin-top: 20px;">
+    <div class="ps-eyebrow" style="margin-bottom: var(--ps-sp-3);">Podium</div>
+    <div class="ps-podium">
+        {% for pp in podium_top %}
+        {% set initials = [] %}
+        {% for w in pp.display_name.split() %}
+        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+        {% endfor %}
+        <div class="ps-podium-item{% if loop.first %} is-first{% endif %}">
+            <div class="ps-podium-rank">{{ loop.index }}</div>
+            <div class="ps-avatar" style="margin:0 auto;{% if loop.first %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+            <div class="ps-podium-name">{{ pp.display_name.split() | first }}</div>
+            <div class="ps-podium-value">{{ '%.1f'|format(pp.value) }}{{ stat_entry.get('suffix', '') }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 <section style="margin-top: 24px;">
     <div class="ps-row ps-between" style="margin-bottom: 16px;">
         <div>
