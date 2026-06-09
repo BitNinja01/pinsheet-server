@@ -34,6 +34,7 @@ pinsheet-import.zip
 # Example / demo data (not for distribution)
 example_data/
 fake_players/
+demo_home_page/
 
 # Design system artifacts (internal)
 design-system/
