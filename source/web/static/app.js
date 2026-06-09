@@ -1154,10 +1154,13 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('input[name="entry_mode"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
             document.getElementById('scorecard-area').innerHTML = '';
+            var holesDetail = document.querySelector('.wizard-step[data-step="holes_detail"]');
             if (this.value === 'detailed') {
+                holesDetail.classList.remove('is-score-only');
                 buildScorecardGrid();
                 showStep('holes_detail');
             } else {
+                holesDetail.classList.add('is-score-only');
                 addGrossScoreInput();
                 showStep('holes_detail');
             }
