@@ -30,12 +30,11 @@
     </div>
 </div>
 
-{% set podium_players = players | selectattr('round_count', 'gt', 0) | list | sort(attribute='total_net') %}
 {% if podium_players %}
 <section style="margin-top: 20px;">
     <div class="ps-eyebrow" style="margin-bottom: var(--ps-sp-3);">Standing</div>
     <div class="ps-podium">
-        {% for pp in podium_players[:3] %}
+        {% for pp in podium_top %}
         {% set initials = [] %}
         {% for w in pp.user_name.split() %}
         {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}

@@ -108,9 +108,13 @@ def register_matches_routes(app):
         player_rounds = {}
         for rd in round_details:
             player_rounds.setdefault(rd["user_id"], []).append(rd)
+        podium_players = [p for p in players if p["round_count"] > 0]
+        podium_players.sort(key=lambda x: x["total_net"])
+        podium_top = podium_players[:3]
         return render_template("match_detail.html", **base_context(
             current_page="matches", match=match, players=players,
             round_details=round_details, player_rounds=player_rounds,
+            podium_players=podium_players, podium_top=podium_top,
             is_participant=is_participant,
         ))
 
