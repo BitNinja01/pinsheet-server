@@ -66,9 +66,7 @@
         <div style="font-family:var(--ps-font-display);font-weight:200;font-size:112px;
                     letter-spacing:-0.05em;line-height:0.85;font-variant-numeric:tabular-nums lining-nums;">
           {% if s.handicap is not none %}
-          <span style="color:var(--ps-ink);">{{ hi_parts[0] }}</span>
-          <span style="color:var(--ps-ink-3);">.</span>
-          <span style="color:var(--ps-accent);">{{ hi_parts[1][0] if hi_parts|length > 1 else '0' }}</span>
+          <span style="color:var(--ps-ink);">{{ hi_parts[0] }}</span><span style="color:var(--ps-ink-3);">.</span><span style="color:var(--ps-accent);">{{ hi_parts[1][0] if hi_parts|length > 1 else '0' }}</span>
           {% else %}
           <span style="color:var(--ps-ink-3);">--</span>
           {% endif %}
