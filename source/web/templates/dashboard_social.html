@@ -70,7 +70,7 @@
     {% endfor %}
 
     {# Column headers #}
-    {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr 100px' %}
+    {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr' %}
     <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
                 padding:11px 16px 10px;align-items:end;flex-shrink:0;">
       <div class="ps-eyebrow">Player</div>
@@ -87,7 +87,6 @@
         </a>
       </div>
       {% endfor %}
-      <div class="ps-eyebrow" style="text-align:right;">Form</div>
     </div>
     <div style="height:0;border-top:1px solid var(--ps-ink);flex-shrink:0;"></div>
 
@@ -152,15 +151,6 @@
           {% endif %}
         </div>
         {% endfor %}
-        <div style="display:flex;justify-content:flex-end;">
-          {% set fs = s.form_svg %}
-          {% if fs %}
-          <svg width="{{ fs.width }}" height="{{ fs.height }}" style="display:block;">
-            <path d="{{ fs.path }}" fill="none" stroke="{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="{{ fs.final_x }}" cy="{{ fs.final_y }}" r="2.4" fill="var(--ps-paper)" stroke="{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }}" stroke-width="1.4"/>
-          </svg>
-          {% endif %}
-        </div>
       </div>
       {% endfor %}
       {% else %}
