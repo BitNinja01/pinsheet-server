@@ -110,15 +110,12 @@
                       letter-spacing:-0.04em;color:{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }};
                       font-variant-numeric:tabular-nums;width:32px;flex-shrink:0;">{{ '%02d' % loop.index }}</div>
           <div class="ps-avatar {{ 'is-self' if is_you }}" style="width:34px;height:34px;font-size:11px;">{{ initials | join('') }}</div>
-          <div>
-            <div style="font-family:var(--ps-font-mono);font-size:14px;line-height:1.2;">
-              {{ entry.display_name }}
-              {% if is_you %}<span style="color:var(--ps-accent);font-size:9px;margin-left:5px;">you</span>{% endif %}
+            <div>
+              <div style="font-family:var(--ps-font-mono);font-size:14px;line-height:1.2;">
+                {{ entry.display_name }}
+                {% if is_you %}<span style="color:var(--ps-accent);font-size:9px;margin-left:5px;">you</span>{% endif %}
+              </div>
             </div>
-            <div style="font-size:9px;color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
-              {{ s.streak }} rd streak
-            </div>
-          </div>
         </div>
         {% for key in board_stats %}
         {% set val = s[key] %}
