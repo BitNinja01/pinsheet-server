@@ -335,7 +335,7 @@ def register_rounds_routes(app, csrf):
         total_gross = front_gross + back_gross
 
         if entry_mode == "score_only":
-            total_gross = int(round_data.gross_total) if round_data.gross_total else 0
+            total_gross = int(round_data.total_gross) if round_data.total_gross else 0
 
         return render_template("round_detail.html", **base_context(
             round=round_data, course=course, holes=holes,
