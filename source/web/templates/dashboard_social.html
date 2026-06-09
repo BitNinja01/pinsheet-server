@@ -193,8 +193,8 @@
       <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
         <div class="ps-eyebrow" style="margin-bottom:12px;">Featured challenge</div>
         {% if featured_challenge %}
-        <a href="/challenges/{{ featured_challenge.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
-                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
+        <div style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
           <div>
             <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
               {{ featured_challenge.title }}
@@ -203,10 +203,21 @@
               {{ featured_challenge.stat_key }} · {{ featured_challenge.start_date }} → {{ featured_challenge.end_date }}
             </div>
           </div>
-          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
-            {{ featured_challenge.participant_count }} player{{ 's' if featured_challenge.participant_count != 1 }} · All challenges →
+          <div>
+            {% for p in featured_challenge.leaderboard[:5] %}
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ps-rule-c);">
+              <span style="font-family:var(--ps-font-display);font-weight:200;font-size:18px;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink-3)' }};width:22px;flex-shrink:0;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+              <span style="font-family:var(--ps-font-mono);font-size:12px;flex:1;color:{{ 'var(--ps-accent)' if p.is_you else 'var(--ps-ink-2)' }};">{{ p.display_name }}{% if p.is_you %}<span style="font-size:9px;margin-left:4px;color:var(--ps-accent);">you</span>{% endif %}</span>
+              <span style="font-family:var(--ps-font-display);font-weight:300;font-size:22px;letter-spacing:-0.02em;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink)' }};font-variant-numeric:tabular-nums lining-nums;">{% if p.value is not none %}{{ '%.1f'|format(p.value) }}{% else %}&mdash;{% endif %}</span>
+            </div>
+            {% endfor %}
+            <div style="margin-top:12px;"><div class="ps-minibar" style="margin-top:0;"><div class="ps-minibar-fill" style="width:{{ (featured_challenge.progress * 100) | round }}%;"></div></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-3);">{{ featured_challenge.submitted_count }} of {{ featured_challenge.participant_count }} submitted</div>
+              <a href="/challenges/{{ featured_challenge.id }}" style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-decoration:none;">All challenges →</a>
+            </div>
           </div>
-        </a>
+        </div>
         {% else %}
         <a href="/challenges/new" class="ps-card ps-card--create" style="flex:1;">
           <div class="ps-card--create-icon">+</div>
@@ -219,19 +230,29 @@
       <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
         <div class="ps-eyebrow" style="margin-bottom:12px;">Featured match</div>
         {% if featured_match %}
-        <a href="/matches/{{ featured_match.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
-                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
+        <div style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
           <div>
             <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
               {{ featured_match.course_name }}
             </div>
             <div class="ps-eyebrow" style="margin-top:4px;">{{ featured_match.date }}</div>
           </div>
-          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
-            {{ featured_match.player_count }} player{{ 's' if featured_match.player_count != 1 }} ·
-            View match →
+          <div>
+            {% for p in featured_match.participants[:5] %}
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ps-rule-c);">
+              <span style="font-family:var(--ps-font-display);font-weight:200;font-size:18px;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink-3)' }};width:22px;flex-shrink:0;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+              <span style="font-family:var(--ps-font-mono);font-size:12px;flex:1;color:{{ 'var(--ps-accent)' if p.is_you else 'var(--ps-ink-2)' }};">{{ p.name }}{% if p.is_you %}<span style="font-size:9px;margin-left:4px;color:var(--ps-accent);">you</span>{% endif %}</span>
+              <span style="font-family:var(--ps-font-display);font-weight:300;font-size:22px;letter-spacing:-0.02em;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink)' }};font-variant-numeric:tabular-nums lining-nums;">{% if p.net_total is not none %}{{ '%.1f'|format(p.net_total) }}{% else %}&mdash;{% endif %}</span>
+            </div>
+            {% endfor %}
+            <div style="margin-top:12px;"><div class="ps-minibar" style="margin-top:0;"><div class="ps-minibar-fill" style="width:{{ (featured_match.progress * 100) | round }}%;"></div></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-3);">{{ featured_match.player_count }} players{% if featured_match.participants[0].round_count %} · through {{ featured_match.participants[0].round_count * 18 }} holes{% endif %}</div>
+              <a href="/matches/{{ featured_match.id }}" style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-decoration:none;">Full scorecard →</a>
+            </div>
           </div>
-        </a>
+        </div>
         {% else %}
         <a href="/matches/new" class="ps-card ps-card--create" style="flex:1;">
           <div class="ps-card--create-icon">+</div>

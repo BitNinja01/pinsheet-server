@@ -29,11 +29,16 @@ def _featured_match():
     players = get_match_players(m["id"])
     participants = []
     for p in players:
+        net_total = round(float(p["total_net"]), 1) if p.get("total_net") else None
         participants.append({
             "name": p["user_name"],
-            "net_total": round(float(p["total_net"]), 1) if p.get("total_net") else None,
+            "net_total": net_total,
             "round_count": p["round_count"],
+            "is_you": p["user_id"] == current_user.id,
         })
+    participants.sort(key=lambda x: (x["net_total"] is None, x["net_total"] or 0))
+    if participants and participants[0]["net_total"] is not None:
+        participants[0]["is_leader"] = True
     match_rounds = get_match_rounds(m["id"])
     max_holes = 18
     completed = 0
@@ -54,19 +59,61 @@ def _featured_match():
 
 
 def _featured_challenge():
+    from datetime import datetime
     challenges = get_all_challenges()
     active = [c for c in challenges if c.get("status") == "active"]
     if not active:
         return None
     c = active[0]
+    participant_ids = get_challenge_participants(c["id"])
+    all_users = store_get_users()
+    user_lookup = {u["id"]: u for u in all_users}
+    courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
+    include_9hole = get_settings().get("include_9hole", True)
+    stat_entry = next((s for s in STAT_CATALOG if s["key"] == c["stat_key"]), {})
+    fn_primary = stat_entry.get("fn_primary")
+    higher_better = stat_entry.get("higher_better", True)
+    leaderboard = []
+    for uid in participant_ids:
+        user = user_lookup.get(uid, {"display_name": f"User #{uid}"})
+        rounds = get_all_rounds(uid)
+        scoped = [r for r in rounds if r.date >= c["start_date"] and r.date <= c["end_date"]]
+        value = None
+        if scoped and fn_primary:
+            try:
+                val = fn_primary(scoped, scoped, courses_dict, include_9hole)
+                if val is not None:
+                    value = round(val, 1)
+            except Exception:
+                pass
+        leaderboard.append({
+            "display_name": user.get("display_name", f"User #{uid}"),
+            "value": value,
+            "round_count": len(scoped),
+            "is_you": uid == current_user.id,
+        })
+    non_none = [x for x in leaderboard if x["value"] is not None]
+    none_vals = [x for x in leaderboard if x["value"] is None]
+    non_none.sort(key=lambda x: x["value"], reverse=higher_better)
+    leaderboard = non_none + none_vals
+    if leaderboard and leaderboard[0]["value"] is not None:
+        leaderboard[0]["is_leader"] = True
+    start = datetime.strptime(c["start_date"], "%Y-%m-%d")
+    end = datetime.strptime(c["end_date"], "%Y-%m-%d")
+    total_days = max((end - start).days, 1)
+    elapsed = max((datetime.now() - start).days, 0)
+    challenge_progress = min(elapsed / total_days, 1.0)
     return {
         "id": c["id"],
         "title": c["title"],
-        "stat_key": c["stat_key"],
+        "stat_key": stat_entry.get("label", c["stat_key"]),
         "start_date": c["start_date"],
         "end_date": c["end_date"],
         "participant_count": c.get("participant_count", 0),
         "status": c.get("status", "active"),
+        "leaderboard": leaderboard,
+        "submitted_count": len(non_none),
+        "progress": challenge_progress,
     }
 
 
