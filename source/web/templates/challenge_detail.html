@@ -44,7 +44,6 @@
     </div>
 </div>
 
-{% set podium_top = (leaderboard | selectattr('value', 'ne', none) | list | batch(3) | first) | default([]) %}
 {% if podium_top %}
 <section style="margin-top: 20px;">
     <div class="ps-eyebrow" style="margin-bottom: var(--ps-sp-3);">Podium</div>

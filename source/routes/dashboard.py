@@ -481,10 +481,13 @@ def register_dashboard_routes(app, limiter, csrf):
         if leaderboard and leaderboard[0]["value"] is not None:
             leaderboard[0]["is_leader"] = True
 
+        podium_top = [p for p in leaderboard if p["value"] is not None][:3]
+
         return render_template("challenge_detail.html", **base_context(
             current_page="dashboard",
             challenge=challenge,
             leaderboard=leaderboard,
+            podium_top=podium_top,
             stat_entry=stat_entry,
         ))
 
