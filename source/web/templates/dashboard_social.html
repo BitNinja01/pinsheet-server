@@ -15,7 +15,7 @@
 
     {# Page header #}
     <div style="padding-bottom:14px;border-bottom:1px solid var(--ps-ink);flex-shrink:0;">
-      <div class="ps-eyebrow">The Board · {{ season_label }}</div>
+      <div style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ps-ink-3);line-height:1.4;">The Board · {{ season_label }}</div>
       <div class="ps-h1" style="margin-top:6px;">Crew<em> standings</em></div>
     </div>
 
@@ -39,7 +39,7 @@
       </div>
       <div class="ps-avatar is-self" style="width:52px;height:52px;font-size:17px;">{{ initials | join('') }}</div>
       <div style="flex:1;min-width:0;">
-        <div class="ps-eyebrow" style="margin-bottom:6px;">Your standing</div>
+        <div style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ps-ink-3);line-height:1.4;margin-bottom:6px;">Your standing</div>
         <div style="font-family:var(--ps-font-display);font-weight:200;font-size:58px;
                     letter-spacing:-0.03em;line-height:0.9;color:var(--ps-ink);">
           {{ current_user.display_name }}
@@ -62,7 +62,7 @@
       </div>
       {% set hi_parts = s.handicap | string | split('.') if s.handicap is not none else ['--'] %}
       <div style="text-align:right;flex-shrink:0;">
-        <div class="ps-eyebrow" style="margin-bottom:4px;text-align:right;">Handicap index</div>
+        <div style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ps-ink-3);line-height:1.4;margin-bottom:4px;text-align:right;">Handicap index</div>
         <div style="font-family:var(--ps-font-display);font-weight:200;font-size:112px;
                     letter-spacing:-0.05em;line-height:0.85;font-variant-numeric:tabular-nums lining-nums;">
           {% if s.handicap is not none %}
@@ -80,13 +80,14 @@
 
     {# Column headers #}
     {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr 100px' %}
+    {% set bw_style = 'font-family:var(--ps-font-mono);font-size:10px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ps-ink-3);line-height:1.4;' %}
     <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
                 padding:11px 16px 10px;align-items:end;flex-shrink:0;">
-      <div class="ps-eyebrow">Player</div>
+      <div style="{{ bw_style }}">Player</div>
       {% for key in board_stats %}
       {% set meta = stat_meta[key] %}
       {% set new_desc = '0' if current_sort != key else ('0' if current_desc else '1') %}
-      <div class="ps-eyebrow" style="text-align:right;">
+      <div style="{{ bw_style }}text-align:right;">
         <a href="?sort={{ key }}&desc={{ new_desc }}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
            style="color:{% if current_sort == key %}var(--ps-accent){% else %}inherit{% endif %};text-decoration:none;">
           {{ meta.label }}
@@ -96,7 +97,7 @@
         </a>
       </div>
       {% endfor %}
-      <div class="ps-eyebrow" style="text-align:right;">Form</div>
+      <div style="{{ bw_style }}text-align:right;">6-rd form</div>
     </div>
     <div style="height:0;border-top:1px solid var(--ps-ink);flex-shrink:0;"></div>
 
@@ -153,8 +154,8 @@
                       color:{{ 'var(--ps-accent)' if is_leader else 'var(--ps-ink)' }};">
             {{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}
           </div>
-          <div class="ps-minibar" style="margin-top:6px;">
-            <div class="ps-minibar-fill {{ 'is-self' if is_you }}" style="width:{{ (raw * 100) | round }}%;"></div>
+          <div style="height:2px;background:var(--ps-rule-c);position:relative;width:100%;margin-top:8px;">
+            <div style="position:absolute;left:0;top:0;bottom:0;background:{{ 'var(--ps-accent)' if is_leader else 'var(--ps-ink-3)' }};width:{{ (raw * 100) | round }}%;"></div>
           </div>
           {% else %}
           <div style="font-family:var(--ps-font-mono);font-size:11px;color:var(--ps-ink-3);">&mdash;</div>
@@ -200,7 +201,7 @@
 
       {# Featured challenge #}
       <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured challenge</div>
+        <div style="{{ bw_style }}margin-bottom:12px;">Featured challenge</div>
         {% if featured_challenge %}
         <a href="/challenges/{{ featured_challenge.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
                    padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
@@ -209,15 +210,15 @@
               <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
                           color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● live</span>
             </div>
-            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+            <div style="font-family:var(--ps-font-display);font-weight:300;font-size:40px;letter-spacing:-0.02em;line-height:0.95;margin-top:10px;">
               {{ featured_challenge.title }}
             </div>
-            <div class="ps-eyebrow" style="margin-top:4px;">
+            <div style="{{ bw_style }}margin-top:6px;">
               {{ featured_challenge.stat_key }} · {{ featured_challenge.start_date }} → {{ featured_challenge.end_date }}
             </div>
           </div>
-          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
-            {{ featured_challenge.participant_count }} player{{ 's' if featured_challenge.participant_count != 1 }} · All challenges →
+          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-3);text-align:right;margin-top:12px;">
+            {{ featured_challenge.participant_count }} players · <span style="color:var(--ps-ink-2);letter-spacing:0.04em;">All challenges →</span>
           </div>
         </a>
         {% else %}
@@ -230,23 +231,19 @@
 
       {# Featured match #}
       <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured match</div>
+        <div style="{{ bw_style }}margin-bottom:12px;">Featured match</div>
         {% if featured_match %}
         <a href="/matches/{{ featured_match.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
                    padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
           <div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
               <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
-                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● {{ featured_match.status }}</span>
+                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● in progress</span>
             </div>
-            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+            <div style="font-family:var(--ps-font-display);font-weight:300;font-size:40px;letter-spacing:-0.02em;line-height:0.95;margin-top:10px;">
               {{ featured_match.course_name }}
             </div>
-            <div class="ps-eyebrow" style="margin-top:4px;">{{ featured_match.date }}</div>
-          </div>
-          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
-            {{ featured_match.player_count }} player{{ 's' if featured_match.player_count != 1 }} ·
-            View match →
+            <div style="{{ bw_style }}margin-top:6px;">{{ featured_match.date }} · {{ featured_match.player_count }} player{{ 's' if featured_match.player_count != 1 }}</div>
           </div>
         </a>
         {% else %}
