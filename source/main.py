@@ -108,6 +108,10 @@ def inject_plugin_globals():
 
 app.jinja_env.globals.setdefault("plugin_info", {})
 
+@app.template_filter("split")
+def _jinja_split(value, separator):
+    return value.split(separator)
+
 
 
 PORT = 8080
