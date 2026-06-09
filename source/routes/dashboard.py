@@ -4,7 +4,7 @@ from datetime import date, timedelta, datetime
 from flask import render_template, request, redirect, jsonify, g, current_app
 from flask_login import login_required, current_user
 
-from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches, get_all_challenges, create_challenge, add_challenge_participant, get_challenge, get_challenge_participants, get_all_rounds, get_users as store_get_users
+from store import get_user_by_id, save_settings, get_slope_rating, get_all_matches, get_all_challenges, create_challenge, add_challenge_participant, get_challenge, get_challenge_participants, get_all_rounds, get_users as store_get_users, get_match_players, get_match_rounds, get_round_by_id
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
@@ -18,6 +18,56 @@ from calc import per_round_hole_stats
 from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.web.catalog import STAT_CATALOG
+
+
+def _featured_match():
+    matches = get_all_matches()
+    active = [m for m in matches if m.get("status") == "active"]
+    if not active:
+        return None
+    m = active[0]
+    players = get_match_players(m["id"])
+    participants = []
+    for p in players:
+        participants.append({
+            "name": p["user_name"],
+            "net_total": round(float(p["total_net"]), 1) if p.get("total_net") else None,
+            "round_count": p["round_count"],
+        })
+    match_rounds = get_match_rounds(m["id"])
+    max_holes = 18
+    completed = 0
+    for mr in match_rounds:
+        rd = get_round_by_id(mr["round_id"])
+        if rd and rd.holes:
+            completed += len(rd.holes)
+    progress = min(completed / max_holes, 1.0) if max_holes else 0
+    return {
+        "id": m["id"],
+        "course_name": m["course_name"],
+        "date": m["date"],
+        "status": m.get("status", "active"),
+        "participants": participants,
+        "progress": progress,
+        "player_count": m.get("player_count", 0),
+    }
+
+
+def _featured_challenge():
+    challenges = get_all_challenges()
+    active = [c for c in challenges if c.get("status") == "active"]
+    if not active:
+        return None
+    c = active[0]
+    return {
+        "id": c["id"],
+        "title": c["title"],
+        "stat_key": c["stat_key"],
+        "start_date": c["start_date"],
+        "end_date": c["end_date"],
+        "participant_count": c.get("participant_count", 0),
+        "status": c.get("status", "active"),
+    }
 
 
 def _build_profile_context():
@@ -224,6 +274,25 @@ def register_dashboard_routes(app, limiter, csrf):
             date_end=date_end,
         )
         board_meta = compute_board_meta(rankings, BOARD_STATS, STAT_META)
+
+        you_lead_stat = None
+        for entry in rankings:
+            if entry["user_id"] == current_user.id:
+                you_lead_stat = entry["stats"].get("lead_stat")
+                break
+
+        now = datetime.now()
+        month = now.month
+        if month <= 2:
+            season_name = "Winter"
+        elif month <= 5:
+            season_name = "Spring"
+        elif month <= 8:
+            season_name = "Summer"
+        else:
+            season_name = "Fall"
+        season_label = f"{season_name} '{now.strftime('%y')}"
+
         return render_template(
             "dashboard_social.html",
             **base_context(
@@ -238,6 +307,10 @@ def register_dashboard_routes(app, limiter, csrf):
                 board_stats=BOARD_STATS,
                 matches=get_all_matches(),
                 challenges=get_all_challenges(),
+                featured_match=_featured_match(),
+                featured_challenge=_featured_challenge(),
+                you_lead_stat=you_lead_stat,
+                season_label=season_label,
             ),
         )
 

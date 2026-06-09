@@ -1,206 +1,264 @@
 {% extends "base.html" %}
 {% block content %}
 
-{% set active_tab = request.args.get('tab', 'board') %}
+{% set you_rank = 0 %}
+{% for entry in rankings %}
+  {% if entry.user_id == current_user.id %}
+    {% set you_rank = loop.index %}
+  {% endif %}
+{% endfor %}
 
-<div class="ps-tabs">
-    <a href="/?tab=board" class="ps-tab {% if active_tab == 'board' %}is-active{% endif %}">The Board</a>
-    <a href="/?tab=matches" class="ps-tab {% if active_tab == 'matches' %}is-active{% endif %}">Matches</a>
-    <a href="/?tab=challenges" class="ps-tab {% if active_tab == 'challenges' %}is-active{% endif %}">Challenges</a>
+<div style="display:grid;grid-template-columns:1fr 268px;gap:36px;min-height:0;">
+
+  {#── Main column ──#}
+  <main style="display:flex;flex-direction:column;min-width:0;min-height:0;">
+
+    {# Page header #}
+    <div style="padding-bottom:14px;border-bottom:1px solid var(--ps-ink);flex-shrink:0;">
+      <div class="ps-eyebrow">The Board · {{ season_label }}</div>
+      <div class="ps-h1" style="margin-top:6px;">Crew<em> standings</em></div>
+    </div>
+
+    {# Personal hero #}
+    {% for entry in rankings %}
+    {% if entry.user_id == current_user.id %}
+    {% set s = entry.stats %}
+    {% set initials = [] %}
+    {% for w in current_user.display_name.split() %}
+      {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+    {% endfor %}
+    <div style="flex-shrink:0;height:228px;background:var(--ps-paper-2);
+                display:flex;align-items:center;padding:0 36px;gap:40px;
+                border-top:1px solid var(--ps-ink);border-bottom:1px solid var(--ps-rule-c);
+                position:relative;overflow:hidden;">
+      <div style="font-family:var(--ps-font-display);font-weight:200;font-size:200px;
+                  letter-spacing:-0.05em;line-height:1;color:var(--ps-rule-c);
+                  position:absolute;right:280px;top:50%;transform:translateY(-50%);
+                  user-select:none;pointer-events:none;font-variant-numeric:tabular-nums;">
+        {{ '%02d' % you_rank }}
+      </div>
+      <div class="ps-avatar is-self" style="width:52px;height:52px;font-size:17px;">{{ initials | join('') }}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="ps-eyebrow" style="margin-bottom:6px;">Your standing</div>
+        <div style="font-family:var(--ps-font-display);font-weight:200;font-size:58px;
+                    letter-spacing:-0.03em;line-height:0.9;color:var(--ps-ink);">
+          {{ current_user.display_name }}
+        </div>
+        <div style="display:flex;align-items:center;gap:22px;margin-top:16px;">
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-ink-2);">
+            #{{ you_rank }} of {{ rankings | length }}
+          </div>
+          {% if you_lead_stat and stat_meta[you_lead_stat] %}
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-accent);font-weight:500;">
+            leads {{ stat_meta[you_lead_stat].label }}
+          </div>
+          {% endif %}
+          {% if s.hi_movement %}
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-accent);font-weight:500;">
+            {{ s.hi_movement }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% set hi_parts = s.handicap | string | split('.') if s.handicap is not none else ['--'] %}
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="ps-eyebrow" style="margin-bottom:4px;text-align:right;">Handicap index</div>
+        <div style="font-family:var(--ps-font-display);font-weight:200;font-size:112px;
+                    letter-spacing:-0.05em;line-height:0.85;font-variant-numeric:tabular-nums lining-nums;">
+          {% if s.handicap is not none %}
+          <span style="color:var(--ps-ink);">{{ hi_parts[0] }}</span>
+          <span style="color:var(--ps-ink-3);">.</span>
+          <span style="color:var(--ps-accent);">{{ hi_parts[1][0] if hi_parts|length > 1 else '0' }}</span>
+          {% else %}
+          <span style="color:var(--ps-ink-3);">--</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {# Column headers #}
+    {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr 100px' %}
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
+                padding:11px 16px 10px;align-items:end;flex-shrink:0;">
+      <div class="ps-eyebrow">Player</div>
+      {% for key in board_stats %}
+      {% set meta = stat_meta[key] %}
+      {% set new_desc = '0' if current_sort != key else ('0' if current_desc else '1') %}
+      <div class="ps-eyebrow" style="text-align:right;">
+        <a href="?sort={{ key }}&desc={{ new_desc }}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+           style="color:{% if current_sort == key %}var(--ps-accent){% else %}inherit{% endif %};text-decoration:none;">
+          {{ meta.label }}
+          {% if current_sort == key %}
+          <span>{{ '▲' if not current_desc else '▼' }}</span>
+          {% endif %}
+        </a>
+      </div>
+      {% endfor %}
+      <div class="ps-eyebrow" style="text-align:right;">Form</div>
+    </div>
+    <div style="height:0;border-top:1px solid var(--ps-ink);flex-shrink:0;"></div>
+
+    {# Ranked rows #}
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+      {% if rankings %}
+      {% for entry in rankings %}
+      {% set is_you = entry.user_id == current_user.id %}
+      {% set s = entry.stats %}
+      {% set initials = [] %}
+      {% for w in entry.display_name.split() %}
+        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+      {% endfor %}
+      <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
+                  padding:0 16px;flex:1;align-items:center;
+                  border-bottom:1px solid var(--ps-rule-c);
+                  background:{{ 'var(--ps-paper-2)' if is_you else 'transparent' }};
+                  border-left:{{ '2px solid var(--ps-accent)' if is_you else '2px solid transparent' }};">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-family:var(--ps-font-display);font-weight:200;font-size:28px;
+                      letter-spacing:-0.04em;color:{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }};
+                      font-variant-numeric:tabular-nums;width:32px;flex-shrink:0;">{{ '%02d' % loop.index }}</div>
+          <div class="ps-avatar {{ 'is-self' if is_you }}" style="width:34px;height:34px;font-size:11px;">{{ initials | join('') }}</div>
+          <div>
+            <div style="font-family:var(--ps-font-mono);font-size:14px;line-height:1.2;">
+              {{ entry.display_name }}
+              {% if is_you %}<span style="color:var(--ps-accent);font-size:9px;margin-left:5px;">you</span>{% endif %}
+            </div>
+            <div style="font-size:9px;color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
+              {{ s.streak }} rd streak
+            </div>
+          </div>
+        </div>
+        {% for key in board_stats %}
+        {% set val = s[key] %}
+        <div style="text-align:right;">
+          {% if val is not none %}
+          {% set cm = board_meta[key] %}
+          {% set is_leader = (cm.min is not none) and (
+            (stat_meta[key].higher_better and val >= cm.max) or
+            (not stat_meta[key].higher_better and val <= cm.min)
+          ) %}
+          {% set cm_range = cm.max - cm.min %}
+          {% if cm_range > 0 %}
+            {% set raw = (val - cm.min) / cm_range %}
+            {% if not stat_meta[key].higher_better %}
+              {% set raw = 1 - raw %}
+            {% endif %}
+          {% else %}
+            {% set raw = 0.5 %}
+          {% endif %}
+          <div style="font-family:var(--ps-font-display);font-weight:300;font-size:23px;
+                      letter-spacing:-0.03em;font-variant-numeric:tabular-nums lining-nums;line-height:1;
+                      color:{{ 'var(--ps-accent)' if is_leader else 'var(--ps-ink)' }};">
+            {{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}
+          </div>
+          <div class="ps-minibar" style="margin-top:6px;">
+            <div class="ps-minibar-fill {{ 'is-self' if is_you }}" style="width:{{ (raw * 100) | round }}%;"></div>
+          </div>
+          {% else %}
+          <div style="font-family:var(--ps-font-mono);font-size:11px;color:var(--ps-ink-3);">&mdash;</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        <div style="display:flex;justify-content:flex-end;">
+          {% set fs = s.form_svg %}
+          {% if fs %}
+          <svg width="{{ fs.width }}" height="{{ fs.height }}" style="display:block;">
+            <path d="{{ fs.path }}" fill="none" stroke="{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="{{ fs.final_x }}" cy="{{ fs.final_y }}" r="2.4" fill="var(--ps-paper)" stroke="{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }}" stroke-width="1.4"/>
+          </svg>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div class="empty-state">
+          <p class="placeholder">No data yet — log some rounds to populate The Board.</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="padding-top:10px;border-top:1px solid var(--ps-rule-c);flex-shrink:0;">
+      <div style="font-family:var(--ps-font-mono);font-size:11px;color:var(--ps-ink-3);">
+        {% if you_lead_stat and stat_meta[you_lead_stat] %}
+        you lead on <span style="color:var(--ps-accent);">{{ stat_meta[you_lead_stat].label }}</span>
+        {% endif %}
+        · tap a column to re-sort
+      </div>
+    </div>
+
+  </main>
+
+  {#── Right rail ──#}
+  <aside style="display:flex;flex-direction:column;min-height:0;
+                border-left:1px solid var(--ps-rule-c);padding-left:28px;">
+
+    <div style="flex:1;padding:2px 0 0;display:flex;flex-direction:column;min-height:0;gap:14px;">
+
+      {# Featured challenge #}
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured challenge</div>
+        {% if featured_challenge %}
+        <a href="/challenges/{{ featured_challenge.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
+                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● live</span>
+            </div>
+            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+              {{ featured_challenge.title }}
+            </div>
+            <div class="ps-eyebrow" style="margin-top:4px;">
+              {{ featured_challenge.stat_key }} · {{ featured_challenge.start_date }} → {{ featured_challenge.end_date }}
+            </div>
+          </div>
+          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
+            {{ featured_challenge.participant_count }} player{{ 's' if featured_challenge.participant_count != 1 }} · All challenges →
+          </div>
+        </a>
+        {% else %}
+        <a href="/challenges/new" class="ps-card ps-card--create" style="flex:1;">
+          <div class="ps-card--create-icon">+</div>
+          <div class="ps-card--create-text">Create a challenge<br>for the crew</div>
+        </a>
+        {% endif %}
+      </div>
+
+      {# Featured match #}
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured match</div>
+        {% if featured_match %}
+        <a href="/matches/{{ featured_match.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
+                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● {{ featured_match.status }}</span>
+            </div>
+            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+              {{ featured_match.course_name }}
+            </div>
+            <div class="ps-eyebrow" style="margin-top:4px;">{{ featured_match.date }}</div>
+          </div>
+          <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-align:right;margin-top:12px;">
+            {{ featured_match.player_count }} player{{ 's' if featured_match.player_count != 1 }} ·
+            View match →
+          </div>
+        </a>
+        {% else %}
+        <a href="/matches/new" class="ps-card ps-card--create" style="flex:1;">
+          <div class="ps-card--create-icon">+</div>
+          <div class="ps-card--create-text">Create a match<br>for the crew</div>
+        </a>
+        {% endif %}
+      </div>
+
+    </div>
+  </aside>
+
 </div>
-
-{% if active_tab == 'board' %}
-<section>
-    <div class="ps-row ps-between" style="margin-bottom: 16px;">
-        <div>
-            <div class="ps-eyebrow">Leaderboard</div>
-            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">All players ranked</div>
-        </div>
-        <form method="get" action="/" class="ps-filters">
-            <input type="hidden" name="tab" value="board">
-            <input type="hidden" name="sort" value="{{ current_sort }}">
-            <input type="hidden" name="desc" value="{{ '1' if current_desc else '0' }}">
-            <input type="date" name="from" value="{{ date_from }}" style="font-family:var(--ps-font-mono);font-size:11px;padding:4px 8px;border:1px solid var(--ps-rule-c);background:transparent;color:var(--ps-ink-2);text-transform:uppercase;letter-spacing:0.08em;">
-            <input type="date" name="to" value="{{ date_to }}" style="font-family:var(--ps-font-mono);font-size:11px;padding:4px 8px;border:1px solid var(--ps-rule-c);background:transparent;color:var(--ps-ink-2);text-transform:uppercase;letter-spacing:0.08em;">
-            <button type="submit" class="ps-btn">Filter</button>
-            {% if date_from or date_to %}
-            <a href="?tab=board&sort={{ current_sort }}&desc={{ '1' if current_desc else '0' }}" class="ps-btn ps-btn--ghost">Clear</a>
-            {% endif %}
-        </form>
-    </div>
-    <table class="ps-table">
-        <thead>
-            <tr>
-                <th>Player</th>
-                {% for key in board_stats %}
-                {% set meta = stat_meta[key] %}
-                {% set new_desc = '0' if current_sort != key else ('0' if current_desc else '1') %}
-                <th class="r">
-                    <a href="?tab=board&sort={{ key }}&desc={{ new_desc }}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
-                       style="color:{% if current_sort == key %}var(--ps-accent){% else %}inherit{% endif %};text-decoration:none;">
-                        {{ meta.label }}
-                        {% if current_sort == key %}
-                        <span>{{ '▲' if not current_desc else '▼' }}</span>
-                        {% endif %}
-                    </a>
-                </th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% if rankings %}
-            {% for entry in rankings %}
-            <tr>
-                <td>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        {% set initials = [] %}
-                        {% for w in entry.display_name.split() %}
-                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
-                        {% endfor %}
-                        <div class="ps-avatar">{{ initials | join('') }}</div>
-                        <div class="ps-course">{{ entry.display_name }}</div>
-                    </div>
-                </td>
-                {% for key in board_stats %}
-                {% set val = entry.stats[key] %}
-                <td class="r" style="vertical-align:middle;">
-                    {% if val is not none %}
-                    {% set cm = board_meta[key] %}
-                    {% set is_leader = (cm.min is not none) and (
-                      (stat_meta[key].higher_better and val >= cm.max) or
-                      (not stat_meta[key].higher_better and val <= cm.min)
-                    ) %}
-                    {% set cm_range = cm.max - cm.min %}
-                    {% if cm_range > 0 %}
-                      {% set raw = (val - cm.min) / cm_range %}
-                      {% if not stat_meta[key].higher_better %}
-                        {% set raw = 1 - raw %}
-                      {% endif %}
-                    {% else %}
-                      {% set raw = 0.5 %}
-                    {% endif %}
-                    <span{% if is_leader %} class="ps-leader"{% endif %}>{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}</span>
-                    <div class="ps-minibar">
-                        <div class="ps-minibar-fill" style="width:{{ (raw * 100) | round }}%;"></div>
-                    </div>
-                    {% else %}
-                    <span style="color:var(--ps-ink-3);">&mdash;</span>
-                    {% endif %}
-                </td>
-                {% endfor %}
-            </tr>
-            {% endfor %}
-            <tr style="border-top:2px solid var(--ps-ink);">
-                <td>
-                    <div class="ps-eyebrow" style="color:var(--ps-ink-2);">Crew average</div>
-                </td>
-                {% for key in board_stats %}
-                {% set cm = board_meta[key] %}
-                <td class="r" style="color:var(--ps-ink-3);font-size:var(--ps-fs-table-num);">
-                    {% if cm.avg is not none %}
-                    {{ '%.1f'|format(cm.avg) }}{{ stat_meta[key].suffix }}
-                    {% else %}
-                    &mdash;
-                    {% endif %}
-                </td>
-                {% endfor %}
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="{{ 1 + board_stats|length }}">
-                    <div class="empty-state">
-                        <p class="placeholder">No data yet — log some rounds to populate The Board.</p>
-                    </div>
-                </td>
-            </tr>
-            {% endif %}
-        </tbody>
-    </table>
-</section>
-
-{% elif active_tab == 'matches' %}
-<section>
-    <div class="ps-row ps-between" style="margin-bottom: 16px;">
-        <div>
-            <div class="ps-eyebrow">Head to head</div>
-            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Your matches</div>
-        </div>
-        <a href="/matches/new" class="ps-btn">+ Create Match</a>
-    </div>
-    {% if matches %}
-    <div class="ps-card-list">
-        {% for m in matches %}
-        <a href="/matches/{{ m.id }}" class="ps-card is-clickable">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                    <div class="ps-course">{{ m.course_name }}</div>
-                    <div style="display:flex;gap:var(--ps-sp-4);margin-top:4px;color:var(--ps-ink-2);font-size:var(--ps-fs-eyebrow);letter-spacing:0.04em;">
-                        <span>{{ m.date }}</span>
-                        <span>{{ m.player_count }} player{{ 's' if m.player_count != 1 }}</span>
-                        <span>{{ m.round_count }} round{{ 's' if m.round_count != 1 }}</span>
-                    </div>
-                </div>
-                <span class="ps-status">
-                    <span class="ps-status-dot{% if m.status == 'active' %} is-active{% elif m.status == 'completed' %} is-completed{% endif %}"></span>
-                    {{ m.status }}
-                </span>
-            </div>
-        </a>
-        {% endfor %}
-        <a href="/matches/new" class="ps-card ps-card--create">
-            <div class="ps-card--create-icon">+</div>
-            <div class="ps-card--create-text">Create a match<br>for the crew</div>
-        </a>
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <p class="placeholder">No matches yet. Create one to challenge another player.</p>
-        <a href="/matches/new" class="ps-btn" style="margin-top:var(--ps-sp-3);">+ Create Match</a>
-    </div>
-    {% endif %}
-</section>
-
-{% elif active_tab == 'challenges' %}
-<section>
-    <div class="ps-row ps-between" style="margin-bottom: 16px;">
-        <div>
-            <div class="ps-eyebrow">Competitions</div>
-            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Active challenges</div>
-        </div>
-        <a href="/challenges/new" class="ps-btn">+ Create Challenge</a>
-    </div>
-    {% if challenges %}
-    <div class="ps-card-list">
-        {% for c in challenges %}
-        <a href="/challenges/{{ c.id }}" class="ps-card is-clickable">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                    <div class="ps-course">{{ c.title }}</div>
-                    <div style="display:flex;gap:var(--ps-sp-4);margin-top:4px;color:var(--ps-ink-2);font-size:var(--ps-fs-eyebrow);letter-spacing:0.04em;">
-                        <span>{{ c.stat_key }}</span>
-                        <span>{{ c.start_date }} → {{ c.end_date }}</span>
-                        <span>{{ c.participant_count }} player{{ 's' if c.participant_count != 1 }}</span>
-                    </div>
-                </div>
-                <span class="ps-status">
-                    <span class="ps-status-dot{% if c.status == 'active' %} is-active{% elif c.status == 'completed' %} is-completed{% endif %}"></span>
-                    {{ c.status }}
-                </span>
-            </div>
-        </a>
-        {% endfor %}
-        <a href="/challenges/new" class="ps-card ps-card--create">
-            <div class="ps-card--create-icon">+</div>
-            <div class="ps-card--create-text">Create a challenge<br>for the crew</div>
-        </a>
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <p class="placeholder">No challenges yet. Create one to compete on any stat.</p>
-        <a href="/challenges/new" class="ps-btn" style="margin-top:var(--ps-sp-3);">+ Create Challenge</a>
-    </div>
-    {% endif %}
-</section>
-{% endif %}
-
 {% endblock %}
