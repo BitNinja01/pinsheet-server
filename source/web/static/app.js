@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Please enter your gross score.');
                 return;
             }
-            showStep('match');
+            showStep('notes');
         });
     }
 
@@ -782,7 +782,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var range = getScorecardRange();
         var nextIdx = range.indexOf(holeNum) + 1;
         if (nextIdx >= range.length) {
-            showStep('match');
+            showStep('notes');
         }
     }
 
@@ -1180,11 +1180,11 @@ document.addEventListener('DOMContentLoaded', function () {
     wizard.addEventListener('change', debouncedDraftSave);
     wizard.addEventListener('input', debouncedDraftSave);
 
-    // --- Match step ---
-    var matchContinue = document.getElementById('match-continue');
-    if (matchContinue) {
-        matchContinue.addEventListener('click', function () {
-            showStep('notes');
+    // --- Notes step ---
+    var notesContinue = document.getElementById('notes-continue');
+    if (notesContinue) {
+        notesContinue.addEventListener('click', function () {
+            showStep('match');
         });
     }
 
