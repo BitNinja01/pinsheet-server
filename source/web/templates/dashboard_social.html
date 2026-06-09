@@ -102,7 +102,7 @@
         {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
       {% endfor %}
       <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
-                  padding:12px 16px;flex:1;align-items:center;
+                  padding:20px 16px;flex:1;align-items:center;
                   border-bottom:1px solid var(--ps-rule-c);
                   background:{{ 'var(--ps-paper-2)' if is_you else 'transparent' }};
                   border-left:{{ '2px solid var(--ps-accent)' if is_you else '2px solid transparent' }};">
