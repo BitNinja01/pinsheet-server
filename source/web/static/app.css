@@ -1655,7 +1655,9 @@ select.hole-input { width: 3rem; appearance: none; }
 
 /* ── Desktop inline shorthand entry (step 7) ── */
 .wizard-step.is-score-only #desktop-hole-progress,
-.wizard-step.is-score-only #hole-progress-bar {
+.wizard-step.is-score-only #hole-progress-bar,
+.wizard-step.is-score-only #desktop-running-stats,
+.wizard-step.is-score-only #hole-cards-area {
     display: none !important;
 }
 .desktop-hole-progress {
