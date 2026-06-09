@@ -2,7 +2,7 @@
 {% block content %}
 
 {# Compute value range for mini bar #}
-{% set vals = leaderboard | map(attribute='value') | select('not none') | list %}
+{% set vals = leaderboard | map(attribute='value') | reject('none') | list %}
 {% set vmin = (vals | min) if vals else none %}
 {% set vmax = (vals | max) if vals else none %}
 {% set vrange = (vmax - vmin) if (vmin is not none and vmax is not none and vmax > vmin) else 0 %}
