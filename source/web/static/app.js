@@ -436,7 +436,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function addGrossScoreInput() {
         if (document.getElementById('gross-score')) return;
         var area = document.getElementById('scorecard-area');
-        area.innerHTML = '<div><label class="step-label">Gross Score</label><input type="number" class="step-input" id="gross-score" placeholder="e.g. 87" min="1" max="200"></div>';
+        area.innerHTML = '<div><label class="step-label">Gross Score</label><input type="number" class="step-input" id="gross-score" placeholder="e.g. 87" min="1" max="200"><button class="btn btn-accent" id="gross-score-continue" style="margin-top:0.75rem">Continue</button></div>';
+        document.getElementById('gross-score-continue').addEventListener('click', function () {
+            var gross = document.getElementById('gross-score').value;
+            if (!gross) {
+                alert('Please enter your gross score.');
+                return;
+            }
+            showStep('match');
+        });
     }
 
     function getScorecardRange() {
@@ -1151,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showStep('holes_detail');
             } else {
                 addGrossScoreInput();
-                showStep('match');
+                showStep('holes_detail');
             }
         });
     });
