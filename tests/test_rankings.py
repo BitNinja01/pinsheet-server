@@ -153,3 +153,43 @@ def test_stat_meta_has_all_board_stats(db):
         assert "label" in STAT_META[key]
         assert "higher_better" in STAT_META[key]
     db.close()
+
+
+def test_rankings_includes_streak(db):
+    create_user("p1", "Player1", "pass")
+    for i in range(5):
+        _add_round(1, 80, diff="10.0", date=f"2026-06-{i+1:02d}")
+    rankings = compute_rankings()
+    assert len(rankings) == 1
+    stats = rankings[0]["stats"]
+    assert "streak" in stats
+    assert stats["streak"] >= 0
+    db.close()
+
+
+def test_rankings_includes_form(db):
+    create_user("p1", "Player1", "pass")
+    for i in range(10):
+        diff_val = 5.0 + i * 0.5
+        _add_round(1, 70 + i, diff=str(diff_val), date=f"2026-06-{i+1:02d}")
+    rankings = compute_rankings()
+    stats = rankings[0]["stats"]
+    assert "form" in stats
+    assert len(stats["form"]) <= 6
+    assert isinstance(stats["form"], list)
+    if len(stats["form"]) >= 2:
+        assert stats["form_svg"] is not None
+        assert "path" in stats["form_svg"]
+    db.close()
+
+
+def test_rankings_includes_lead_stat(db):
+    create_user("p1", "Player1", "pass")
+    create_user("p2", "Player2", "pass")
+    for i in range(5):
+        _add_round(1, 70 + i, diff="5.0", date=f"2026-06-{i+1:02d}")
+        _add_round(2, 80 + i, diff="15.0", date=f"2026-06-{i+1:02d}")
+    rankings = compute_rankings()
+    for entry in rankings:
+        assert "lead_stat" in entry["stats"]
+    db.close()
