@@ -196,11 +196,7 @@
         <a href="/challenges/{{ featured_challenge.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
                    padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
-                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● live</span>
-            </div>
-            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+            <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
               {{ featured_challenge.title }}
             </div>
             <div class="ps-eyebrow" style="margin-top:4px;">
@@ -226,11 +222,7 @@
         <a href="/matches/{{ featured_match.id }}" style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
                    padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;color:inherit;">
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <span style="font-family:var(--ps-font-mono);font-size:10px;font-weight:500;
-                          color:var(--ps-accent);letter-spacing:0.12em;text-transform:uppercase;">● {{ featured_match.status }}</span>
-            </div>
-            <div style="font-family:var(--ps-font-mono);font-size:18px;margin-top:10px;line-height:1.2;">
+            <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
               {{ featured_match.course_name }}
             </div>
             <div class="ps-eyebrow" style="margin-top:4px;">{{ featured_match.date }}</div>
