@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 268px;gap:36px;min-height:0;height:100%;">
+
+  {#── Main column ──#}
+  <main style="display:flex;flex-direction:column;min-width:0;min-height:0;">
+
+    {# Page header #}
+    <div style="padding-bottom:14px;border-bottom:1px solid var(--ps-ink);flex-shrink:0;">
+      <div class="ps-eyebrow">The Board · {{ season_label }}</div>
+      <div class="ps-h1" style="margin-top:6px;">Crew<em> standings</em></div>
+    </div>
+
+    {# Personal hero #}
+    {% for entry in rankings %}
+    {% if entry.user_id == current_user.id %}
+    {% set s = entry.stats %}
+    {% set initials = [] %}
+    {% for w in current_user.display_name.split() %}
+      {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+    {% endfor %}
+    <div style="flex-shrink:0;height:228px;background:var(--ps-paper-2);
+                display:flex;align-items:center;padding:0 36px;gap:40px;
+                border-top:1px solid var(--ps-ink);border-bottom:1px solid var(--ps-rule-c);
+                position:relative;overflow:hidden;">
+      <div style="font-family:var(--ps-font-display);font-weight:200;font-size:200px;
+                  letter-spacing:-0.05em;line-height:1;color:var(--ps-rule-c);
+                  position:absolute;right:320px;top:50%;transform:translateY(-50%);
+                  user-select:none;pointer-events:none;font-variant-numeric:tabular-nums;">
+        {{ '%02d' % you_rank }}
+      </div>
+      <div class="ps-avatar is-self" style="width:52px;height:52px;font-size:17px;">{{ initials | join('') }}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="ps-eyebrow" style="margin-bottom:6px;">Your standing</div>
+        <div style="font-family:var(--ps-font-display);font-weight:200;font-size:58px;
+                    letter-spacing:-0.03em;line-height:0.9;color:var(--ps-ink);">
+          {{ current_user.display_name }}
+        </div>
+        <div style="display:flex;align-items:center;gap:22px;margin-top:16px;">
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-ink-2);">
+            #{{ you_rank }} of {{ rankings | length }}
+          </div>
+          {% if you_lead_stat and stat_meta[you_lead_stat] %}
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-accent);font-weight:500;">
+            leads {{ stat_meta[you_lead_stat].label }}
+          </div>
+          {% endif %}
+          {% if s.hi_movement %}
+          <div style="font-family:var(--ps-font-mono);font-size:13px;color:var(--ps-accent);font-weight:500;">
+            {{ s.hi_movement }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% set hi_parts = s.handicap | string | split('.') if s.handicap is not none else ['--'] %}
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="ps-eyebrow" style="margin-bottom:4px;text-align:right;">Handicap index</div>
+        <div style="font-family:var(--ps-font-display);font-weight:200;font-size:112px;
+                    letter-spacing:-0.05em;line-height:0.85;font-variant-numeric:tabular-nums lining-nums;">
+          {% if s.handicap is not none %}
+          <span style="color:var(--ps-ink);">{{ hi_parts[0] }}</span><span style="color:var(--ps-ink-3);font-size:0.5em;">.</span><span style="color:var(--ps-accent);">{{ hi_parts[1][0] if hi_parts|length > 1 else '0' }}</span>
+          {% else %}
+          <span style="color:var(--ps-ink-3);">--</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {# Column headers #}
+    {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr' %}
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
+                padding:11px 16px 10px;align-items:end;flex-shrink:0;">
+      <div class="ps-eyebrow">Player</div>
+      {% for key in board_stats %}
+      {% set meta = stat_meta[key] %}
+      {% set new_desc = '0' if current_sort != key else ('0' if current_desc else '1') %}
+      <div class="ps-eyebrow" style="text-align:right;">
+        <a href="?sort={{ key }}&desc={{ new_desc }}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+           style="color:{% if current_sort == key %}var(--ps-accent){% else %}inherit{% endif %};text-decoration:none;">
+          {{ meta.label }}
+          {% if current_sort == key %}
+          <span>{{ '▲' if not current_desc else '▼' }}</span>
+          {% endif %}
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="height:0;border-top:1px solid var(--ps-ink);flex-shrink:0;"></div>
+
+    {# Ranked rows #}
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+      {% if rankings %}
+      {% for entry in rankings %}
+      {% set is_you = entry.user_id == current_user.id %}
+      {% set s = entry.stats %}
+      {% set initials = [] %}
+      {% for w in entry.display_name.split() %}
+        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+      {% endfor %}
+      <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
+                  padding:20px 16px;flex:1;align-items:center;
+                  border-bottom:1px solid var(--ps-rule-c);
+                  background:{{ 'var(--ps-paper-2)' if is_you else 'transparent' }};
+                  border-left:{{ '2px solid var(--ps-accent)' if is_you else '2px solid transparent' }};">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-family:var(--ps-font-display);font-weight:200;font-size:28px;
+                      letter-spacing:-0.04em;color:{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }};
+                      font-variant-numeric:tabular-nums;width:32px;flex-shrink:0;">{{ '%02d' % loop.index }}</div>
+          <div class="ps-avatar {{ 'is-self' if is_you }}" style="width:34px;height:34px;font-size:11px;">{{ initials | join('') }}</div>
+            <div>
+              <div style="font-family:var(--ps-font-mono);font-size:14px;line-height:1.2;">
+                {{ entry.display_name }}
+                {% if is_you %}<span style="color:var(--ps-accent);font-size:9px;margin-left:5px;">you</span>{% endif %}
+              </div>
+            </div>
+        </div>
+        {% for key in board_stats %}
+        {% set val = s[key] %}
+        <div style="text-align:right;">
+          {% if val is not none %}
+          {% set cm = board_meta[key] %}
+          {% set is_leader = (cm.min is not none) and (
+            (stat_meta[key].higher_better and val >= cm.max) or
+            (not stat_meta[key].higher_better and val <= cm.min)
+          ) %}
+          {% set cm_range = cm.max - cm.min %}
+          {% if cm_range > 0 %}
+            {% set raw = (val - cm.min) / cm_range %}
+            {% if not stat_meta[key].higher_better %}
+              {% set raw = 1 - raw %}
+            {% endif %}
+          {% else %}
+            {% set raw = 0.5 %}
+          {% endif %}
+          <div style="font-family:var(--ps-font-display);font-weight:300;font-size:23px;
+                      letter-spacing:-0.03em;font-variant-numeric:tabular-nums lining-nums;line-height:1;
+                      color:{{ 'var(--ps-accent)' if is_leader else 'var(--ps-ink)' }};">
+            {{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}
+          </div>
+          <div class="ps-minibar" style="margin-top:6px;">
+            <div class="ps-minibar-fill {{ 'is-self' if is_you }}" style="width:{{ (raw * 100) | round }}%;"></div>
+          </div>
+          {% else %}
+          <div style="font-family:var(--ps-font-mono);font-size:11px;color:var(--ps-ink-3);">&mdash;</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div class="empty-state">
+          <p class="placeholder">No data yet — log some rounds to populate The Board.</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="padding-top:10px;border-top:1px solid var(--ps-rule-c);flex-shrink:0;">
+      <div style="font-family:var(--ps-font-mono);font-size:11px;color:var(--ps-ink-3);">
+        {% if you_lead_stat and stat_meta[you_lead_stat] %}
+        you lead on <span style="color:var(--ps-accent);">{{ stat_meta[you_lead_stat].label }}</span>
+        {% endif %}
+        · tap a column to re-sort
+      </div>
+    </div>
+
+  </main>
+
+  {#── Right rail ──#}
+  <aside style="display:flex;flex-direction:column;min-height:0;
+                border-left:1px solid var(--ps-rule-c);padding-left:28px;">
+
+    <div style="flex:1;padding:2px 0 0;display:flex;flex-direction:column;min-height:0;gap:14px;">
+
+      {# Featured challenge #}
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured challenge</div>
+        {% if featured_challenge %}
+        <div style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
+              {{ featured_challenge.title }}
+            </div>
+            <div class="ps-eyebrow" style="margin-top:4px;">
+              {{ featured_challenge.stat_key }} · {{ featured_challenge.start_date }} → {{ featured_challenge.end_date }}
+            </div>
+          </div>
+          <div>
+            {% for p in featured_challenge.leaderboard[:5] %}
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ps-rule-c);">
+              <span style="font-family:var(--ps-font-display);font-weight:200;font-size:18px;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink-3)' }};width:22px;flex-shrink:0;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+              <span style="font-family:var(--ps-font-mono);font-size:12px;flex:1;color:{{ 'var(--ps-accent)' if p.is_you else 'var(--ps-ink-2)' }};">{{ p.display_name }}{% if p.is_you %}<span style="font-size:9px;margin-left:4px;color:var(--ps-accent);">you</span>{% endif %}</span>
+              <span style="font-family:var(--ps-font-display);font-weight:300;font-size:22px;letter-spacing:-0.02em;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink)' }};font-variant-numeric:tabular-nums lining-nums;">{% if p.value is not none %}{{ '%.1f'|format(p.value) }}{% else %}&mdash;{% endif %}</span>
+            </div>
+            {% endfor %}
+            <div style="margin-top:12px;"><div class="ps-minibar" style="margin-top:0;"><div class="ps-minibar-fill" style="width:{{ (featured_challenge.progress * 100) | round }}%;"></div></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-3);">{{ featured_challenge.submitted_count }} of {{ featured_challenge.participant_count }} submitted</div>
+              <a href="/challenges/{{ featured_challenge.id }}" style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-decoration:none;">All challenges →</a>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <a href="/challenges/new" class="ps-card ps-card--create" style="flex:1;">
+          <div class="ps-card--create-icon">+</div>
+          <div class="ps-card--create-text">Create a challenge<br>for the crew</div>
+        </a>
+        {% endif %}
+      </div>
+
+      {# Featured match #}
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div class="ps-eyebrow" style="margin-bottom:12px;">Featured match</div>
+        {% if featured_match %}
+        <div style="flex:1;border:1px solid var(--ps-rule-c);background:var(--ps-paper-2);
+                   padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <div style="font-family:var(--ps-font-mono);font-size:18px;line-height:1.2;">
+              {{ featured_match.course_name }}
+            </div>
+            <div class="ps-eyebrow" style="margin-top:4px;">{{ featured_match.date }}</div>
+          </div>
+          <div>
+            {% for p in featured_match.participants[:5] %}
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ps-rule-c);">
+              <span style="font-family:var(--ps-font-display);font-weight:200;font-size:18px;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink-3)' }};width:22px;flex-shrink:0;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+              <span style="font-family:var(--ps-font-mono);font-size:12px;flex:1;color:{{ 'var(--ps-accent)' if p.is_you else 'var(--ps-ink-2)' }};">{{ p.name }}{% if p.is_you %}<span style="font-size:9px;margin-left:4px;color:var(--ps-accent);">you</span>{% endif %}</span>
+              <span style="font-family:var(--ps-font-display);font-weight:300;font-size:22px;letter-spacing:-0.02em;color:{{ 'var(--ps-accent)' if p.is_leader else 'var(--ps-ink)' }};font-variant-numeric:tabular-nums lining-nums;">{% if p.net_total is not none %}{{ '%.1f'|format(p.net_total) }}{% else %}&mdash;{% endif %}</span>
+            </div>
+            {% endfor %}
+            <div style="margin-top:12px;"><div class="ps-minibar" style="margin-top:0;"><div class="ps-minibar-fill" style="width:{{ (featured_match.progress * 100) | round }}%;"></div></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-3);">{{ featured_match.player_count }} players{% if featured_match.participants[0].round_count %} · through {{ featured_match.participants[0].round_count * 18 }} holes{% endif %}</div>
+              <a href="/matches/{{ featured_match.id }}" style="font-family:var(--ps-font-mono);font-size:10px;color:var(--ps-ink-2);letter-spacing:0.04em;text-decoration:none;">Full scorecard →</a>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <a href="/matches/new" class="ps-card ps-card--create" style="flex:1;">
+          <div class="ps-card--create-icon">+</div>
+          <div class="ps-card--create-text">Create a match<br>for the crew</div>
+        </a>
+        {% endif %}
+      </div>
+
+    </div>
+  </aside>
+
+</div>
+{% endblock %}

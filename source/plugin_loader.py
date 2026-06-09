@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from source.store import seed_plugin_state, get_plugin_states
+
 if TYPE_CHECKING:
     from flask import Flask
 
@@ -108,6 +110,8 @@ def discover_plugins(app: "Flask") -> None:
 
     from source.plugin import _plugins
 
+    plugin_states = get_plugin_states()
+
     for entry in sorted(plugins_dir.iterdir()):
         if not entry.is_dir() or not (entry / "__init__.py").exists():
             continue
@@ -120,6 +124,13 @@ def discover_plugins(app: "Flask") -> None:
         _wire_static_route(app, mod.plugin_info["name"], entry)
         _install_requirements(entry)
 
+        seed_plugin_state(mod.plugin_info["name"])
+        app._discovered_plugins.append(mod)
+
+        if not plugin_states.get(mod.plugin_info["name"], True):
+            _log.info("plugin %s: disabled — skipping register()", mod.plugin_info["name"])
+            continue
+
         try:
             mod.register(app)
         except Exception as exc:
@@ -129,3 +140,5 @@ def discover_plugins(app: "Flask") -> None:
         if mod not in _plugins:
             _plugins.append(mod)
             _log.info("plugin loaded: %s v%s", mod.plugin_info["name"], mod.plugin_info["version"])
+
+    app._plugin_states_at_startup = get_plugin_states()

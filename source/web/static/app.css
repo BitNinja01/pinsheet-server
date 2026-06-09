@@ -242,6 +242,35 @@ body {
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
 }
 
+/* ── Tabs ──────────────────────────────────────────────────────────── */
+.ps-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+    margin-bottom: var(--ps-sp-6);
+}
+.ps-tab {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+    text-decoration: none;
+    padding: var(--ps-sp-3) var(--ps-sp-5);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color var(--ps-dur-quick) var(--ps-ease),
+                border-color var(--ps-dur-quick) var(--ps-ease);
+}
+.ps-tab:hover {
+    color: var(--ps-ink);
+}
+.ps-tab.is-active {
+    color: var(--ps-ink);
+    border-bottom-color: var(--ps-accent);
+}
+
 /* ── Eyebrow ───────────────────────────────────────────────────────── */
 .ps-eyebrow {
     font-family: var(--ps-font-mono);
@@ -498,9 +527,44 @@ body {
 
 /* ── Card ──────────────────────────────────────────────────────────── */
 .ps-card {
-    background: var(--ps-paper-2);
+    background: var(--ps-paper);
     border: var(--ps-rule) solid var(--ps-rule-c);
     padding: 18px 24px;
+}
+
+/* Card list (vertical stack) */
+.ps-card-list {
+    display: flex; flex-direction: column; gap: var(--ps-sp-2);
+}
+
+/* Clickable card */
+.ps-card.is-clickable {
+    cursor: pointer; display: block; text-decoration: none; color: inherit;
+    transition: border-color var(--ps-dur-quick) var(--ps-ease);
+}
+.ps-card.is-clickable:hover {
+    border-color: var(--ps-ink);
+}
+
+/* Create tile (dashed) */
+.ps-card--create {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--ps-sp-2); padding: var(--ps-sp-8) var(--ps-sp-4);
+    border-style: dashed; cursor: pointer; text-align: center;
+    text-decoration: none; color: inherit;
+    transition: border-color var(--ps-dur-quick) var(--ps-ease);
+}
+.ps-card--create:hover {
+    border-color: var(--ps-ink);
+}
+.ps-card--create-icon {
+    font-family: var(--ps-font-display);
+    font-size: 40px; font-weight: var(--ps-fw-display);
+    line-height: 0.8; color: var(--ps-ink-3);
+}
+.ps-card--create-text {
+    font-size: var(--ps-fs-eyebrow);
+    color: var(--ps-ink-2); letter-spacing: 0.04em;
 }
 
 /* ── Links ─────────────────────────────────────────────────────────── */
@@ -809,6 +873,113 @@ select.hole-input { width: 3rem; appearance: none; }
     margin-top: var(--ps-sp-1);
 }
 .ps-stat .ps-stat-delta.is-down { color: var(--ps-warn); }
+
+/* ── Avatar ─────────────────────────────────────────────────────────── */
+.ps-avatar {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    background: var(--ps-paper-2);
+    color: var(--ps-ink-2);
+    font-family: var(--ps-font-mono);
+    font-weight: var(--ps-fw-label);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.ps-avatar.is-self {
+    background: var(--ps-ink);
+    color: var(--ps-paper);
+    border-color: var(--ps-ink);
+}
+
+/* ── Mini bar (stat cells in tables) ───────────────────────────────── */
+.ps-minibar {
+    height: 4px;
+    background: var(--ps-rule-c);
+    position: relative;
+    margin-top: 5px;
+    overflow: hidden;
+}
+.ps-minibar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--ps-accent);
+}
+.ps-minibar-fill.is-self {
+    background: var(--ps-paper);
+}
+
+/* ── Leader value ──────────────────────────────────────────────────── */
+.ps-leader { color: var(--ps-accent); font-weight: var(--ps-fw-label); }
+.ps-leader.is-self { color: var(--ps-paper); }
+
+/* ── Podium ─────────────────────────────────────────────────────────── */
+.ps-podium {
+    display: flex; gap: 0; border: var(--ps-rule) solid var(--ps-rule-c); overflow: hidden;
+}
+.ps-podium-item {
+    flex: 1; padding: var(--ps-sp-4) var(--ps-sp-3); text-align: center;
+    border-right: var(--ps-rule) solid var(--ps-rule-c); background: var(--ps-paper);
+}
+.ps-podium-item:last-child { border-right: none; }
+.ps-podium-item.is-first {
+    background: var(--ps-accent-dim);
+}
+.ps-podium-rank {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+    margin-bottom: var(--ps-sp-1);
+}
+.ps-podium-item.is-first .ps-podium-rank {
+    color: var(--ps-accent);
+}
+.ps-podium-name {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-table-num);
+    font-weight: var(--ps-fw-label);
+    color: var(--ps-ink);
+    margin-top: var(--ps-sp-1);
+}
+.ps-podium-item.is-first .ps-podium-name {
+    color: var(--ps-accent);
+}
+.ps-podium-value {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-h2);
+    font-weight: var(--ps-fw-body);
+    color: var(--ps-ink);
+    margin-top: var(--ps-sp-1);
+}
+.ps-podium-item.is-first .ps-podium-value {
+    color: var(--ps-accent);
+}
+
+/* ── Status chip ─────────────────────────────────────────────────────── */
+.ps-status-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.ps-status-dot.is-active { background: var(--ps-accent); }
+.ps-status-dot.is-completed { background: var(--ps-ink-3); }
+.ps-status-dot.is-draft { background: var(--ps-ink-3); opacity: 0.5; }
+
+/* ── Self row in tables ────────────────────────────────────────────── */
+.ps-table tbody tr.is-you td {
+    background: var(--ps-ink) !important;
+    color: var(--ps-paper);
+    border-bottom-color: rgba(255,255,255,0.12);
+}
+.ps-table tbody tr.is-you td .ps-course,
+.ps-table tbody tr.is-you td .ps-score,
+.ps-table tbody tr.is-you td a,
+.ps-table tbody tr.is-you td .ps-avatar {
+    color: var(--ps-paper);
+    border-color: var(--ps-paper);
+}
 
 /* Stats grid (3-column numeric cells) */
 .stats-grid {
@@ -1483,6 +1654,13 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 /* ── Desktop inline shorthand entry (step 7) ── */
+.wizard-step.is-score-only > .step-label,
+.wizard-step.is-score-only #desktop-hole-progress,
+.wizard-step.is-score-only #hole-progress-bar,
+.wizard-step.is-score-only #desktop-running-stats,
+.wizard-step.is-score-only #hole-cards-area {
+    display: none !important;
+}
 .desktop-hole-progress {
     display: flex;
     gap: 3px;

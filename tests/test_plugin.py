@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from source.database import set_db_path, init_db
+from database import set_db_path, init_db
 
 
 @pytest.fixture
@@ -22,7 +22,15 @@ def plugin_app(tmp_path, monkeypatch):
     import source.store as store_mod
     monkeypatch.setattr(store_mod, "_DATA_DIR", data_dir)
 
+    from source.store import seed_plugin_state, set_plugin_state
+    seed_plugin_state("minimal")
+    seed_plugin_state("with_everything")
+    seed_plugin_state("disabled_test")
+    set_plugin_state("disabled_test", False)
+
     app = main_mod.app
+    app._discovered_plugins = []
+    app._plugin_states_at_startup = {}
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
@@ -89,6 +97,39 @@ class TestPluginDiscovery:
         searchpath = plugin_app.jinja_loader.searchpath
         with_everything_templates = Path(__file__).parent / "fixtures" / "plugins" / "with_everything" / "templates"
         assert str(with_everything_templates) in searchpath
+
+    def test_disabled_plugin_not_registered(self, plugin_app):
+        from source import plugin
+        plugin._plugins.clear()
+
+        import source.plugin_loader
+        source.plugin_loader.discover_plugins(plugin_app)
+
+        names = [p.plugin_info["name"] for p in plugin._plugins]
+        assert "minimal" in names
+        assert "with_everything" in names
+        assert "disabled_test" not in names
+        assert plugin_app.config.get("plugins.disabled_test") is None
+
+    def test_disabled_plugin_still_in_discovered_list(self, plugin_app):
+        from source import plugin
+        plugin._plugins.clear()
+
+        import source.plugin_loader
+        source.plugin_loader.discover_plugins(plugin_app)
+
+        names = [p.plugin_info["name"] for p in plugin_app._discovered_plugins]
+        assert "disabled_test" in names
+
+    def test_plugin_states_at_startup_snapshot(self, plugin_app):
+        from source import plugin
+        plugin._plugins.clear()
+
+        import source.plugin_loader
+        source.plugin_loader.discover_plugins(plugin_app)
+
+        assert "minimal" in plugin_app._plugin_states_at_startup
+        assert plugin_app._plugin_states_at_startup["disabled_test"] is False
 
 
 class TestFireHook:

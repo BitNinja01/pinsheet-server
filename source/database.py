@@ -97,6 +97,54 @@ def init_db() -> None:
             used_at     TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS plugin_states (
+            plugin_name TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS matches (
+            id          INTEGER PRIMARY KEY,
+            created_by  INTEGER NOT NULL REFERENCES users(id),
+            course_name TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'active',
+            created_at  TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS match_players (
+            id         INTEGER PRIMARY KEY,
+            match_id   INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            UNIQUE(match_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS match_rounds (
+            id         INTEGER PRIMARY KEY,
+            match_id   INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            round_id   INTEGER NOT NULL REFERENCES rounds(id),
+            net        REAL NOT NULL,
+            UNIQUE(match_id, user_id, round_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS challenges (
+            id          INTEGER PRIMARY KEY,
+            created_by  INTEGER NOT NULL REFERENCES users(id),
+            title       TEXT NOT NULL,
+            stat_key    TEXT NOT NULL,
+            start_date  TEXT NOT NULL,
+            end_date    TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'active',
+            created_at  TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS challenge_participants (
+            id           INTEGER PRIMARY KEY,
+            challenge_id INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+            user_id      INTEGER NOT NULL REFERENCES users(id),
+            UNIQUE(challenge_id, user_id)
+        );
+
     """)
     db.commit()
     db.close()

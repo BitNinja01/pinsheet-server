@@ -50,7 +50,6 @@
         {% endif %}
     </div>
 
-    {% if g.is_own_data %}
     <div class="round-actions">
         {% if edit_mode %}
         <button class="btn" id="btn-save-round">Save</button>
@@ -60,7 +59,6 @@
         <button class="btn" id="btn-delete">Delete</button>
         {% endif %}
     </div>
-    {% endif %}
 
     {% if edit_mode and entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">

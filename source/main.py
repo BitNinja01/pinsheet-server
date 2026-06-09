@@ -22,7 +22,7 @@ from flask import Flask, request, g
 
 from database import set_db_path, init_db
 from store import (
-    get_user_by_id, get_user,
+    get_user_by_id,
 )
 
 from source.plugin import _plugins
@@ -83,27 +83,13 @@ limiter, csrf = init_app(app)
 
 
 @app.before_request
-def _load_globals():
+def _setup_globals():
     if request.endpoint in ("login_page", "register_page", "static"):
         return
-
-    current_user_id = current_user.id if current_user.is_authenticated else None
-
-    view_username = request.args.get("user")
-    if view_username:
-        view_user_dict = get_user(view_username)
-        if view_user_dict:
-            g.view_user = view_user_dict
-        else:
-            g.view_user = None
+    if current_user.is_authenticated:
+        g.is_own_data = True
     else:
-        if current_user.is_authenticated:
-            g.view_user = get_user_by_id(current_user_id)
-        else:
-            g.view_user = None
-
-    if g.view_user is None:
-        return
+        g.is_own_data = False
 
 
 @app.context_processor
@@ -122,14 +108,9 @@ def inject_plugin_globals():
 
 app.jinja_env.globals.setdefault("plugin_info", {})
 
-
-@app.before_request
-def _check_view_permission():
-    if request.endpoint in ("login_page", "register_page", "static"):
-        return
-    if not hasattr(g, "view_user") or g.view_user is None:
-        return
-    g.is_own_data = current_user.is_authenticated and g.view_user["id"] == current_user.id
+@app.template_filter("split")
+def _jinja_split(value, separator):
+    return value.split(separator)
 
 
 
@@ -203,11 +184,15 @@ def main():
     db_path = str(data_dir / "pinsheet.db")
     set_db_path(db_path)
     init_db()
+    from store import recompute_all_handicaps
+    recompute_all_handicaps()
     app.config["DB_PATH"] = Path(db_path)
     app.config["DATA_DIR"] = data_dir
     app._plugin_blocks = {}
     app._plugin_nav = []
     app._plugin_course_actions = []
+    app._discovered_plugins = []
+    app._plugin_states_at_startup = {}
     discover_plugins(app)
 
     register_routes(app, limiter, csrf, User)

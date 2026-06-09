@@ -8,6 +8,7 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_slope_rating, save_round, delete_round,
+    get_matches_for_user, link_round,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -18,9 +19,9 @@ from calc import (
     calc_scoring_avg_by_par_type, calc_penalties_per_round,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
+    calc_hole_scores,
 )
 from source.web.charts import sparkline_svg
-from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
@@ -33,13 +34,13 @@ def register_rounds_routes(app, csrf):
     @app.route("/rounds/new")
     @login_required
     def round_entry():
-        if not g.is_own_data:
-            return "You can only enter data for yourself.", 403
         today = date.today().isoformat()
         no_courses = len(get_courses()) == 0
+        matches = get_matches_for_user(current_user.id)
         return render_template("round_entry.html", **base_context(
             current_page="round_entry",
             courses=get_courses(), today=today, no_courses=no_courses,
+            matches=matches,
         ))
 
     @app.route("/rounds")
@@ -130,7 +131,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_round_put():
         save_round_draft(request.get_json(), current_user.id)
@@ -138,7 +138,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_round_delete():
         clear_round_draft(current_user.id)
@@ -152,7 +151,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/course", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_course_put():
         save_course_draft(request.get_json(), current_user.id)
@@ -160,7 +158,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/course", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_course_delete():
         clear_course_draft(current_user.id)
@@ -168,13 +165,13 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds", methods=["POST"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_post():
         data = request.get_json()
         date_val = data.get("date", "")
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
+        match_id = data.get("match_id")
 
         course = get_courses().get(course_name, {})
         tees = course.get("tees", {}).get(tees_name, {})
@@ -212,21 +209,68 @@ def register_rounds_routes(app, csrf):
                 total_gross += gross
             golf_round["total_gross"] = str(total_gross)
 
+        all_rounds_for_user = get_all_rounds_for_user()
         adjusted_gross = total_gross
+        if data.get("entry_mode") != "score_only" and data.get("holes"):
+            current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+            if current_hi is not None:
+                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    hole_nums = sorted(course_holes.keys(), key=int)
+                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                adjusted_total = 0
+                for hole_num, hole_data in data["holes"].items():
+                    hc_hole = course_holes.get(hole_num, {})
+                    if hc_hole:
+                        par = int(hc_hole.get("par", 0))
+                        stroke_index = int(hc_hole.get("hole_index", 999))
+                        gross = int(hole_data.get("gross", 0))
+                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
+                        adjusted_total += esc_gross
+                    else:
+                        adjusted_total += int(hole_data.get("gross", 0))
+                adjusted_gross = adjusted_total
+
         differential = calc_round_dif(slope, adjusted_gross, rating)
         golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
-        all_rounds_for_user = get_all_rounds_for_user()
         all_rounds_for_user.insert(0, golf_round_typed)
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        save_round(golf_round, date_val, 0, current_user.id)
+        round_id = save_round(golf_round, date_val, 0, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
         index = 0
+
+        if match_id and golf_round.get("computed_handicap"):
+            try:
+                match_id = int(match_id)
+                hi = float(golf_round["computed_handicap"])
+                adj_hi = hi / 2 if holes_sel != "all" else hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    if golf_round.get("holes"):
+                        played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in golf_round.get("holes", {}))
+                    else:
+                        hole_nums = sorted(course_holes.keys(), key=int)
+                        half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                        played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                ch = calc_course_handicap(adj_hi, played_par, slope, rating)
+                net = total_gross - ch
+                link_round(match_id, current_user.id, round_id, float(net))
+            except (ValueError, TypeError, Exception) as exc:
+                _log.warning("match linking failed — %s", exc)
+
         redirect_url = None
         for plugin in _plugins:
             fn = getattr(plugin, "post_save_redirect", None)
@@ -355,7 +399,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_put(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
@@ -407,6 +450,35 @@ def register_rounds_routes(app, csrf):
             golf_round["total_gross"] = str(total_gross)
 
         adjusted_gross = total_gross
+        if data.get("entry_mode") != "score_only" and data.get("holes"):
+            rounds_before = [
+                r for r in all_rounds_for_user
+                if not (r.date == date and str(r.index) == str(index))
+            ]
+            current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
+            if current_hi is not None:
+                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
+                course_holes = course.get("holes", {})
+                if holes_sel != "all" and course_holes:
+                    hole_nums = sorted(course_holes.keys(), key=int)
+                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+                else:
+                    played_par = int(course.get("par", 0))
+                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                adjusted_total = 0
+                for hole_num, hole_data in data["holes"].items():
+                    hc_hole = course_holes.get(hole_num, {})
+                    if hc_hole:
+                        par = int(hc_hole.get("par", 0))
+                        stroke_index = int(hc_hole.get("hole_index", 999))
+                        gross = int(hole_data.get("gross", 0))
+                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
+                        adjusted_total += esc_gross
+                    else:
+                        adjusted_total += int(hole_data.get("gross", 0))
+                adjusted_gross = adjusted_total
+
         differential = calc_round_dif(slope, adjusted_gross, rating)
         golf_round["differential"] = str(differential)
 
@@ -429,7 +501,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)

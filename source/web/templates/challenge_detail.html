@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block content %}
+
+{# Compute value range for mini bar #}
+{% set vals = leaderboard | map(attribute='value') | reject('none') | list %}
+{% set vmin = (vals | min) if vals else none %}
+{% set vmax = (vals | max) if vals else none %}
+{% set vrange = (vmax - vmin) if (vmin is not none and vmax is not none and vmax > vmin) else 0 %}
+{% set higher_better = stat_entry.get('higher_better', true) %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Challenge</div>
+        <h1 class="ps-h1">{{ challenge.title }}</h1>
+    </div>
+    <div class="ps-row">
+        <a href="/?tab=challenges" class="ps-btn ps-btn--ghost">Back to Challenges</a>
+    </div>
+</div>
+
+<div class="ps-stat-strip">
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Stat</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">
+            {{ stat_entry.get('label', challenge.stat_key) }}
+            {% if stat_entry.get('higher_better') %}&#8593;{% else %}&#8595;{% endif %}
+        </div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">From</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.start_date }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">To</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.end_date }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Status</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);text-transform:capitalize;">{{ challenge.status }}</div>
+    </div>
+    <div class="ps-stat">
+        <div class="ps-eyebrow">Players</div>
+        <div class="ps-stat-v" style="font-size:var(--ps-fs-body);">{{ challenge.participant_count }}</div>
+    </div>
+</div>
+
+{% if podium_top %}
+<section style="margin-top: 20px;">
+    <div class="ps-eyebrow" style="margin-bottom: var(--ps-sp-3);">Podium</div>
+    <div class="ps-podium">
+        {% for pp in podium_top %}
+        {% set initials = [] %}
+        {% for w in pp.display_name.split() %}
+        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+        {% endfor %}
+        <div class="ps-podium-item{% if loop.first %} is-first{% endif %}">
+            <div class="ps-podium-rank">{{ loop.index }}</div>
+            <div class="ps-avatar" style="margin:0 auto;{% if loop.first %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+            <div class="ps-podium-name">{{ pp.display_name.split() | first }}</div>
+            <div class="ps-podium-value">{{ '%.1f'|format(pp.value) }}{{ stat_entry.get('suffix', '') }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section style="margin-top: 24px;">
+    <div class="ps-row ps-between" style="margin-bottom: 16px;">
+        <div>
+            <div class="ps-eyebrow">Leaderboard</div>
+            <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Ranked by {{ stat_entry.get('label', challenge.stat_key) }}</div>
+        </div>
+    </div>
+    <table class="ps-table">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th class="r" style="width:120px;">{{ stat_entry.get('label', challenge.stat_key) }}</th>
+                <th class="r">Rounds</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in leaderboard %}
+            {% set is_leader = p.get('is_leader', false) %}
+            <tr{% if is_leader %} style="border-left:2px solid var(--ps-accent);"{% endif %}>
+                <td style="color:var(--ps-ink-3);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);width:40px;">
+                    {{ loop.index }}
+                </td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% set initials = [] %}
+                        {% for w in p.display_name.split() %}
+                        {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+                        {% endfor %}
+                        <div class="ps-avatar" style="{% if is_leader %}background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-paper);{% endif %}">{{ initials | join('') }}</div>
+                        <div>
+                            <div class="ps-course" style="{% if is_leader %}color:var(--ps-accent);{% endif %}">{{ p.display_name }}</div>
+                            {% if is_leader %}<div class="ps-eyebrow" style="color:var(--ps-accent);margin-top:2px;">LEADER</div>{% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="r" style="vertical-align:middle;">
+                    {% if p.value is not none %}
+                    {% set raw = ((p.value - vmin) / vrange) if vrange > 0 else 0.5 %}
+                    {% if not higher_better %}{% set raw = 1 - raw %}{% endif %}
+                    <span{% if is_leader %} class="ps-leader"{% endif %}>{{ '%.1f'|format(p.value) }}{{ stat_entry.get('suffix', '') }}</span>
+                    <div class="ps-minibar">
+                        <div class="ps-minibar-fill" style="width:{{ (raw * 100) | round }}%;"></div>
+                    </div>
+                    {% else %}
+                    <span style="color:var(--ps-ink-3);">&mdash;</span>
+                    {% endif %}
+                </td>
+                <td class="r" style="color:var(--ps-ink-2);">{{ p.round_count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}

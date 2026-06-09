@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="ps-topbar">
+    <div>
+        <div class="ps-eyebrow">Match</div>
+        <h1 class="ps-h1">Create a new <em>match</em>.</h1>
+    </div>
+</div>
+
+<form method="post" class="settings-form" style="margin-top: 24px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if error %}
+    <div style="color:var(--ps-warn);font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);margin-bottom:16px;">{{ error }}</div>
+    {% endif %}
+
+    <div class="settings-group">
+        <h3>Course</h3>
+        <select name="course" class="settings-field" style="width:100%;font-family:var(--ps-font-mono);font-size:13px;padding:8px;border:1px solid var(--ps-rule-c);background:var(--ps-paper);color:var(--ps-ink);">
+            <option value="">Select a course</option>
+            {% for name, data in courses.items() %}
+            <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="settings-group">
+        <h3>Date</h3>
+        <input type="date" name="date" value="{{ today }}" class="settings-field" style="font-family:var(--ps-font-mono);font-size:13px;padding:8px;border:1px solid var(--ps-rule-c);background:var(--ps-paper);color:var(--ps-ink);">
+    </div>
+
+    <div class="settings-group">
+        <h3>Participants (select at least 2)</h3>
+        {% for u in users %}
+        <label class="settings-toggle">
+            <input type="checkbox" name="participants" value="{{ u.id }}">
+            {% set initials = [] %}
+            {% for w in u.display_name.split() %}
+            {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+            {% endfor %}
+            <span class="ps-avatar" style="width:22px;height:22px;font-size:8px;vertical-align:middle;">{{ initials | join('') }}</span>
+            {{ u.display_name }}
+        </label>
+        {% endfor %}
+    </div>
+
+    <button type="submit" class="ps-btn">Create Match</button>
+    <a href="/?tab=matches" class="ps-btn ps-btn--ghost">Cancel</a>
+</form>
+
+{% endblock %}

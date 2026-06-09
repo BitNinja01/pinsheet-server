@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var wizard = document.getElementById("round-wizard");
     if (!wizard) return;
 
-    var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'notes'];
+    var STEP_ORDER = ['date', 'course', 'tee', 'holes', 'transport', 'entry_mode', 'holes_detail', 'match', 'notes'];
     var draftTimer = null;
     var scorecardData = {};
     var _editingHole = null;
@@ -436,7 +436,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function addGrossScoreInput() {
         if (document.getElementById('gross-score')) return;
         var area = document.getElementById('scorecard-area');
-        area.innerHTML = '<div><label class="step-label">Gross Score</label><input type="number" class="step-input" id="gross-score" placeholder="e.g. 87" min="1" max="200"></div>';
+        area.innerHTML = '<div><label class="step-label">Gross Score</label><input type="number" class="step-input" id="gross-score" placeholder="e.g. 87" min="1" max="200"><button class="btn btn-accent" id="gross-score-continue" style="margin-top:0.75rem">Continue</button></div>';
+        document.getElementById('gross-score-continue').addEventListener('click', function () {
+            var gross = document.getElementById('gross-score').value;
+            if (!gross) {
+                alert('Please enter your gross score.');
+                return;
+            }
+            showStep('notes');
+        });
     }
 
     function getScorecardRange() {
@@ -467,7 +475,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var course = window._courses[courseName];
         var holesData = course ? course.holes || {} : {};
         var currentHole = (_editingHole !== null) ? _editingHole : _currentHoleNum();
-        if (currentHole === null) currentHole = holesRange[holesRange.length - 1];
 
         var html = '<table class="data-table scorecard-input"><thead><tr>' +
             '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
@@ -771,6 +778,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         buildScorecardGrid();
         saveDraft();
+
+        var range = getScorecardRange();
+        var nextIdx = range.indexOf(holeNum) + 1;
+        if (nextIdx >= range.length) {
+            showStep('notes');
+        }
     }
 
     function updateRunningStats() {
@@ -1035,6 +1048,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var entryMode = (document.querySelector('input[name="entry_mode"]:checked') || {}).value || 'detailed';
         var notes = document.getElementById('round-notes').value;
 
+        var matchSelect = document.getElementById('round-match');
+        var matchId = matchSelect ? matchSelect.value : '';
+
         var payload = {
             date: date,
             course: courseName,
@@ -1043,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', function () {
             transport: transport,
             entry_mode: entryMode,
             notes: notes,
+            match_id: matchId || null,
         };
 
         if (entryMode === 'detailed') {
@@ -1136,12 +1153,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('input[name="entry_mode"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
             document.getElementById('scorecard-area').innerHTML = '';
+            var holesDetail = document.querySelector('.wizard-step[data-step="holes_detail"]');
             if (this.value === 'detailed') {
+                holesDetail.classList.remove('is-score-only');
                 buildScorecardGrid();
                 showStep('holes_detail');
             } else {
+                holesDetail.classList.add('is-score-only');
                 addGrossScoreInput();
-                showStep('notes');
+                showStep('holes_detail');
             }
         });
     });
@@ -1159,6 +1179,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     wizard.addEventListener('change', debouncedDraftSave);
     wizard.addEventListener('input', debouncedDraftSave);
+
+    // --- Notes step ---
+    var notesContinue = document.getElementById('notes-continue');
+    if (notesContinue) {
+        notesContinue.addEventListener('click', function () {
+            showStep('match');
+        });
+    }
 
     // --- Submit ---
     document.getElementById('submit-round').addEventListener('click', submitRound);
@@ -1274,3 +1302,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+(function () {
+    var toggles = document.querySelectorAll('.plugin-toggle');
+    if (!toggles.length) return;
+
+    toggles.forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            var pluginName = this.dataset.plugin;
+            var enabled = this.checked;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/admin/plugin-state', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    var row = toggle.closest('.plugin-row');
+                    if (row) {
+                        var badge = row.querySelector('.restart-badge');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'restart-badge';
+                            badge.style.cssText = 'font-size: 11px; color: var(--ps-warn); background: rgba(255,165,0,0.1); padding: 2px 8px; border-radius: 4px;';
+                            badge.textContent = 'Restart required';
+                            var container = row.querySelector('div:last-child');
+                            if (container) container.insertBefore(badge, container.querySelector('.settings-toggle'));
+                        }
+                    }
+                } else {
+                    this.checked = !enabled;
+                }
+            }.bind(this);
+            xhr.onerror = function () {
+                toggle.checked = !enabled;
+            };
+            xhr.send(JSON.stringify({plugin_name: pluginName, enabled: enabled}));
+        });
+    });
+})();

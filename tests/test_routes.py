@@ -182,6 +182,73 @@ def test_put_course_updates_existing(test_app):
     assert courses["Test Course Renamed"]["location"]["city"] == "New City"
 
 
+class TestAdminPluginState:
+    def test_admin_can_toggle_plugin(self, test_app):
+        from source.store import seed_plugin_state, get_plugin_states
+        seed_plugin_state("test-plugin")
+
+        create_user("admin", "Admin", "adminpass")
+        client = test_app.test_client()
+        client.post("/login", data={"username": "admin", "password": "adminpass"})
+
+        resp = client.post("/api/admin/plugin-state", json={
+            "plugin_name": "test-plugin",
+            "enabled": False,
+        })
+        assert resp.status_code == 200
+        assert resp.get_json() == {"ok": True}
+
+        states = get_plugin_states()
+        assert states["test-plugin"] is False
+
+    def test_toggle_back_to_enabled(self, test_app):
+        from source.store import seed_plugin_state, set_plugin_state, get_plugin_states
+        seed_plugin_state("test-plugin")
+        set_plugin_state("test-plugin", False)
+
+        create_user("admin", "Admin", "adminpass")
+        client = test_app.test_client()
+        client.post("/login", data={"username": "admin", "password": "adminpass"})
+
+        resp = client.post("/api/admin/plugin-state", json={
+            "plugin_name": "test-plugin",
+            "enabled": True,
+        })
+        assert resp.status_code == 200
+
+        states = get_plugin_states()
+        assert states["test-plugin"] is True
+
+    def test_rejects_missing_plugin_name(self, test_app):
+        create_user("admin", "Admin", "adminpass")
+        client = test_app.test_client()
+        client.post("/login", data={"username": "admin", "password": "adminpass"})
+
+        resp = client.post("/api/admin/plugin-state", json={
+            "enabled": False,
+        })
+        assert resp.status_code == 400
+
+    def test_non_admin_gets_403(self, test_app):
+        create_user("admin", "Admin", "adminpass")
+        create_user("user", "User", "userpass")
+        client = test_app.test_client()
+        client.post("/login", data={"username": "user", "password": "userpass"})
+
+        resp = client.post("/api/admin/plugin-state", json={
+            "plugin_name": "test-plugin",
+            "enabled": False,
+        })
+        assert resp.status_code == 403
+
+    def test_requires_login(self, test_app):
+        resp = test_app.test_client().post("/api/admin/plugin-state", json={
+            "plugin_name": "test-plugin",
+            "enabled": False,
+        })
+        assert resp.status_code in (302, 401)
+
+
 def test_put_round_updates_existing(test_app):
     create_user("p", "P", "pass1234")
     client = test_app.test_client()
