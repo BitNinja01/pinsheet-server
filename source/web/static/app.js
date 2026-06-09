@@ -475,7 +475,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var course = window._courses[courseName];
         var holesData = course ? course.holes || {} : {};
         var currentHole = (_editingHole !== null) ? _editingHole : _currentHoleNum();
-        if (currentHole === null) currentHole = holesRange[holesRange.length - 1];
 
         var html = '<table class="data-table scorecard-input"><thead><tr>' +
             '<th>Hole</th><th>Par</th><th>SI</th><th>Gross</th><th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>' +
