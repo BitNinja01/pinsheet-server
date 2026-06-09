@@ -31,7 +31,7 @@ jobs:
       - name: Fetch release notes
         id: notes
         run: |
-          PR_NUM=$(gh pr list --base main --state merged --json number --jq '.[-1].number')
+          PR_NUM=$(gh pr list --base main --state merged --limit 1 --json number --jq '.[0].number')
           if [ -n "$PR_NUM" ]; then
             gh pr view "$PR_NUM" --json body --jq '.body' > /tmp/release_notes.md
             echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
