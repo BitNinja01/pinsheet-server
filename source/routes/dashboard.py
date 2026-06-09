@@ -275,9 +275,11 @@ def register_dashboard_routes(app, limiter, csrf):
         )
         board_meta = compute_board_meta(rankings, BOARD_STATS, STAT_META)
 
+        you_rank = 0
         you_lead_stat = None
-        for entry in rankings:
+        for i, entry in enumerate(rankings, 1):
             if entry["user_id"] == current_user.id:
+                you_rank = i
                 you_lead_stat = entry["stats"].get("lead_stat")
                 break
 
@@ -309,6 +311,7 @@ def register_dashboard_routes(app, limiter, csrf):
                 challenges=get_all_challenges(),
                 featured_match=_featured_match(),
                 featured_challenge=_featured_challenge(),
+                you_rank=you_rank,
                 you_lead_stat=you_lead_stat,
                 season_label=season_label,
             ),

@@ -1,13 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-{% set you_rank = 0 %}
-{% for entry in rankings %}
-  {% if entry.user_id == current_user.id %}
-    {% set you_rank = loop.index %}
-  {% endif %}
-{% endfor %}
-
 <div style="display:grid;grid-template-columns:1fr 268px;gap:36px;min-height:0;">
 
   {#── Main column ──#}
