@@ -22,7 +22,6 @@ from calc import (
     calc_hole_scores,
 )
 from source.web.charts import sparkline_svg
-from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_round, dict_to_course
 from source.plugin import fire_hook, _plugins
@@ -35,8 +34,6 @@ def register_rounds_routes(app, csrf):
     @app.route("/rounds/new")
     @login_required
     def round_entry():
-        if not g.is_own_data:
-            return "You can only enter data for yourself.", 403
         today = date.today().isoformat()
         no_courses = len(get_courses()) == 0
         matches = get_matches_for_user(current_user.id)
@@ -134,7 +131,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_round_put():
         save_round_draft(request.get_json(), current_user.id)
@@ -142,7 +138,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_round_delete():
         clear_round_draft(current_user.id)
@@ -156,7 +151,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/course", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_course_put():
         save_course_draft(request.get_json(), current_user.id)
@@ -164,7 +158,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/course", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_draft_course_delete():
         clear_course_draft(current_user.id)
@@ -172,7 +165,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds", methods=["POST"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_post():
         data = request.get_json()
@@ -407,7 +399,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_put(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
@@ -510,7 +501,6 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)

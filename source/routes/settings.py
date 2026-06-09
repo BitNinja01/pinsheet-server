@@ -11,7 +11,6 @@ from store import (
     get_all_rounds, update_round_handicap,
 )
 from calc import calc_handicap_index
-from source.routes.auth import requires_own_data
 from source.request_data import get_settings, get_courses, base_context
 
 
@@ -30,7 +29,6 @@ def register_settings_routes(app, csrf):
 
     @app.route("/settings/import", methods=["GET", "POST"])
     @login_required
-    @requires_own_data
     def settings_import():
         if request.method == "POST":
             uploaded = request.files.get("zipfile")
@@ -90,7 +88,6 @@ def register_settings_routes(app, csrf):
     @csrf.exempt
     @app.route("/api/settings", methods=["PUT"])
     @login_required
-    @requires_own_data
     def api_settings_put():
         data = request.get_json()
         _log.info("api_settings_put user_id=%s, data=%s", current_user.id, data)

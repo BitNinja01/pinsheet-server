@@ -2,7 +2,6 @@ from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
 from store import save_course, delete_course, rename_course
-from source.routes.auth import requires_own_data
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.plugin import fire_hook
 
@@ -11,8 +10,6 @@ def register_courses_routes(app, csrf):
     @app.route("/courses/new")
     @login_required
     def course_entry():
-        if not g.is_own_data:
-            return "You can only enter data for yourself.", 403
         return render_template("course_entry.html", **base_context(
             courses=get_courses(),
         ))
@@ -95,7 +92,6 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses", methods=["POST"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_courses_post():
         data = request.get_json()
@@ -120,7 +116,6 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["DELETE"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_courses_delete(name):
         for r in get_all_rounds_for_user():
@@ -131,7 +126,6 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["PUT"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_courses_put(name):
         if not get_courses().get(name):

@@ -56,8 +56,6 @@ def register_matches_routes(app):
     @app.route("/matches/new", methods=["GET", "POST"])
     @login_required
     def match_new():
-        if not g.is_own_data:
-            return "You can only create matches for yourself.", 403
         if request.method == "POST":
             course_name = request.form.get("course", "").strip()
             match_date = request.form.get("date", "").strip()

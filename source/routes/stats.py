@@ -18,7 +18,6 @@ from calc import (
     calc_per_round_average, calc_hole_percentage,
     last_n_rounds, best_n_rounds,
 )
-from source.routes.auth import requires_own_data
 from calc import stat_delta
 from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context

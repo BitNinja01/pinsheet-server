@@ -14,7 +14,6 @@ from calc import (
 )
 
 from source.web.charts import sparkline_svg, make_chart_data
-from source.routes.auth import requires_own_data
 from calc import per_round_hole_stats
 from source.models import dict_to_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
@@ -245,8 +244,6 @@ def register_dashboard_routes(app, limiter, csrf):
     @app.route("/challenges/new", methods=["GET", "POST"])
     @login_required
     def challenge_new():
-        if not g.is_own_data:
-            return "You can only create challenges for yourself.", 403
         if request.method == "POST":
             title = request.form.get("title", "").strip()
             participant_ids = request.form.getlist("participants")
@@ -370,7 +367,6 @@ def register_dashboard_routes(app, limiter, csrf):
 
     @app.route("/api/welcome", methods=["POST"])
     @login_required
-    @requires_own_data
     @csrf.exempt
     def api_welcome_done():
         settings = get_settings()

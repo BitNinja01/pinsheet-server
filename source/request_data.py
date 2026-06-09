@@ -1,10 +1,11 @@
 from flask import g
+from flask_login import current_user
 import store
 
 
 def get_settings():
     if not hasattr(g, '_settings'):
-        g._settings = store.load_settings(g.view_user["id"])
+        g._settings = store.load_settings(current_user.id)
     return g._settings
 
 
@@ -16,7 +17,7 @@ def get_courses():
 
 def get_all_rounds_for_user():
     if not hasattr(g, '_all_rounds'):
-        g._all_rounds = store.get_all_rounds(g.view_user["id"])
+        g._all_rounds = store.get_all_rounds(current_user.id)
     return g._all_rounds
 
 
