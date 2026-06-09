@@ -116,6 +116,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
     result = []
     for row in rows:
         r = {
+            "id": row["id"],
             "date": row["date"],
             "index": row["round_index"],
             "user_id": row["user_id"],
@@ -144,6 +145,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
     if not row:
         return None
     r = {
+        "id": row["id"],
         "date": row["date"],
         "index": row["round_index"],
         "user_id": row["user_id"],

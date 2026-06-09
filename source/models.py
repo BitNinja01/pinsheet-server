@@ -12,6 +12,7 @@ class HoleData:
 
 @dataclass
 class RoundData:
+    id: int = 0
     date: str = ""
     course: str = ""
     tees: str = ""
@@ -105,6 +106,7 @@ def dict_to_round(d: dict) -> RoundData:
     for k, v in d.get("holes", {}).items():
         holes[k] = dict_to_hole(v)
     return RoundData(
+        id=d.get("id", 0),
         date=d.get("date", ""),
         course=d.get("course", ""),
         tees=d.get("tees", ""),
