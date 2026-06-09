@@ -225,6 +225,59 @@ def update_round_handicap(date: str, index: int, handicap: float, user_id: int) 
     db.close()
 
 
+def recompute_all_handicaps() -> None:
+    users = get_users()
+    if not users:
+        _log.info("No users found — skipping handicap recompute")
+        return
+
+    _log.info("Recomputing handicaps for %d user(s)...", len(users))
+    import time
+    from calc.handicap import calc_handicap_index
+    t0 = time.time()
+    total_rounds = 0
+    total_updated = 0
+
+    for u in users:
+        uid = u["id"]
+        try:
+            settings = load_settings(uid)
+            include_9hole = settings.get("include_9hole", True)
+
+            all_rounds = get_all_rounds(uid)
+            if not all_rounds:
+                _log.info("  User '%s': 0 rounds, skipped", u["username"])
+                continue
+
+            chronological = list(reversed(all_rounds))
+            user_updated = 0
+
+            for i, r in enumerate(chronological):
+                window = chronological[:i + 1]
+                hi = calc_handicap_index(window, include_9hole)
+                if hi is not None:
+                    new_val = str(hi)
+                    if r.computed_handicap != new_val:
+                        update_round_handicap(r.date, r.index, hi, uid)
+                        user_updated += 1
+
+            total_rounds += len(chronological)
+            total_updated += user_updated
+            _log.info(
+                "  User '%s': %d rounds, %d updated",
+                u["username"], len(chronological), user_updated,
+            )
+        except Exception as exc:
+            _log.error("  User '%s': error — %s", u["username"], exc)
+            continue
+
+    elapsed = time.time() - t0
+    _log.info(
+        "Handicap recompute complete: %d users, %d rounds processed, %d updated, %.3fs",
+        len(users), total_rounds, total_updated, elapsed,
+    )
+
+
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
     if holes_sel == "front":
         slope  = float(tee_data.get("front_slope",  tee_data.get("slope",  113)))

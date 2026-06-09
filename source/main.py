@@ -184,6 +184,8 @@ def main():
     db_path = str(data_dir / "pinsheet.db")
     set_db_path(db_path)
     init_db()
+    from store import recompute_all_handicaps
+    recompute_all_handicaps()
     app.config["DB_PATH"] = Path(db_path)
     app.config["DATA_DIR"] = data_dir
     app._plugin_blocks = {}

@@ -9,6 +9,7 @@ from store import (
     load_settings, save_settings,
     get_courses, save_course, delete_course, rename_course,
     get_all_rounds, save_round, delete_round, update_round_handicap,
+    recompute_all_handicaps,
     get_slope_rating,
     save_course_draft, load_course_draft, clear_course_draft,
     save_round_draft, load_round_draft, clear_round_draft,
@@ -565,3 +566,26 @@ def test_challenge_participant_count(db):
     chal = get_challenge(cid)
     assert chal["participant_count"] == 2
     db.close()
+
+
+def test_recompute_all_handicaps(db):
+    create_user("golfer", "Golfer", "pass1234")
+    settings = {"include_9hole": True, "season_start_month": 1, "season_end_month": 12}
+    save_settings(settings, user_id=1)
+
+    for i in range(6):
+        r = {"course": "GC", "tees": "W", "total_gross": str(70 + i),
+             "differential": str(15 - i), "computed_handicap": "99.9",
+             "holes_selection": "all", "entry_mode": "score_only", "holes": {}}
+        save_round(r, f"2026-05-{i+1:02d}", 0, user_id=1)
+
+    recompute_all_handicaps()
+
+    rounds = get_all_rounds(user_id=1)
+    rounds.sort(key=lambda r: r.date)
+
+    for r in rounds:
+        assert r.computed_handicap not in (None, "", "0"), \
+            f"round {r.date} has empty value ({r.computed_handicap})"
+    assert rounds[-1].computed_handicap != "99.9"
+    assert float(rounds[-1].computed_handicap) < 20.0
