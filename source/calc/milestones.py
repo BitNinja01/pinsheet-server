@@ -19,11 +19,11 @@ def calc_personal_bests(rounds: list[RoundData], courses: dict[str, CourseData])
                 best_diff_date = date
         if not r.holes:
             continue
-        fir = sum(1 for h in r.holes.values() if h.fairway == "H")
+        fir = sum(1 for h in r.holes.values() if not h.fairway or h.fairway == "H")
         if most_fir is None or fir > most_fir:
             most_fir = fir
             most_fir_date = date
-        gir = sum(1 for h in r.holes.values() if h.gir == "H")
+        gir = sum(1 for h in r.holes.values() if not h.gir or h.gir == "H")
         if most_gir is None or gir > most_gir:
             most_gir = gir
             most_gir_date = date
@@ -255,7 +255,7 @@ def calc_best_gir_round(season_rounds: list[RoundData]) -> tuple[RoundData, int]
     for r in season_rounds:
         if not r.holes:
             continue
-        count = sum(1 for h in r.holes.values() if h.gir == "H")
+        count = sum(1 for h in r.holes.values() if not h.gir or h.gir == "H")
         if count > best_count:
             best_count = count
             best = r
@@ -274,7 +274,7 @@ def calc_best_fir_round(season_rounds: list[RoundData], courses: dict[str, Cours
         course_holes = course.holes if course else {}
         count = sum(
             1 for h_num, h in r.holes.items()
-            if h.fairway == "H"
+            if (not h.fairway or h.fairway == "H")
             and course_holes.get(str(h_num), HoleDef()).par != 3
         )
         if count > best_count:

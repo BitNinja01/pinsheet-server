@@ -1460,7 +1460,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 @media (max-width: 768px) {
     .desktop-table { display: none !important; }
-    .desktop-hole-progress, .inline-error, .desktop-running-stats { display: none !important; }
+    .desktop-hole-progress, .desktop-running-stats { display: none !important; }
     .hole-table-wrap { overflow-x: auto; padding-left: 0; padding-right: 0; }
 }
 
@@ -1600,15 +1600,17 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .hole-card-shorthand {
     width: 100%;
-    padding: 14px;
-    font-size: var(--ps-fs-score);
+    padding: 8px 10px;
     font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-detail);
     background: var(--ps-paper);
-    border: var(--ps-rule) solid var(--ps-rule-c);
+    border: 1px solid var(--ps-rule-c);
     color: var(--ps-ink);
-    text-align: center;
-    letter-spacing: 2px;
     box-sizing: border-box;
+    outline: none;
+}
+.hole-card-shorthand.is-error {
+    border-color: var(--ps-warn);
 }
 .hole-card-shorthand:focus {
     outline: none;

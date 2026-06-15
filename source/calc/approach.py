@@ -15,7 +15,7 @@ def calc_fir_percent(rounds: list[RoundData], courses: dict[str, CourseData]) ->
             if par == 3:
                 continue
             eligible += 1
-            if h.fairway == "H":
+            if not h.fairway or h.fairway == "H":
                 hits += 1
     return (hits / eligible) * 100 if eligible else None
 
@@ -28,7 +28,7 @@ def calc_gir_percent(rounds: list[RoundData]) -> float | None:
             continue
         for h in r.holes.values():
             total += 1
-            if h.gir == "H":
+            if not h.gir or h.gir == "H":
                 hits += 1
     return (hits / total) * 100 if total else None
 
@@ -42,7 +42,7 @@ def calc_scramble_percent(rounds: list[RoundData], courses: dict[str, CourseData
         course = courses.get(r.course)
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
-            if h.gir == "H":
+            if not h.gir or h.gir == "H":
                 continue
             missed_gir += 1
             par = holes.get(str(hole_num), HoleDef()).par
@@ -100,7 +100,7 @@ def calc_scoring_by_fairway(rounds: list[RoundData], courses: dict[str, CourseDa
                 continue
             diff = h.gross - par
             fw = h.fairway
-            if fw == "H":
+            if not fw or fw == "H":
                 hit_diffs.append(diff)
             elif fw in {"L", "OBL", "R", "OBR"}:
                 missed_diffs.append(diff)
@@ -147,7 +147,7 @@ def calc_gir_by_par_type(rounds: list[RoundData], courses: dict[str, CourseData]
             if par not in totals:
                 continue
             totals[par] += 1
-            if h.gir == "H":
+            if not h.gir or h.gir == "H":
                 hits[par] += 1
     return {p: (hits[p] / totals[p]) * 100 if totals[p] else None for p in [3, 4, 5]}
 
@@ -185,8 +185,8 @@ def calc_gir_from_fairway_vs_rough(rounds: list[RoundData], courses: dict[str, C
             if par == 3:
                 continue
             fw = h.fairway
-            gir_hit = h.gir == "H"
-            if fw == "H":
+            gir_hit = not h.gir or h.gir == "H"
+            if not fw or fw == "H":
                 fw_total += 1
                 if gir_hit:
                     fw_hits += 1
@@ -213,7 +213,7 @@ def calc_scoring_by_gir(rounds: list[RoundData], courses: dict[str, CourseData])
             if not par or not h.gross:
                 continue
             diff = h.gross - par
-            if h.gir == "H":
+            if not h.gir or h.gir == "H":
                 hit_diffs.append(diff)
             else:
                 missed_diffs.append(diff)
@@ -256,7 +256,7 @@ def calc_scramble_by_par_type(rounds: list[RoundData], courses: dict[str, Course
         course = courses.get(r.course)
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
-            if h.gir == "H" or not h.gross:
+            if (not h.gir or h.gir == "H") or not h.gross:
                 continue
             par = holes.get(str(hole_num), HoleDef()).par
             if par not in missed:
@@ -352,24 +352,23 @@ def per_round_hole_stats(holes, course_holes_data):
     scr_updown = scr_opps = 0
     total_putts = 0
     for hn, h in holes.items():
+        try:
+            hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
+        except (ValueError, TypeError):
+            hole_par = 99
         fw = h.fairway
-        if fw and fw != "N":
+        if hole_par != 3 and fw != "N":
             fir_attempts += 1
-            if fw == "H":
+            if not fw or fw == "H":
                 fir_hit += 1
         gi = h.gir
-        if gi:
-            gir_total += 1
-            if gi == "H":
-                gir_hit += 1
-            if gi != "H":
-                scr_opps += 1
-                try:
-                    hole_par = int(course_holes_data.get(hn, {}).get("par", 99))
-                    if h.gross <= hole_par:
-                        scr_updown += 1
-                except (ValueError, TypeError):
-                    pass
+        if not gi or gi == "H":
+            gir_hit += 1
+        else:
+            scr_opps += 1
+            if h.gross <= hole_par:
+                scr_updown += 1
+        gir_total += 1
         try:
             total_putts += h.putts
         except (ValueError, TypeError):
