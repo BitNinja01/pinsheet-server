@@ -840,7 +840,7 @@ select.hole-input { width: 3rem; appearance: none; }
     text-transform: uppercase;
     color: var(--ps-ink-3);
 }
-.tee-remove-btn { padding: 0.1rem 0.4rem; font-size: 1rem; line-height: 1; }
+.tee-remove-btn { padding: 0.1rem 0.4rem; font-size: var(--ps-fs-body); line-height: 1; }
 .tee-numbers { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .tee-numbers label {
     font-family: var(--ps-font-mono);
@@ -1145,12 +1145,12 @@ select.hole-input { width: 3rem; appearance: none; }
     margin-bottom: 1.5rem;
 }
 .welcome-intro {
-    font-size: 0.925rem;
+    font-size: var(--ps-fs-body);
     color: var(--ps-ink-2);
     line-height: var(--ps-lh-loose);
     margin-bottom: 1rem;
 }
-.welcome-screen .ps-btn { margin-top: 1.5rem; padding: 0.75rem 2rem; font-size: 1rem; }
+.welcome-screen .ps-btn { margin-top: 1.5rem; padding: 0.75rem 2rem; font-size: var(--ps-fs-body); }
 
 /* ─────────────────────────────────────────────────────────────────────
  * SEASON SUMMARY
@@ -1693,7 +1693,7 @@ select.hole-input { width: 3rem; appearance: none; }
     width: 100%;
     padding: 6px 10px;
     font-family: var(--ps-font-mono);
-    font-size: 0.85rem;
+    font-size: var(--ps-fs-detail);
     background: var(--ps-paper);
     border: var(--ps-rule) solid var(--ps-rule-c);
     color: var(--ps-ink);

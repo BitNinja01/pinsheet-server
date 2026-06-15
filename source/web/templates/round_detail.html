@@ -50,7 +50,7 @@
     {% if entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">
       <div class="stat-label">Gross Score</div>
-      <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:2rem;width:6rem;text-align:center;">
+      <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:var(--ps-fs-h1);width:6rem;text-align:center;">
     </div>
     {% else %}
     <table class="data-table scorecard-view" id="edit-scorecard">
@@ -135,16 +135,16 @@
             {% if total.diff > 0 %}+{% endif %}{{ total.diff }}
           {% else %}--{% endif %}
         </span>
-        <span style="font-size:12px;color:var(--ps-ink-3);letter-spacing:0.04em;">par {{ total.par }}</span>
+        <span style="font-size:var(--ps-fs-round-meta);color:var(--ps-ink-3);letter-spacing:0.04em;">par {{ total.par }}</span>
       </div>
     </div>
 
     {% if course_handicap is not none %}
     <div class="rd-section">
       <div style="display:flex;align-items:baseline;gap:8px;">
-        <span style="font-size:11px;color:var(--ps-ink-3);letter-spacing:0.1em;text-transform:uppercase;font-weight:500;">Net</span>
-        <span style="font-size:28px;font-weight:300;letter-spacing:-0.03em;line-height:1;">{{ total.net_total }}</span>
-        <span style="font-size:14px;font-weight:500;"
+        <span style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);letter-spacing:0.1em;text-transform:uppercase;font-weight:500;">Net</span>
+        <span style="font-size:var(--ps-fs-stat-cell);font-weight:300;letter-spacing:-0.03em;line-height:1;">{{ total.net_total }}</span>
+        <span style="font-size:var(--ps-fs-body-lg);font-weight:500;"
           class="rd-to-par-value
           {%- if total.net_diff is not none and total.net_diff <= 0 %} is-mint
           {%- elif total.net_diff is not none and total.net_diff >= 2 %} is-warn
@@ -155,18 +155,18 @@
           {% endif %}
         </span>
       </div>
-      <div style="font-size:10px;color:var(--ps-ink-3);margin-top:3px;letter-spacing:0.06em;">
+      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:3px;letter-spacing:0.06em;">
         COURSE HCP {{ course_handicap }}
       </div>
     </div>
     {% endif %}
 
     <div class="rd-section">
-      <div style="font-size:16px;font-weight:400;">{{ round.course }}</div>
-      <div style="font-size:11px;color:var(--ps-ink-3);margin-top:4px;letter-spacing:0.04em;">
+      <div style="font-size:var(--ps-fs-body);font-weight:400;">{{ round.course }}</div>
+      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:4px;letter-spacing:0.04em;">
         {{ round.tees }} · {{ rating }} / {{ slope }}
       </div>
-      <div style="font-size:11px;color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
+      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
         {{ round.date }}{% if round.transport %} · {{ round.transport }}{% endif %}
       </div>
     </div>
@@ -206,12 +206,12 @@
       <div class="rd-hcp-numeral">
         {{ hcp_int }}<span class="ps-decimal">.</span><span class="ps-frac">{{ hcp_dec }}</span>
       </div>
-      <div style="font-size:11px;color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
+      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
         {{ "%.1f"|format(hi_before) if hi_before is not none else '--' }} → {{ "%.1f"|format(hcp_val) }}
       </div>
       {% if hi_before is not none %}
       {% set hcp_diff = hi_before - hcp_val %}
-      <div style="font-size:12px;font-weight:500;margin-top:3px;font-family:var(--ps-font-mono);{% if hcp_diff > 0 %}color:var(--ps-accent);{% elif hcp_diff < 0 %}color:var(--ps-warn);{% endif %}">
+      <div style="font-size:var(--ps-fs-round-meta);font-weight:500;margin-top:3px;font-family:var(--ps-font-mono);{% if hcp_diff > 0 %}color:var(--ps-accent);{% elif hcp_diff < 0 %}color:var(--ps-warn);{% endif %}">
         {% if hcp_diff > 0 %}▼{% elif hcp_diff < 0 %}▲{% endif %}
         {% if hcp_diff != 0 %}{{ "%.1f"|format(hcp_diff|abs) }}{% endif %}
       </div>
@@ -256,7 +256,7 @@
 
     {% if entry_mode == "score_only" %}
     <div style="display:flex;flex-direction:column;align-items:center;padding:40px 0;gap:10px;">
-      <div class="ps-hero-numeral" style="font-size:100px;">{{ total.gross }}</div>
+      <div class="ps-hero-numeral" style="font-size:var(--ps-fs-hero-tablet);">{{ total.gross }}</div>
       <div class="ps-eyebrow">Gross Score</div>
     </div>
     {% else %}
@@ -410,8 +410,8 @@
           {% else %}--{% endif %}
         </td>
         <td class="rd-td-r rd-td-meta" style="font-weight:500;">{{ total.putts }}</td>
-        <td class="rd-td-c rd-td-meta" style="font-size:11px;">{{ total.fir_hits }}/{{ total.fir_eligible }}</td>
-        <td class="rd-td-c rd-td-meta" style="font-size:11px;">{{ total.gir_hits }}/{{ total.total_holes }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-micro);">{{ total.fir_hits }}/{{ total.fir_eligible }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-micro);">{{ total.gir_hits }}/{{ total.total_holes }}</td>
       </tr>
       {% if course_avgs %}
       <tr class="rd-course-avg-row">
