@@ -68,16 +68,12 @@
     --ps-fs-detail: 0.875rem;
     --ps-fs-caption: 0.75rem;
     --ps-fs-table-cell: 0.8rem;
-    --ps-fs-round-label: 11px;
     --ps-fs-round-meta: 12px;
-    --ps-fs-round-sm: 13px;
     --ps-fs-round-bold: 15px;
     --ps-fs-round-score: 17px;
-    --ps-fs-round-lg: 20px;
     --ps-fs-round-stat: 24px;
     --ps-fs-round-hcp: 44px;
     --ps-fs-round-hero: 140px;
-    --ps-fs-stat-label-sm: 11px;
     --ps-fs-stat-cell: 28px;
     --ps-fs-icon: 40px;
     --ps-fs-hero-phone: 64px;
@@ -1450,7 +1446,7 @@ select.hole-input { width: 3rem; appearance: none; }
         gap: 4px;
     }
     .stat-cell-label {
-        font-size: var(--ps-fs-stat-label-sm);
+        font-size: var(--ps-fs-micro);
     }
 }
 
@@ -1868,7 +1864,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-to-par-value {
-    font-size: var(--ps-fs-round-lg);
+    font-size: var(--ps-fs-lg);
     font-weight: 500;
     letter-spacing: -0.02em;
 }
@@ -1896,7 +1892,7 @@ select.hole-input { width: 3rem; appearance: none; }
     line-height: 1;
 }
 .rd-stat-avg {
-    font-size: var(--ps-fs-round-label);
+    font-size: var(--ps-fs-micro);
     color: var(--ps-ink-3);
     margin-top: 2px;
     letter-spacing: var(--ps-tracking-label);
@@ -1928,7 +1924,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
 }
 .rd-dist-num {
-    font-size: var(--ps-fs-round-sm);
+    font-size: var(--ps-fs-eyebrow);
     font-weight: 500;
     font-family: var(--ps-font-mono);
 }
@@ -1987,7 +1983,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-td-r { text-align: right; }
 
 .rd-td-label {
-    font-size: var(--ps-fs-round-label);
+    font-size: var(--ps-fs-micro);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -1995,7 +1991,7 @@ select.hole-input { width: 3rem; appearance: none; }
     text-align: center;
 }
 .rd-td-meta {
-    font-size: var(--ps-fs-round-sm);
+    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
 }
 
@@ -2042,7 +2038,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .rd-na-dot {
     color: var(--ps-ink-3);
-    font-size: var(--ps-fs-round-label);
+    font-size: var(--ps-fs-micro);
 }
 
 .rd-score-bold {
@@ -2060,12 +2056,12 @@ select.hole-input { width: 3rem; appearance: none; }
     border-bottom: none;
 }
 .rd-total-score {
-    font-size: var(--ps-fs-round-lg);
+    font-size: var(--ps-fs-lg);
     font-weight: 500;
     text-align: right;
 }
 .rd-total-topar {
-    font-size: var(--ps-fs-round-sm);
+    font-size: var(--ps-fs-eyebrow);
     font-weight: 500;
     text-align: right;
 }
