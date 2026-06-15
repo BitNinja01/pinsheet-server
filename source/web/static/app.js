@@ -579,8 +579,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderHoleCards(getScorecardRange(), holesData);
     }
 
-    var FAIRWAY_CODES = new Set(['H', 'L', 'R', 'OBL', 'OBR', 'N']);
-    var GIR_CODES = new Set(['H', 'L', 'R', 'S', 'LO', 'OBL', 'OBR', 'OBS', 'OBLO']);
+    var SHORTHAND_CODES = new Set(['H', 'L', 'R', 'S', 'LO', 'N', 'OBL', 'OBR', 'OBS', 'OBLO']);
 
     /* ── Shorthand parser ── */
     function parseShorthand(raw) {
@@ -600,11 +599,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!gross || isNaN(gross) || gross < 1 || gross > 30) {
             errors.push('Score must be 1-30');
         }
-        if (!parsed.fairway || !FAIRWAY_CODES.has(parsed.fairway)) {
-            errors.push('Fairway: H L R OBL OBR N');
+        if (!parsed.fairway || !SHORTHAND_CODES.has(parsed.fairway)) {
+            errors.push('Fairway: H L R S LO N OBL OBR OBS OBLO');
         }
-        if (!parsed.gir || !GIR_CODES.has(parsed.gir)) {
-            errors.push('GIR: H L R S LO OBL OBR OBS OBLO');
+        if (!parsed.gir || !SHORTHAND_CODES.has(parsed.gir)) {
+            errors.push('GIR: H L R S LO N OBL OBR OBS OBLO');
         }
         var putts = parseInt(parsed.putts);
         if (parsed.putts === '' || isNaN(putts) || putts < 0 || putts > 10) {
