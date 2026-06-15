@@ -63,6 +63,20 @@
     --ps-fs-h1: 32px;
     --ps-fs-stat: 38px;
     --ps-fs-hero: 200px;
+    --ps-fs-round-label: 10px;
+    --ps-fs-round-meta: 12px;
+    --ps-fs-round-sm: 13px;
+    --ps-fs-round-bold: 15px;
+    --ps-fs-round-score: 17px;
+    --ps-fs-round-lg: 20px;
+    --ps-fs-round-stat: 24px;
+    --ps-fs-round-hcp: 44px;
+    --ps-fs-round-hero: 140px;
+    --ps-fs-stat-label-sm: 9px;
+    --ps-fs-stat-cell: 28px;
+    --ps-fs-icon: 40px;
+    --ps-fs-hero-phone: 64px;
+    --ps-fs-hero-tablet: 100px;
 
     --ps-fw-display: 400;
     --ps-fw-body: 400;
@@ -75,10 +89,13 @@
     --ps-tracking-eyebrow: 0.16em;
     --ps-tracking-chip: 0.12em;
     --ps-tracking-mono: 0.04em;
+    --ps-tracking-label: 0.06em;
 
     --ps-lh-hero: 0.82;
     --ps-lh-tight: 1;
     --ps-lh-body: 1.45;
+    --ps-lh-heading: 1.05;
+    --ps-lh-loose: 1.6;
 
     --ps-sp-1: 4px;
     --ps-sp-2: 8px;
@@ -112,6 +129,7 @@
     --ps-brass: #a4843c;
     --ps-warn: #b04848;
     --ps-warn-dim: rgba(176, 72, 72, 0.08);
+    --ps-accent-fg: #0a0a0a;
 }
 
 /* ── Dark mode ─────────────────────────────────────────────────────── */
@@ -127,6 +145,7 @@
     --ps-brass: #c9a35a;
     --ps-warn: #d96a6a;
     --ps-warn-dim: rgba(217, 106, 106, 0.12);
+    --ps-accent-fg: #0a0a0a;
 }
 
 /* ── Body defaults ─────────────────────────────────────────────────── */
@@ -286,7 +305,7 @@ body {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-h1);
     font-weight: var(--ps-fw-body);
-    line-height: 1.05;
+    line-height: var(--ps-lh-heading);
     letter-spacing: var(--ps-tracking-display);
 }
 .ps-h1 em {
@@ -373,7 +392,7 @@ body {
     color: var(--ps-ink);
 }
 .ps-stat .ps-stat-v .ps-stat-pct {
-    font-size: 24px;
+    font-size: var(--ps-fs-stat-cell);
     font-weight: 400;
     color: var(--ps-ink-2);
 }
@@ -508,7 +527,7 @@ body {
     font-family: var(--ps-font-mono);
     font-size: 11px;
     font-weight: var(--ps-fw-label);
-    letter-spacing: 0.06em;
+    letter-spacing: var(--ps-tracking-label);
     text-transform: uppercase;
     padding: var(--ps-sp-2) var(--ps-sp-4);
     border: var(--ps-rule) solid var(--ps-ink);
@@ -559,12 +578,12 @@ body {
 }
 .ps-card--create-icon {
     font-family: var(--ps-font-display);
-    font-size: 40px; font-weight: var(--ps-fw-display);
+    font-size: var(--ps-fs-icon); font-weight: var(--ps-fw-display);
     line-height: 0.8; color: var(--ps-ink-3);
 }
 .ps-card--create-text {
     font-size: var(--ps-fs-eyebrow);
-    color: var(--ps-ink-2); letter-spacing: 0.04em;
+    color: var(--ps-ink-2); letter-spacing: var(--ps-tracking-mono);
 }
 
 /* ── Links ─────────────────────────────────────────────────────────── */
@@ -884,7 +903,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-weight: var(--ps-fw-label);
     font-size: 10px;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ps-tracking-mono);
     flex-shrink: 0;
 }
 .ps-avatar.is-self {
@@ -1029,7 +1048,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-eyebrow);
     font-weight: var(--ps-fw-label);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ps-tracking-mono);
     margin-bottom: 8px;
 }
 .stat-cell-delta.is-up { color: var(--ps-accent); }
@@ -1045,7 +1064,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ps-tracking-mono);
 }
 .stat-cell-window strong {
     color: var(--ps-ink-2);
@@ -1126,7 +1145,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .welcome-intro {
     font-size: 0.925rem;
     color: var(--ps-ink-2);
-    line-height: 1.6;
+    line-height: var(--ps-lh-loose);
     margin-bottom: 1rem;
 }
 .welcome-screen .ps-btn { margin-top: 1.5rem; padding: 0.75rem 2rem; font-size: 1rem; }
@@ -1156,7 +1175,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: 11px;
     font-weight: var(--ps-fw-label);
-    letter-spacing: 0.06em;
+    letter-spacing: var(--ps-tracking-label);
     text-transform: uppercase;
     padding: var(--ps-sp-2) var(--ps-sp-4);
     border: var(--ps-rule) solid var(--ps-ink);
@@ -1220,7 +1239,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: 11px;
     font-weight: var(--ps-fw-label);
-    letter-spacing: 0.06em;
+    letter-spacing: var(--ps-tracking-label);
     text-transform: uppercase;
     padding: var(--ps-sp-2) var(--ps-sp-4);
     border: var(--ps-rule) solid var(--ps-ink);
@@ -1369,10 +1388,10 @@ select.hole-input { width: 3rem; appearance: none; }
     .ps-stat-strip { grid-template-columns: repeat(3, 1fr); }
     .ps-stat { padding: var(--ps-sp-2) var(--ps-sp-4); }
     .ps-stat:nth-child(3n) { border-right: none; }
-    .ps-stat-v { font-size: 28px; }
+    .ps-stat-v { font-size: var(--ps-fs-stat-cell); }
 
     /* Hero numeral: smaller */
-    .ps-hero-numeral { font-size: 100px; }
+    .ps-hero-numeral { font-size: var(--ps-fs-hero-tablet); }
 
     /* Hero grid: stack */
     .ps-hero {
@@ -1396,7 +1415,7 @@ select.hole-input { width: 3rem; appearance: none; }
 @media (max-width: 480px) {
     .ps-main { padding: var(--ps-sp-3); }
 
-    .ps-hero-numeral { font-size: 64px; }
+    .ps-hero-numeral { font-size: var(--ps-fs-hero-phone); }
 
     /* Stat strip: 2 columns */
     .ps-stat-strip { grid-template-columns: repeat(2, 1fr); }
@@ -1426,7 +1445,7 @@ select.hole-input { width: 3rem; appearance: none; }
         gap: 4px;
     }
     .stat-cell-label {
-        font-size: 9px;
+        font-size: var(--ps-fs-stat-label-sm);
     }
 }
 
@@ -1463,7 +1482,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .round-card-date {
     font-size: var(--ps-fs-micro);
     color: var(--ps-ink-3);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ps-tracking-mono);
 }
 .round-card-course {
     font-family: var(--ps-font-mono);
@@ -1617,7 +1636,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .hole-card-btn--next {
     background: var(--ps-accent);
-    color: #0a0a0a;
+    color: var(--ps-accent-fg);
     border-color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
 }
@@ -1645,7 +1664,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .hole-progress-dot.completed {
     background: var(--ps-accent);
-    color: #0a0a0a;
+    color: var(--ps-accent-fg);
     border-color: var(--ps-accent);
 }
 .hole-progress-dot.current {
@@ -1701,7 +1720,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ps-tracking-mono);
 }
 .desktop-running-stats strong {
     color: var(--ps-ink);
@@ -1836,7 +1855,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .rd-hero {
     font-family: var(--ps-font-display);
-    font-size: 140px;
+    font-size: var(--ps-fs-round-hero);
     font-weight: 200;
     line-height: 0.82;
     letter-spacing: -0.04em;
@@ -1844,7 +1863,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-to-par-value {
-    font-size: 20px;
+    font-size: var(--ps-fs-round-lg);
     font-weight: 500;
     letter-spacing: -0.02em;
 }
@@ -1865,22 +1884,22 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-stat-value {
-    font-size: 24px;
+    font-size: var(--ps-fs-round-stat);
     font-weight: 300;
     margin-top: 2px;
     letter-spacing: -0.02em;
     line-height: 1;
 }
 .rd-stat-avg {
-    font-size: 10px;
+    font-size: var(--ps-fs-round-label);
     color: var(--ps-ink-3);
     margin-top: 2px;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--ps-tracking-label);
 }
 
 .rd-hcp-numeral {
     font-family: var(--ps-font-display);
-    font-size: 44px;
+    font-size: var(--ps-fs-round-hcp);
     font-weight: 200;
     line-height: 0.85;
     letter-spacing: -0.04em;
@@ -1900,11 +1919,11 @@ select.hole-input { width: 3rem; appearance: none; }
     align-items: center;
 }
 .rd-dist-lbl {
-    font-size: 12px;
+    font-size: var(--ps-fs-round-meta);
     font-family: var(--ps-font-mono);
 }
 .rd-dist-num {
-    font-size: 13px;
+    font-size: var(--ps-fs-round-sm);
     font-weight: 500;
     font-family: var(--ps-font-mono);
 }
@@ -1922,7 +1941,7 @@ select.hole-input { width: 3rem; appearance: none; }
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
 }
 .rd-notes-text {
-    font-size: 12px;
+    font-size: var(--ps-fs-round-meta);
     line-height: 1.4;
     color: var(--ps-ink-2);
     font-family: var(--ps-font-mono);
@@ -1963,7 +1982,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-td-r { text-align: right; }
 
 .rd-td-label {
-    font-size: 10px;
+    font-size: var(--ps-fs-round-label);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -1971,12 +1990,12 @@ select.hole-input { width: 3rem; appearance: none; }
     text-align: center;
 }
 .rd-td-meta {
-    font-size: 13px;
+    font-size: var(--ps-fs-round-sm);
     color: var(--ps-ink-3);
 }
 
 .rd-hole-num {
-    font-size: 11px;
+    font-size: var(--ps-fs-micro);
     color: var(--ps-ink-3);
     position: relative;
 }
@@ -1989,7 +2008,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-score-cell {
-    font-size: 17px;
+    font-size: var(--ps-fs-round-score);
     font-weight: 400;
 }
 .rd-score-cell.is-mint  { color: var(--ps-accent); }
@@ -1998,7 +2017,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-score-cell.is-warn  { color: var(--ps-warn); }
 
 .rd-topar-cell {
-    font-size: 11px;
+    font-size: var(--ps-fs-micro);
 }
 .rd-topar-cell.is-mint  { color: var(--ps-accent); }
 .rd-topar-cell.is-ink-3 { color: var(--ps-ink-3); }
@@ -2010,19 +2029,19 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .rd-hit-dot {
     color: var(--ps-accent);
-    font-size: 12px;
+    font-size: var(--ps-fs-round-meta);
 }
 .rd-miss-dot {
     color: var(--ps-ink-3);
-    font-size: 12px;
+    font-size: var(--ps-fs-round-meta);
 }
 .rd-na-dot {
     color: var(--ps-ink-3);
-    font-size: 10px;
+    font-size: var(--ps-fs-round-label);
 }
 
 .rd-score-bold {
-    font-size: 15px;
+    font-size: var(--ps-fs-round-bold);
     font-weight: 500;
     color: var(--ps-ink);
 }
@@ -2036,12 +2055,12 @@ select.hole-input { width: 3rem; appearance: none; }
     border-bottom: none;
 }
 .rd-total-score {
-    font-size: 20px;
+    font-size: var(--ps-fs-round-lg);
     font-weight: 500;
     text-align: right;
 }
 .rd-total-topar {
-    font-size: 13px;
+    font-size: var(--ps-fs-round-sm);
     font-weight: 500;
     text-align: right;
 }
