@@ -1,191 +1,440 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="round-detail">
-    <div class="round-summary">
-        {% if edit_mode %}
-        <div class="summary-item">
-            <span class="summary-label">Date</span>
-            <input type="date" id="edit-date" class="step-input" value="{{ round.date }}">
-        </div>
-        <div class="summary-item">
-            <span class="summary-label">Course</span>
-            <select id="edit-course" class="edit-course-select step-input">
-                {% for c_name in courses %}
-                <option value="{{ c_name }}" {% if c_name == round.course %}selected{% endif %}>{{ c_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="summary-item">
-            <span class="summary-label">Tees</span>
-            <select id="edit-tees" class="step-input">
-                {% for t_name in course.get('tees', {}).keys() %}
-                <option value="{{ t_name }}" {% if t_name == round.tees %}selected{% endif %}>{{ t_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="summary-item">
-            <span class="summary-label">Transport</span>
-            <select id="edit-transport" class="step-input">
-                <option value="Walking" {% if round.transport == 'Walking' %}selected{% endif %}>Walking</option>
-                <option value="Riding" {% if round.transport == 'Riding' %}selected{% endif %}>Riding</option>
-            </select>
-        </div>
-        <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
-        <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
-        {% if round.computed_handicap %}
-        <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
-        {% endif %}
-        {% else %}
-        <div class="summary-item"><span class="summary-label">Date</span> {{ round.date }}</div>
-        <div class="summary-item"><span class="summary-label">Course</span> {{ round.course }}</div>
-        <div class="summary-item"><span class="summary-label">Tees</span> {{ round.tees }}</div>
-        {% if round.transport %}
-        <div class="summary-item"><span class="summary-label">Transport</span> {{ round.transport }}</div>
-        {% endif %}
-        <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
-        <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
-        {% if round.computed_handicap %}
-        <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
-        {% endif %}
-        {% endif %}
-    </div>
-
-    <div class="round-actions">
-        {% if edit_mode %}
+<div class="rd-layout">
+{% if edit_mode %}
+  <div class="rd-left">
+    <div class="rd-edit-form">
+      <div class="summary-item">
+        <span class="summary-label">Date</span>
+        <input type="date" id="edit-date" class="step-input" value="{{ round.date }}">
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Course</span>
+        <select id="edit-course" class="edit-course-select step-input">
+          {% for c_name in courses %}
+          <option value="{{ c_name }}" {% if c_name == round.course %}selected{% endif %}>{{ c_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Tees</span>
+        <select id="edit-tees" class="step-input">
+          {% for t_name in course.get('tees', {}).keys() %}
+          <option value="{{ t_name }}" {% if t_name == round.tees %}selected{% endif %}>{{ t_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Transport</span>
+        <select id="edit-transport" class="step-input">
+          <option value="Walking" {% if round.transport == 'Walking' %}selected{% endif %}>Walking</option>
+          <option value="Riding" {% if round.transport == 'Riding' %}selected{% endif %}>Riding</option>
+        </select>
+      </div>
+      <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff is not none and total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
+      <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
+      {% if round.computed_handicap %}
+      <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
+      {% endif %}
+      <div class="summary-item">
+        <span class="summary-label">Notes</span>
+        <textarea id="edit-notes" class="step-input">{{ round.notes }}</textarea>
+      </div>
+      <div class="rd-edit-actions">
         <button class="btn" id="btn-save-round">Save</button>
         <a href="{{ url_for('round_detail', date=round.date, index=round.index) }}" class="btn">Cancel</a>
-        {% else %}
-        <a href="?edit=1" class="btn" id="btn-edit-round">Edit</a>
-        <button class="btn" id="btn-delete">Delete</button>
-        {% endif %}
+      </div>
     </div>
-
-    {% if edit_mode and entry_mode == "score_only" %}
+  </div>
+  <div class="rd-right">
+    {% if entry_mode == "score_only" %}
     <div class="stat-panel score-only-summary">
-        <div class="stat-label">Gross Score</div>
-        <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:2rem;width:6rem;text-align:center;">
+      <div class="stat-label">Gross Score</div>
+      <input type="number" id="edit-gross-total" class="step-input" value="{{ total.gross }}" style="font-size:var(--ps-fs-h1);width:6rem;text-align:center;">
     </div>
-    {% elif entry_mode == "score_only" %}
-    <div class="stat-panel score-only-summary">
-        <div class="stat-value">{{ total.gross }}</div>
-        <div class="stat-label">Gross Score</div>
-    </div>
-    {% endif %}
-
-    {% if edit_mode and entry_mode != "score_only" %}
+    {% else %}
     <table class="data-table scorecard-view" id="edit-scorecard">
-        <thead>
-            <tr>
-                <th>Hole</th><th>Par</th><th>Score</th>
-                <th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for h in holes %}
-            {% if h.num == 10 %}
-            <tr class="subtotal-row">
-                <td colspan="7" class="live-subtotals" id="subtotals-front">
-                    OUT <span class="live-gross">{{ front_nine.gross }}</span> (<span class="live-par">{{ front_nine.par }}</span>) &nbsp;
-                    putts <span class="live-putts">{{ front_nine.putts }}</span>
-                </td>
-            </tr>
-            {% endif %}
-            <tr class="hole-row">
-                <td>{{ h.num }}</td>
-                <td>{{ h.par }}</td>
-                <td><input class="edit-gross hole-input" data-hole="{{ h.num }}" value="{{ h.gross }}"></td>
-                <td>
-                    <select class="edit-fairway hole-input" data-hole="{{ h.num }}">
-                        <option value="" {% if not h.fw %}selected{% endif %}></option>
-                        <option value="H" {% if h.fw == 'H' %}selected{% endif %}>H</option>
-                        <option value="L" {% if h.fw == 'L' %}selected{% endif %}>L</option>
-                        <option value="R" {% if h.fw == 'R' %}selected{% endif %}>R</option>
-                        <option value="OBL" {% if h.fw == 'OBL' %}selected{% endif %}>OBL</option>
-                        <option value="OBR" {% if h.fw == 'OBR' %}selected{% endif %}>OBR</option>
-                        <option value="N" {% if h.fw == 'N' %}selected{% endif %}>N</option>
-                    </select>
-                </td>
-                <td>
-                    <select class="edit-gir hole-input" data-hole="{{ h.num }}">
-                        <option value="" {% if not h.gir %}selected{% endif %}></option>
-                        <option value="H" {% if h.gir == 'H' %}selected{% endif %}>H</option>
-                        <option value="L" {% if h.gir == 'L' %}selected{% endif %}>L</option>
-                        <option value="R" {% if h.gir == 'R' %}selected{% endif %}>R</option>
-                        <option value="S" {% if h.gir == 'S' %}selected{% endif %}>S</option>
-                        <option value="LO" {% if h.gir == 'LO' %}selected{% endif %}>LO</option>
-                        <option value="OBL" {% if h.gir == 'OBL' %}selected{% endif %}>OBL</option>
-                        <option value="OBR" {% if h.gir == 'OBR' %}selected{% endif %}>OBR</option>
-                        <option value="OBS" {% if h.gir == 'OBS' %}selected{% endif %}>OBS</option>
-                        <option value="OBLO" {% if h.gir == 'OBLO' %}selected{% endif %}>OBLO</option>
-                    </select>
-                </td>
-                <td><input class="edit-putts hole-input" data-hole="{{ h.num }}" value="{{ h.putts }}"></td>
-                <td><input class="edit-penalties hole-input" data-hole="{{ h.num }}" value="{{ h.penalties if h.penalties else '0' }}"></td>
-            </tr>
-        {% endfor %}
-        <tr class="subtotal-row">
-            <td colspan="7" class="live-subtotals" id="subtotals-total">
-                IN <span class="live-gross-back">{{ back_nine.gross }}</span> (<span class="live-par-back">{{ back_nine.par }}</span>) &nbsp;
-                putts <span class="live-putts-back">{{ back_nine.putts }}</span> &nbsp;|&nbsp;
-                TOT <span class="live-gross-total">{{ total.gross }}</span> (<span class="live-par-total">{{ total.par }}</span>) &nbsp;
-                putts <span class="live-putts-total">{{ front_nine.putts + back_nine.putts }}</span>
-            </td>
+      <thead>
+        <tr>
+          <th>Hole</th><th>Par</th><th>Score</th>
+          <th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>
         </tr>
-        </tbody>
+      </thead>
+      <tbody>
+      {% for h in holes %}
+        {% if h.num == 10 %}
+        <tr class="subtotal-row">
+          <td colspan="7" class="live-subtotals" id="subtotals-front">
+            OUT <span class="live-gross">{{ front_nine.gross }}</span> (<span class="live-par">{{ front_nine.par }}</span>) &nbsp;
+            putts <span class="live-putts">{{ front_nine.putts }}</span>
+          </td>
+        </tr>
+        {% endif %}
+        <tr class="hole-row">
+          <td>{{ h.num }}</td>
+          <td>{{ h.par }}</td>
+          <td><input class="edit-gross hole-input" data-hole="{{ h.num }}" value="{{ h.gross }}"></td>
+          <td>
+            <select class="edit-fairway hole-input" data-hole="{{ h.num }}">
+              <option value="" {% if not h.fw %}selected{% endif %}></option>
+              <option value="H" {% if h.fw == 'H' %}selected{% endif %}>H</option>
+              <option value="L" {% if h.fw == 'L' %}selected{% endif %}>L</option>
+              <option value="R" {% if h.fw == 'R' %}selected{% endif %}>R</option>
+              <option value="OBL" {% if h.fw == 'OBL' %}selected{% endif %}>OBL</option>
+              <option value="OBR" {% if h.fw == 'OBR' %}selected{% endif %}>OBR</option>
+              <option value="N" {% if h.fw == 'N' %}selected{% endif %}>N</option>
+            </select>
+          </td>
+          <td>
+            <select class="edit-gir hole-input" data-hole="{{ h.num }}">
+              <option value="" {% if not h.gir %}selected{% endif %}></option>
+              <option value="H" {% if h.gir == 'H' %}selected{% endif %}>H</option>
+              <option value="L" {% if h.gir == 'L' %}selected{% endif %}>L</option>
+              <option value="R" {% if h.gir == 'R' %}selected{% endif %}>R</option>
+              <option value="S" {% if h.gir == 'S' %}selected{% endif %}>S</option>
+              <option value="LO" {% if h.gir == 'LO' %}selected{% endif %}>LO</option>
+              <option value="OBL" {% if h.gir == 'OBL' %}selected{% endif %}>OBL</option>
+              <option value="OBR" {% if h.gir == 'OBR' %}selected{% endif %}>OBR</option>
+              <option value="OBS" {% if h.gir == 'OBS' %}selected{% endif %}>OBS</option>
+              <option value="OBLO" {% if h.gir == 'OBLO' %}selected{% endif %}>OBLO</option>
+            </select>
+          </td>
+          <td><input class="edit-putts hole-input" data-hole="{{ h.num }}" value="{{ h.putts }}"></td>
+          <td><input class="edit-penalties hole-input" data-hole="{{ h.num }}" value="{{ h.penalties if h.penalties else '0' }}"></td>
+        </tr>
+      {% endfor %}
+      <tr class="subtotal-row">
+        <td colspan="7" class="live-subtotals" id="subtotals-total">
+          IN <span class="live-gross-back">{{ back_nine.gross }}</span> (<span class="live-par-back">{{ back_nine.par }}</span>) &nbsp;
+          putts <span class="live-putts-back">{{ back_nine.putts }}</span> &nbsp;|&nbsp;
+          TOT <span class="live-gross-total">{{ total.gross }}</span> (<span class="live-par-total">{{ total.par }}</span>) &nbsp;
+          putts <span class="live-putts-total">{{ front_nine.putts + back_nine.putts }}</span>
+        </td>
+      </tr>
+      </tbody>
     </table>
-    {% elif entry_mode != "score_only" %}
-    <table class="data-table scorecard-view">
-        <thead>
-            <tr>
-                <th>Hole</th><th>Par</th><th>Score</th>
-                <th>FW</th><th>GIR</th><th>Putts</th><th>Pen</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for h in holes %}
-            {% if h.num == 10 %}
-            <tr class="subtotal-row">
-                <td colspan="7">
-                    OUT {{ front_nine.gross }} ({{ front_nine.par }}) &nbsp;
-                    putts {{ front_nine.putts }}
-                </td>
-            </tr>
-            {% endif %}
-            <tr class="hole-row{% if h.gross_diff is not none and h.gross_diff <= -1 %} birdie{% elif h.gross_diff is not none and h.gross_diff >= 2 %} double{% endif %}">
-                <td>{{ h.num }}</td>
-                <td>{{ h.par }}</td>
-                <td class="{% if h.gross_diff is not none and h.gross_diff <= -2 %}eagle{% elif h.gross_diff == -1 %}birdie-score{% elif h.gross_diff == 1 %}bogey-score{% elif h.gross_diff is not none and h.gross_diff >= 2 %}double-score{% endif %}">
-                    {% if h.gross %}{{ h.gross }}{% else %}&mdash;{% endif %}
-                </td>
-                <td class="fw-cell">{% if h.fw %}{{ h.fw }}{% else %}&mdash;{% endif %}</td>
-                <td class="gir-cell">{% if h.gir %}{{ h.gir }}{% elif not h.is_par3 %}&mdash;{% endif %}</td>
-                <td class="{% if h.putts == 1 %}one-putt{% elif h.putts >= 3 %}three-putt{% endif %}">
-                    {{ h.putts }}
-                </td>
-                <td class="{% if h.penalties > 0 %}has-penalty{% endif %}">
-                    {% if h.penalties %}{{ h.penalties }}{% else %}&mdash;{% endif %}
-                </td>
-            </tr>
-        {% endfor %}
-        <tr class="subtotal-row">
-            <td colspan="7">
-                IN {{ back_nine.gross }} ({{ back_nine.par }}) &nbsp;
-                putts {{ back_nine.putts }} &nbsp;|&nbsp;
-                TOT {{ total.gross }} ({{ total.par }}) &nbsp;
-                putts {{ front_nine.putts + back_nine.putts }}
-            </td>
+    {% endif %}
+  </div>
+
+{% else %}
+  {# View mode - two column ledger layout #}
+
+  {# LEFT PANEL #}
+  <div class="rd-left">
+    <div class="ps-eyebrow" style="margin-bottom:4px;">← Round #{{ round.index }} · {{ entry_mode }}</div>
+
+    <div>
+      <div class="rd-hero">{{ total.gross }}</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px;">
+        <span class="rd-to-par-value
+          {%- if total.diff is not none and total.diff <= 0 %} is-mint
+          {%- elif total.diff is not none and total.diff >= 2 %} is-warn
+          {%- elif total.diff is not none and total.diff == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if total.diff is not none %}
+            {% if total.diff > 0 %}+{% endif %}{{ total.diff }}
+          {% else %}--{% endif %}
+        </span>
+        <span style="font-size:var(--ps-fs-round-meta);color:var(--ps-ink-3);letter-spacing:0.04em;">par {{ total.par }}</span>
+      </div>
+    </div>
+
+    {% if course_handicap is not none %}
+    <div class="rd-section">
+      <div style="display:flex;align-items:baseline;gap:8px;">
+        <span style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);letter-spacing:0.1em;text-transform:uppercase;font-weight:500;">Net</span>
+        <span style="font-size:var(--ps-fs-stat-cell);font-weight:300;letter-spacing:-0.03em;line-height:1;">{{ total.net_total }}</span>
+        <span style="font-size:var(--ps-fs-body-lg);font-weight:500;"
+          class="rd-to-par-value
+          {%- if total.net_diff is not none and total.net_diff <= 0 %} is-mint
+          {%- elif total.net_diff is not none and total.net_diff >= 2 %} is-warn
+          {%- elif total.net_diff is not none and total.net_diff == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if total.net_diff is not none %}
+            {% if total.net_diff > 0 %}+{% endif %}{{ total.net_diff }}
+          {% endif %}
+        </span>
+      </div>
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:3px;letter-spacing:0.06em;">
+        COURSE HCP {{ course_handicap }}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="rd-section">
+      <div style="font-size:var(--ps-fs-body);font-weight:400;">{{ round.course }}</div>
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;letter-spacing:0.04em;">
+        {{ round.tees }} · {{ rating }} / {{ slope }}
+      </div>
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
+        {{ round.date }}{% if round.transport %} · {{ round.transport }}{% endif %}
+      </div>
+    </div>
+
+    <div class="rd-section">
+      <div class="ps-eyebrow" style="margin-bottom:10px;">Round stats</div>
+      <div class="rd-stats-grid">
+        <div class="rd-stat">
+          <div class="ps-eyebrow">Fairways</div>
+          <div class="rd-stat-value">{{ round_stats.fir_pct }}%</div>
+          <div class="rd-stat-avg">AVG {% if course_avgs and course_avgs.fir_pct is not none %}{{ course_avgs.fir_pct }}%{% else %}--{% endif %}</div>
+        </div>
+        <div class="rd-stat">
+          <div class="ps-eyebrow">Greens</div>
+          <div class="rd-stat-value">{{ round_stats.gir_pct }}%</div>
+          <div class="rd-stat-avg">AVG {% if course_avgs and course_avgs.gir_pct is not none %}{{ course_avgs.gir_pct }}%{% else %}--{% endif %}</div>
+        </div>
+        <div class="rd-stat">
+          <div class="ps-eyebrow">Putts</div>
+          <div class="rd-stat-value">{{ round_stats.putts }}</div>
+          <div class="rd-stat-avg">AVG {% if course_avgs and course_avgs.putts is not none %}{{ course_avgs.putts }}{% else %}--{% endif %}</div>
+        </div>
+        <div class="rd-stat">
+          <div class="ps-eyebrow">Scrambling</div>
+          <div class="rd-stat-value">{{ round_stats.scr_pct }}%</div>
+          <div class="rd-stat-avg">AVG {% if course_avgs and course_avgs.scr_pct is not none %}{{ course_avgs.scr_pct }}%{% else %}--{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rd-section">
+      <div class="ps-eyebrow" style="margin-bottom:6px;">Handicap impact</div>
+      {% if round.computed_handicap %}
+      {% set hcp_val = round.computed_handicap|float %}
+      {% set hcp_int = hcp_val|int %}
+      {% set hcp_dec = ((hcp_val - hcp_int) * 10)|round|int %}
+      <div class="rd-hcp-numeral">
+        {{ hcp_int }}<span class="ps-decimal">.</span><span class="ps-frac">{{ hcp_dec }}</span>
+      </div>
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
+        {{ "%.1f"|format(hi_before) if hi_before is not none else '--' }} → {{ "%.1f"|format(hcp_val) }}
+      </div>
+      {% if hi_before is not none %}
+      {% set hcp_diff = hi_before - hcp_val %}
+      <div style="font-size:var(--ps-fs-round-meta);font-weight:500;margin-top:3px;font-family:var(--ps-font-mono);{% if hcp_diff > 0 %}color:var(--ps-accent);{% elif hcp_diff < 0 %}color:var(--ps-warn);{% endif %}">
+        {% if hcp_diff > 0 %}▼{% elif hcp_diff < 0 %}▲{% endif %}
+        {% if hcp_diff != 0 %}{{ "%.1f"|format(hcp_diff|abs) }}{% endif %}
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="rd-section">
+      <div class="rd-dist">
+        <div>
+          <div class="ps-eyebrow" style="margin-bottom:8px;">Gross</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            {% if dist.eagle > 0 %}<div class="rd-dist-item mint"><span class="rd-dist-lbl">Eagle</span><span class="rd-dist-num">{{ dist.eagle }}</span></div>{% endif %}
+            {% if dist.birdie > 0 %}<div class="rd-dist-item mint"><span class="rd-dist-lbl">Birdie</span><span class="rd-dist-num">{{ dist.birdie }}</span></div>{% endif %}
+            {% if dist.par > 0 %}<div class="rd-dist-item ink"><span class="rd-dist-lbl">Par</span><span class="rd-dist-num">{{ dist.par }}</span></div>{% endif %}
+            {% if dist.bogey > 0 %}<div class="rd-dist-item ink-2"><span class="rd-dist-lbl">Bogey</span><span class="rd-dist-num">{{ dist.bogey }}</span></div>{% endif %}
+            {% if dist.double + dist.worse > 0 %}<div class="rd-dist-item warn"><span class="rd-dist-lbl">Dbl+</span><span class="rd-dist-num">{{ dist.double + dist.worse }}</span></div>{% endif %}
+          </div>
+        </div>
+        <div>
+          <div class="ps-eyebrow" style="margin-bottom:8px;">Net</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            {% if net_dist.eagle > 0 %}<div class="rd-dist-item mint"><span class="rd-dist-lbl">Eagle</span><span class="rd-dist-num">{{ net_dist.eagle }}</span></div>{% endif %}
+            {% if net_dist.birdie > 0 %}<div class="rd-dist-item mint"><span class="rd-dist-lbl">Birdie</span><span class="rd-dist-num">{{ net_dist.birdie }}</span></div>{% endif %}
+            {% if net_dist.par > 0 %}<div class="rd-dist-item ink"><span class="rd-dist-lbl">Par</span><span class="rd-dist-num">{{ net_dist.par }}</span></div>{% endif %}
+            {% if net_dist.bogey > 0 %}<div class="rd-dist-item ink-2"><span class="rd-dist-lbl">Bogey</span><span class="rd-dist-num">{{ net_dist.bogey }}</span></div>{% endif %}
+            {% if net_dist.double + net_dist.worse > 0 %}<div class="rd-dist-item warn"><span class="rd-dist-lbl">Dbl+</span><span class="rd-dist-num">{{ net_dist.double + net_dist.worse }}</span></div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# RIGHT PANEL #}
+  <div class="rd-right">
+    {% if round.notes %}
+    <div class="rd-notes">
+      <div class="ps-eyebrow" style="margin-bottom:8px;">Round notes</div>
+      <div class="rd-notes-text">{{ round.notes }}</div>
+    </div>
+    {% endif %}
+
+    {% if entry_mode == "score_only" %}
+    <div style="display:flex;flex-direction:column;align-items:center;padding:40px 0;gap:10px;">
+      <div class="ps-hero-numeral" style="font-size:var(--ps-fs-hero-tablet);">{{ total.gross }}</div>
+      <div class="ps-eyebrow">Gross Score</div>
+    </div>
+    {% else %}
+    <div class="rd-table-header">
+      <div class="ps-eyebrow">Hole-by-hole</div>
+      {% if course_handicap is not none %}
+      <div style="font-family:var(--ps-font-mono);font-size:var(--ps-fs-body);color:var(--ps-ink-3);">● = stroke received</div>
+      {% endif %}
+    </div>
+
+    <table class="rd-table">
+      <thead>
+        <tr>
+          <th class="rd-th-c" style="width:44px;">#</th>
+          <th class="rd-th-r" style="width:44px;">Par</th>
+          <th class="rd-th-r" style="width:52px;">Yds</th>
+          <th class="rd-th-r" style="width:56px;">Score</th>
+          <th class="rd-th-r" style="width:44px;">+/−</th>
+          <th class="rd-th-r" style="width:48px;">Net</th>
+          <th class="rd-th-r" style="width:48px;">Putts</th>
+          <th class="rd-th-c" style="width:40px;">FIR</th>
+          <th class="rd-th-c" style="width:40px;">GIR</th>
         </tr>
-        </tbody>
+      </thead>
+      <tbody>
+      {% for h in holes %}
+        {% if h.num == 10 %}
+        <tr class="rd-subtotal-row">
+          <td class="rd-td-label">Out</td>
+          <td class="rd-td-r rd-td-meta">{{ front_nine.par }}</td>
+          <td class="rd-td-r"></td>
+          <td class="rd-td-r rd-score-bold">{{ front_nine.gross }}</td>
+          <td class="rd-td-r rd-topar-cell
+            {%- set f_tp = front_nine.gross - front_nine.par %}
+            {%- if f_tp <= 0 %} is-mint
+            {%- elif f_tp >= 2 %} is-warn
+            {%- elif f_tp == 1 %} is-ink-2
+            {%- else %} is-ink-3{% endif %}">
+            {% if f_tp == 0 %}E{% elif f_tp > 0 %}+{{ f_tp }}{% else %}{{ f_tp }}{% endif %}
+          </td>
+          <td class="rd-td-r rd-topar-cell
+            {%- set f_ntp = front_nine.net_to_par %}
+            {%- if f_ntp <= 0 %} is-mint
+            {%- elif f_ntp >= 2 %} is-warn
+            {%- elif f_ntp == 1 %} is-ink-2
+            {%- else %} is-ink-3{% endif %}">
+            {% if course_handicap is not none %}
+              {% if f_ntp == 0 %}E{% elif f_ntp > 0 %}+{{ f_ntp }}{% else %}{{ f_ntp }}{% endif %}
+            {% else %}--{% endif %}
+          </td>
+          <td class="rd-td-r rd-td-meta">{{ front_nine.putts }}</td>
+          <td class="rd-td-c rd-td-meta">{{ front_nine.fir_hits }}/{{ front_nine.fir_eligible }}</td>
+          <td class="rd-td-c rd-td-meta">{{ front_nine.gir_hits }}/{{ front_nine.holes_cnt }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="rd-td-c rd-hole-num">
+            {{ h.num }}{% if h.strokes > 0 %}<span class="rd-strokes-dot">●</span>{% endif %}
+          </td>
+          <td class="rd-td-r rd-td-meta">{{ h.par }}</td>
+          <td class="rd-td-r rd-td-meta">{% if h.yds %}{{ h.yds }}{% endif %}</td>
+          <td class="rd-td-r rd-score-cell
+            {%- if h.gross_diff is not none and h.gross_diff <= -1 %} is-mint
+            {%- elif h.gross_diff is not none and h.gross_diff == 0 %} is-ink
+            {%- elif h.gross_diff is not none and h.gross_diff == 1 %} is-ink-2
+            {%- elif h.gross_diff is not none and h.gross_diff >= 2 %} is-warn{% endif %}">
+            {% if h.gross %}{{ h.gross }}{% else %}&mdash;{% endif %}
+          </td>
+          <td class="rd-td-r rd-topar-cell
+            {%- if h.gross_diff is not none and h.gross_diff <= -1 %} is-mint
+            {%- elif h.gross_diff is not none and h.gross_diff == 0 %} is-ink-3
+            {%- elif h.gross_diff is not none and h.gross_diff == 1 %} is-ink-2
+            {%- elif h.gross_diff is not none and h.gross_diff >= 2 %} is-warn{% endif %}">
+            {% if h.gross_diff is not none %}
+              {% if h.gross_diff == 0 %}E{% elif h.gross_diff > 0 %}+{{ h.gross_diff }}{% else %}{{ h.gross_diff }}{% endif %}
+            {% endif %}
+          </td>
+          <td class="rd-td-r rd-topar-cell
+            {%- if h.net_diff is not none and h.net_diff <= -1 %} is-mint
+            {%- elif h.net_diff is not none and h.net_diff == 0 %} is-ink-3
+            {%- elif h.net_diff is not none and h.net_diff == 1 %} is-ink-2
+            {%- elif h.net_diff is not none and h.net_diff >= 2 %} is-warn{% endif %}">
+            {% if h.net_diff is not none %}
+              {% if h.net_diff == 0 %}E{% elif h.net_diff > 0 %}+{{ h.net_diff }}{% else %}{{ h.net_diff }}{% endif %}
+            {% endif %}
+          </td>
+          <td class="rd-td-r rd-td-meta">{{ h.putts }}</td>
+          <td class="rd-td-c rd-dot-cell">
+            {% if h.is_par3 %}<span class="rd-na-dot">—</span>
+            {% elif h.fw == "H" %}<span class="rd-hit-dot">●</span>
+            {% elif h.fw %}<span class="rd-miss-dot">○</span>
+            {% else %}<span class="rd-na-dot">—</span>
+            {% endif %}
+          </td>
+          <td class="rd-td-c rd-dot-cell">
+            {% if h.gir == "H" %}<span class="rd-hit-dot">●</span>
+            {% elif h.gir %}<span class="rd-miss-dot">○</span>
+            {% else %}<span class="rd-na-dot">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      <tr class="rd-subtotal-row">
+        <td class="rd-td-label">In</td>
+        <td class="rd-td-r rd-td-meta">{{ back_nine.par }}</td>
+        <td class="rd-td-r"></td>
+        <td class="rd-td-r rd-score-bold">{{ back_nine.gross }}</td>
+        <td class="rd-td-r rd-topar-cell
+          {%- set b_tp = back_nine.gross - back_nine.par %}
+          {%- if b_tp <= 0 %} is-mint
+          {%- elif b_tp >= 2 %} is-warn
+          {%- elif b_tp == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if b_tp == 0 %}E{% elif b_tp > 0 %}+{{ b_tp }}{% else %}{{ b_tp }}{% endif %}
+        </td>
+        <td class="rd-td-r rd-topar-cell
+          {%- set b_ntp = back_nine.net_to_par %}
+          {%- if b_ntp <= 0 %} is-mint
+          {%- elif b_ntp >= 2 %} is-warn
+          {%- elif b_ntp == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if course_handicap is not none %}
+            {% if b_ntp == 0 %}E{% elif b_ntp > 0 %}+{{ b_ntp }}{% else %}{{ b_ntp }}{% endif %}
+          {% else %}--{% endif %}
+        </td>
+        <td class="rd-td-r rd-td-meta">{{ back_nine.putts }}</td>
+        <td class="rd-td-c rd-td-meta">{{ back_nine.fir_hits }}/{{ back_nine.fir_eligible }}</td>
+        <td class="rd-td-c rd-td-meta">{{ back_nine.gir_hits }}/{{ back_nine.holes_cnt }}</td>
+      </tr>
+      <tr class="rd-total-row">
+        <td class="rd-td-label">Total</td>
+        <td class="rd-td-r rd-td-meta">{{ total.par }}</td>
+        <td class="rd-td-r"></td>
+        <td class="rd-td-r rd-total-score">{{ total.gross }}</td>
+        <td class="rd-td-r rd-total-topar
+          {%- if total.diff is not none and total.diff <= 0 %} is-mint
+          {%- elif total.diff is not none and total.diff >= 2 %} is-warn
+          {%- elif total.diff is not none and total.diff == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if total.diff is not none %}
+            {% if total.diff == 0 %}E{% elif total.diff > 0 %}+{{ total.diff }}{% else %}{{ total.diff }}{% endif %}
+          {% else %}--{% endif %}
+        </td>
+        <td class="rd-td-r rd-total-topar
+          {%- if total.net_diff is not none and total.net_diff <= 0 %} is-mint
+          {%- elif total.net_diff is not none and total.net_diff >= 2 %} is-warn
+          {%- elif total.net_diff is not none and total.net_diff == 1 %} is-ink-2
+          {%- else %} is-ink-3{% endif %}">
+          {% if total.net_diff is not none %}
+            {% if total.net_diff == 0 %}E{% elif total.net_diff > 0 %}+{{ total.net_diff }}{% else %}{{ total.net_diff }}{% endif %}
+          {% else %}--{% endif %}
+        </td>
+        <td class="rd-td-r rd-td-meta" style="font-weight:500;">{{ total.putts }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-eyebrow);">{{ total.fir_hits }}/{{ total.fir_eligible }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-eyebrow);">{{ total.gir_hits }}/{{ total.total_holes }}</td>
+      </tr>
+      {% if course_avgs %}
+      <tr class="rd-course-avg-row">
+        <td class="rd-td-label" colspan="3" style="text-align:left;padding-left:10px;">Course avg</td>
+        <td class="rd-td-r rd-td-meta">{{ course_avgs.score }}</td>
+        <td class="rd-td-r"></td>
+        <td class="rd-td-r"></td>
+        <td class="rd-td-r rd-td-meta">{{ course_avgs.putts }}</td>
+        <td class="rd-td-c rd-td-meta">{{ course_avgs.fir_pct }}%</td>
+        <td class="rd-td-c rd-td-meta">{{ course_avgs.gir_pct }}%</td>
+      </tr>
+      {% endif %}
+      </tbody>
     </table>
     {% endif %}
 
-    {% if edit_mode %}
-    <div class="round-notes">
-        <textarea id="edit-notes" class="step-input">{{ round.notes }}</textarea>
+    <div class="rd-actions">
+      <a href="?edit=1" class="btn" id="btn-edit-round">Edit</a>
+      <button class="btn" id="btn-delete">Delete</button>
+      <a href="{{ url_for('report_card', date=round.date, index=round.index) }}" class="btn">Report</a>
     </div>
-    {% elif round.notes %}
-    <div class="round-notes">{{ round.notes }}</div>
-    {% endif %}
+  </div>
+{% endif %}
 </div>
 
 <script>

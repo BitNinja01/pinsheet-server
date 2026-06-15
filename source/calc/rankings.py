@@ -10,6 +10,7 @@ from calc import (
     calc_putts_per_round,
     calc_scramble_percent,
 )
+from calc.composite import last_n_rounds, best_n_rounds
 
 _log = logging.getLogger("pinsheet")
 
@@ -63,13 +64,15 @@ def _compute_form_svg(form_values: list[float], width: int = 88, height: int = 2
 
 
 def _compute_user_stats(rounds, courses_dict, include_9hole: bool, all_rounds: list = None) -> dict:
+    l20 = last_n_rounds(rounds, 20)
+    b8 = best_n_rounds(rounds, 8)
     stat_values = {}
-    stat_values["handicap"] = calc_handicap_index(rounds, include_9hole)
-    stat_values["score"] = calc_scoring_average(rounds)
-    stat_values["fir"] = calc_fir_percent(rounds, courses_dict)
-    stat_values["gir"] = calc_gir_percent(rounds)
-    stat_values["putts"] = calc_putts_per_round(rounds)
-    stat_values["scramble"] = calc_scramble_percent(rounds, courses_dict)
+    stat_values["handicap"] = calc_handicap_index(l20, include_9hole)
+    stat_values["score"] = calc_scoring_average(b8)
+    stat_values["fir"] = calc_fir_percent(b8, courses_dict)
+    stat_values["gir"] = calc_gir_percent(b8)
+    stat_values["putts"] = calc_putts_per_round(b8)
+    stat_values["scramble"] = calc_scramble_percent(b8, courses_dict)
 
     thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     streak = sum(1 for r in all_rounds if r.date >= thirty_days_ago) if all_rounds else 0

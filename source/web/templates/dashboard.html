@@ -28,15 +28,15 @@
 
         <div class="ps-row" style="gap: 16px; margin-top: 8px; align-items: baseline;">
             {% if hi_movement is not none %}
-                <span style="color: var(--ps-accent); font-size: 14px; font-weight: 500;">{{ hi_movement }}</span>
+                <span style="color: var(--ps-accent); font-size: var(--ps-fs-body-lg); font-weight: 500;">{{ hi_movement }}</span>
             {% endif %}
             {% if career_low is not none %}
-                <span style="color: var(--ps-ink-3); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">Career low · {{ career_low }}</span>
+                <span style="color: var(--ps-ink-3); font-size: var(--ps-fs-round-meta); letter-spacing: 0.08em; text-transform: uppercase;">Career low · {{ career_low }}</span>
             {% endif %}
         </div>
 
         {% if hi_insight %}
-            <p class="ps-serif" style="font-size: 18px; line-height: 1.4; margin-top: 18px; color: var(--ps-ink-2); max-width: 380px; font-weight: 400;">
+            <p class="ps-serif" style="font-size: var(--ps-fs-body); line-height: 1.4; margin-top: 18px; color: var(--ps-ink-2); max-width: 380px; font-weight: 400;">
                 {{ hi_insight }}
             </p>
         {% endif %}
@@ -47,7 +47,7 @@
         <div class="ps-row ps-between" style="margin-bottom: 14px;">
             <div>
                 <div class="ps-eyebrow">12-month trajectory</div>
-                <div class="ps-serif" style="font-size: 18px; margin-top: 2px;">Handicap movement</div>
+                <div class="ps-serif" style="font-size: var(--ps-fs-h2); margin-top: 2px;">Handicap movement</div>
             </div>
             <div class="ps-filters">
                 <span class="ps-chip" data-range="3M">3M</span>
@@ -106,7 +106,7 @@
     <div class="ps-row ps-between" style="margin-bottom: 14px;">
         <div>
             <div class="ps-eyebrow">The card</div>
-            <div class="ps-serif" style="font-size: 22px; margin-top: 2px;">Recent rounds</div>
+            <div class="ps-serif" style="font-size: var(--ps-fs-score); margin-top: 2px;">Recent rounds</div>
         </div>
         <div class="ps-filters">
             <span class="ps-chip is-on">All</span>
