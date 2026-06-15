@@ -262,10 +262,10 @@ def calc_per_hole_stats(
                     except (ValueError, TypeError, StopIteration):
                         pass
 
-        if par_val and par_val in (4, 5):
+        if par_val and par_val in (4, 5) and h.fairway != "N":
             fir_eligible += 1
             fw = h.fairway
-            if fw == "H":
+            if not fw or fw == "H":
                 fir_hits += 1
             elif fw in {"L", "OBL"}:
                 fir_miss_l += 1
@@ -273,7 +273,9 @@ def calc_per_hole_stats(
                 fir_miss_r += 1
 
         gir = h.gir
-        if not gir or gir == "H":
+        if gir == "N":
+            pass
+        elif not gir or gir == "H":
             gir_hits += 1
             gir_total += 1
         elif gir:
