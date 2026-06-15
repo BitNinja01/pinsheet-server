@@ -2002,7 +2002,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .rd-strokes-dot {
     color: var(--ps-accent);
-    font-size: var(--ps-fs-2xs);
+    font-size: var(--ps-fs-eyebrow);
     position: absolute;
     top: 1px;
     margin-left: 1px;
