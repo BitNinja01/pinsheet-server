@@ -45,7 +45,7 @@ def make_round():
             h_gross = gross_per_hole[i]
             h_putts = putts_per_hole[i] if i < len(putts_per_hole) else 2
             h_fir = "H" if n in fir_set else ("L" if n in eligible_fir else "")
-            h_gir = "H" if n in gir_set else ""
+            h_gir = "H" if n in gir_set else "L"
             h_pen = "1" if penalties > 0 and i < penalties else "0"
 
             holes[str(n)] = {

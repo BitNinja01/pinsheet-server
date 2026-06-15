@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (isCurrent) {
                 var savedShorthand = buildShorthand(saved);
                 r += '<td colspan="5">';
-                r += '<input type="text" class="inline-shorthand" value="' + savedShorthand + '" placeholder="gross fw gir putts pen" autocomplete="off">';
+                r += '<input type="text" class="inline-shorthand" value="' + savedShorthand + '" placeholder="score fw gir putts pen" autocomplete="off">';
                 r += '</td>';
             } else {
                 var grossDisplay = isComplete ? saved.gross : '\u2014';
@@ -579,26 +579,53 @@ document.addEventListener('DOMContentLoaded', function () {
         renderHoleCards(getScorecardRange(), holesData);
     }
 
+    var FAIRWAY_CODES = new Set(['H', 'L', 'R', 'OBL', 'OBR', 'N']);
+    var GIR_CODES = new Set(['H', 'L', 'R', 'S', 'LO', 'OBL', 'OBR', 'OBS', 'OBLO']);
+
     /* ── Shorthand parser ── */
     function parseShorthand(raw) {
         var parts = raw.trim().split(/\s+/);
         return {
             gross: parts[0] || '',
-            fairway: parts[1] || '',
-            gir: parts[2] || '',
+            fairway: (parts[1] || '').toUpperCase(),
+            gir: (parts[2] || '').toUpperCase(),
             putts: parts[3] || '',
             penalties: parts[4] || '0',
         };
     }
 
+    function validateShorthand(parsed) {
+        var errors = [];
+        var gross = parseInt(parsed.gross);
+        if (!gross || isNaN(gross) || gross < 1 || gross > 30) {
+            errors.push('Score must be 1-30');
+        }
+        if (!parsed.fairway || !FAIRWAY_CODES.has(parsed.fairway)) {
+            errors.push('Fairway: H L R OBL OBR N');
+        }
+        if (!parsed.gir || !GIR_CODES.has(parsed.gir)) {
+            errors.push('GIR: H L R S LO OBL OBR OBS OBLO');
+        }
+        var putts = parseInt(parsed.putts);
+        if (parsed.putts === '' || isNaN(putts) || putts < 0 || putts > 10) {
+            errors.push('Putts must be 0-10');
+        }
+        var pen = parseInt(parsed.penalties);
+        if (isNaN(pen) || pen < 0) {
+            errors.push('Penalties must be 0+');
+        }
+        return errors;
+    }
+
     function buildShorthand(saved) {
         if (!saved.gross) return '';
-        var parts = [saved.gross];
-        if (saved.fairway) parts.push(saved.fairway);
-        if (saved.gir) parts.push(saved.gir);
-        if (saved.putts) parts.push(saved.putts);
-        if (saved.penalties && saved.penalties !== '0') parts.push(saved.penalties);
-        return parts.join(' ');
+        return [
+            saved.gross,
+            saved.fairway || '',
+            saved.gir || '',
+            saved.putts || '',
+            saved.penalties || '0',
+        ].join(' ');
     }
 
     /* ── Mobile hole cards render ── */
@@ -627,8 +654,8 @@ document.addEventListener('DOMContentLoaded', function () {
             html += '</div>';
             html += '<div class="hole-card-input-area">';
             html += '<div class="hole-card-input-label">Enter shorthand &mdash; score fairway gir putts</div>';
-            html += '<input type="text" class="hole-card-shorthand" id="shorthand-' + num + '" placeholder="e.g. 4 L N 2" value="' + buildShorthand(saved) + '" autocomplete="off">';
-            html += '<div class="hole-card-hint">Score req. &middot; Fairway &middot; GIR &middot; Putts &middot; Pen (opt)</div>';
+            html += '<input type="text" class="hole-card-shorthand" id="shorthand-' + num + '" placeholder="score fw gir putts pen" value="' + buildShorthand(saved) + '" autocomplete="off">';
+            html += '<div class="hole-card-hint">score fairway gir putts penalties</div>';
             html += '</div>';
             html += '<div class="hole-card-actions">';
             var idx = range.indexOf(num);
@@ -698,6 +725,14 @@ document.addEventListener('DOMContentLoaded', function () {
         var input = document.getElementById('shorthand-' + holeNum);
         if (!input) return;
         var parsed = parseShorthand(input.value);
+        var errors = validateShorthand(parsed);
+        if (errors.length > 0) {
+            showInlineError('Hole ' + holeNum + ': ' + errors[0]);
+            input.classList.add('is-error');
+        } else {
+            hideInlineError();
+            input.classList.remove('is-error');
+        }
         var grossEl = document.getElementById('parsed-gross-' + holeNum);
         var fwyEl = document.getElementById('parsed-fairway-' + holeNum);
         var girEl = document.getElementById('parsed-gir-' + holeNum);
@@ -740,35 +775,35 @@ document.addEventListener('DOMContentLoaded', function () {
         updateProgressDots();
     }
 
+    function showInlineError(msg) {
+        var el = document.getElementById('inline-error');
+        if (!el) return;
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function hideInlineError() {
+        var el = document.getElementById('inline-error');
+        if (!el) return;
+        el.style.display = 'none';
+    }
+
     function handleInlineEnter() {
         var input = document.querySelector('.inline-shorthand');
-        var error = document.getElementById('inline-error');
         if (!input) return;
 
         var raw = input.value.trim();
         if (!raw) return;
 
         var parsed = parseShorthand(raw);
-        var gross = parseInt(parsed.gross);
-        if (!gross || isNaN(gross) || gross < 1 || gross > 30) {
-            if (error) {
-                error.textContent = 'Invalid gross score. Must be 1-30.';
-                error.style.display = 'block';
-            }
-            input.classList.add('is-error');
-            return;
-        }
-        var putts = parseInt(parsed.putts);
-        if (parsed.putts && (isNaN(putts) || putts < 0 || putts > 10)) {
-            if (error) {
-                error.textContent = 'Invalid putts. Must be 0-10.';
-                error.style.display = 'block';
-            }
+        var errors = validateShorthand(parsed);
+        if (errors.length > 0) {
+            showInlineError(errors[0]);
             input.classList.add('is-error');
             return;
         }
         input.classList.remove('is-error');
-        if (error) error.style.display = 'none';
+        hideInlineError();
 
         var holeNum = (_editingHole !== null) ? _editingHole : _currentHoleNum();
         if (holeNum === null) return;

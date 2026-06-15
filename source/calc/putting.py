@@ -17,7 +17,7 @@ def calc_putts_per_gir(rounds: list[RoundData]) -> float | None:
         if not r.holes:
             continue
         for h in r.holes.values():
-            if h.gir == "H" and h.putts:
+            if (not h.gir or h.gir == "H") and h.putts:
                 putts.append(h.putts)
     return sum(putts) / len(putts) if putts else None
 

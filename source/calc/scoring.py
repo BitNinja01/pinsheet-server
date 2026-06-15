@@ -273,11 +273,12 @@ def calc_per_hole_stats(
                 fir_miss_r += 1
 
         gir = h.gir
-        if gir:
+        if not gir or gir == "H":
+            gir_hits += 1
             gir_total += 1
-            if gir == "H":
-                gir_hits += 1
-            elif gir in {"L", "OBL"}:
+        elif gir:
+            gir_total += 1
+            if gir in {"L", "OBL"}:
                 gir_miss_l += 1
             elif gir in {"R", "OBR"}:
                 gir_miss_r += 1

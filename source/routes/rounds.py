@@ -378,14 +378,14 @@ def register_rounds_routes(app, csrf):
                     front_fir_eligible += 1
                 else:
                     back_fir_eligible += 1
-                if fw == "H":
+                if not fw or fw == "H":
                     fir_hits += 1
                     if hole_num <= 9:
                         front_fir_hits += 1
                     else:
                         back_fir_hits += 1
 
-            if gir == "H":
+            if not gir or gir == "H":
                 gir_hits += 1
                 if hole_num <= 9:
                     front_gir_hits += 1
