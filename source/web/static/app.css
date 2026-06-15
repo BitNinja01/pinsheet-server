@@ -1977,6 +1977,7 @@ select.hole-input { width: 3rem; appearance: none; }
     padding: 5px 10px;
     border-bottom: var(--ps-rule) solid var(--ps-rule-c);
     font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-body);
     font-variant-numeric: tabular-nums;
     vertical-align: middle;
 }
@@ -1984,7 +1985,6 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-td-r { text-align: right; }
 
 .rd-td-label {
-    font-size: var(--ps-fs-micro);
     font-weight: var(--ps-fw-label);
     letter-spacing: var(--ps-tracking-chip);
     text-transform: uppercase;
@@ -1992,12 +1992,10 @@ select.hole-input { width: 3rem; appearance: none; }
     text-align: center;
 }
 .rd-td-meta {
-    font-size: var(--ps-fs-eyebrow);
     color: var(--ps-ink-3);
 }
 
 .rd-hole-num {
-    font-size: var(--ps-fs-micro);
     color: var(--ps-ink-3);
     position: relative;
 }
@@ -2010,7 +2008,6 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-score-cell {
-    font-size: var(--ps-fs-round-score);
     font-weight: var(--ps-fw-body);
 }
 .rd-score-cell.is-mint  { color: var(--ps-accent); }
@@ -2018,9 +2015,6 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-score-cell.is-ink-2 { color: var(--ps-ink-2); }
 .rd-score-cell.is-warn  { color: var(--ps-warn); }
 
-.rd-topar-cell {
-    font-size: var(--ps-fs-micro);
-}
 .rd-topar-cell.is-mint  { color: var(--ps-accent); }
 .rd-topar-cell.is-ink-3 { color: var(--ps-ink-3); }
 .rd-topar-cell.is-ink-2 { color: var(--ps-ink-2); }
@@ -2043,7 +2037,6 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 
 .rd-score-bold {
-    font-size: var(--ps-fs-round-bold);
     font-weight: var(--ps-fw-label);
     color: var(--ps-ink);
 }
@@ -2057,12 +2050,10 @@ select.hole-input { width: 3rem; appearance: none; }
     border-bottom: none;
 }
 .rd-total-score {
-    font-size: var(--ps-fs-lg);
     font-weight: var(--ps-fw-label);
     text-align: right;
 }
 .rd-total-topar {
-    font-size: var(--ps-fs-eyebrow);
     font-weight: var(--ps-fw-label);
     text-align: right;
 }

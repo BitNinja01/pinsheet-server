@@ -263,7 +263,7 @@
     <div class="rd-table-header">
       <div class="ps-eyebrow">Hole-by-hole</div>
       {% if course_handicap is not none %}
-      <div style="font-family:var(--ps-font-mono);font-size:9px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ps-ink-3);">● = stroke received</div>
+      <div style="font-family:var(--ps-font-mono);font-size:var(--ps-fs-body);color:var(--ps-ink-3);">● = stroke received</div>
       {% endif %}
     </div>
 
@@ -317,7 +317,7 @@
             {{ h.num }}{% if h.strokes > 0 %}<span class="rd-strokes-dot">●</span>{% endif %}
           </td>
           <td class="rd-td-r rd-td-meta">{{ h.par }}</td>
-          <td class="rd-td-r rd-td-meta" style="font-size:11px;">{% if h.yds %}{{ h.yds }}{% endif %}</td>
+          <td class="rd-td-r rd-td-meta">{% if h.yds %}{{ h.yds }}{% endif %}</td>
           <td class="rd-td-r rd-score-cell
             {%- if h.gross_diff is not none and h.gross_diff <= -1 %} is-mint
             {%- elif h.gross_diff is not none and h.gross_diff == 0 %} is-ink
