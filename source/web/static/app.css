@@ -57,7 +57,6 @@
     --ps-fs-micro: 11px;
     --ps-fs-body: 18px;
     --ps-fs-body-lg: 14px;
-    --ps-fs-table-num: 16px;
     --ps-fs-score: 22px;
     --ps-fs-h2: 18px;
     --ps-fs-h1: 32px;
@@ -67,7 +66,6 @@
     --ps-fs-2xs: 5px;
     --ps-fs-detail: 0.875rem;
     --ps-fs-caption: 0.75rem;
-    --ps-fs-table-cell: 0.8rem;
     --ps-fs-round-meta: 12px;
     --ps-fs-round-bold: 15px;
     --ps-fs-round-score: 17px;
@@ -420,7 +418,7 @@ body {
 }
 .ps-table th {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-eyebrow);
+    font-size: var(--ps-fs-body);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -446,7 +444,7 @@ body {
 }
 .ps-table .ps-course {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-table-num);
+    font-size: var(--ps-fs-body);
     letter-spacing: -0.01em;
     font-weight: var(--ps-fw-label);
 }
@@ -695,7 +693,7 @@ select.step-input {
  * ────────────────────────────────────────────────────────────────── */
 .scorecard-input th {
     text-align: center;
-    font-size: 0.7rem;
+    font-size: var(--ps-fs-body);
     font-family: var(--ps-font-mono);
     color: var(--ps-ink-3);
 }
@@ -739,7 +737,7 @@ select.hole-input { width: 3rem; appearance: none; }
     padding: 0.5rem 0.75rem;
     color: var(--ps-accent);
     font-weight: 600;
-    font-size: var(--ps-fs-table-cell);
+    font-size: var(--ps-fs-body);
     border-top: var(--ps-rule) solid var(--ps-rule-c);
 }
 
@@ -855,7 +853,7 @@ select.hole-input { width: 3rem; appearance: none; }
     border: var(--ps-rule) solid var(--ps-rule-c);
     color: var(--ps-ink);
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-table-cell);
+    font-size: var(--ps-fs-body);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -960,7 +958,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .ps-podium-name {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-table-num);
+    font-size: var(--ps-fs-body);
     font-weight: var(--ps-fw-label);
     color: var(--ps-ink);
     margin-top: var(--ps-sp-1);
@@ -1076,7 +1074,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .ps-table td.r { text-align: right; }
 .ps-table .ps-course {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-table-num);
+    font-size: var(--ps-fs-body);
     letter-spacing: -0.01em;
     font-weight: var(--ps-fw-label);
 }
@@ -1194,7 +1192,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .data-table th {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-eyebrow);
+    font-size: var(--ps-fs-body);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -1487,7 +1485,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .round-card-course {
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-table-num);
+    font-size: var(--ps-fs-body);
     letter-spacing: -0.01em;
 }
 .round-card-meta {
@@ -1764,7 +1762,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
     .sc-value {
         display: block;
-        font-size: var(--ps-fs-table-num);
+        font-size: var(--ps-fs-body);
         font-weight: 600;
         margin-top: 2px;
     }
@@ -1962,7 +1960,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-table th {
     padding: 0 10px 8px;
     font-family: var(--ps-font-mono);
-    font-size: var(--ps-fs-eyebrow);
+    font-size: var(--ps-fs-body);
     font-weight: var(--ps-fw-label);
     letter-spacing: 0.14em;
     text-transform: uppercase;
