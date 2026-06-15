@@ -142,7 +142,7 @@
     {% if course_handicap is not none %}
     <div class="rd-section">
       <div style="display:flex;align-items:baseline;gap:8px;">
-        <span style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);letter-spacing:0.1em;text-transform:uppercase;font-weight:500;">Net</span>
+        <span style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);letter-spacing:0.1em;text-transform:uppercase;font-weight:500;">Net</span>
         <span style="font-size:var(--ps-fs-stat-cell);font-weight:300;letter-spacing:-0.03em;line-height:1;">{{ total.net_total }}</span>
         <span style="font-size:var(--ps-fs-body-lg);font-weight:500;"
           class="rd-to-par-value
@@ -155,7 +155,7 @@
           {% endif %}
         </span>
       </div>
-      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:3px;letter-spacing:0.06em;">
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:3px;letter-spacing:0.06em;">
         COURSE HCP {{ course_handicap }}
       </div>
     </div>
@@ -163,10 +163,10 @@
 
     <div class="rd-section">
       <div style="font-size:var(--ps-fs-body);font-weight:400;">{{ round.course }}</div>
-      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:4px;letter-spacing:0.04em;">
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;letter-spacing:0.04em;">
         {{ round.tees }} · {{ rating }} / {{ slope }}
       </div>
-      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:2px;letter-spacing:0.04em;">
         {{ round.date }}{% if round.transport %} · {{ round.transport }}{% endif %}
       </div>
     </div>
@@ -206,7 +206,7 @@
       <div class="rd-hcp-numeral">
         {{ hcp_int }}<span class="ps-decimal">.</span><span class="ps-frac">{{ hcp_dec }}</span>
       </div>
-      <div style="font-size:var(--ps-fs-micro);color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
         {{ "%.1f"|format(hi_before) if hi_before is not none else '--' }} → {{ "%.1f"|format(hcp_val) }}
       </div>
       {% if hi_before is not none %}
@@ -410,8 +410,8 @@
           {% else %}--{% endif %}
         </td>
         <td class="rd-td-r rd-td-meta" style="font-weight:500;">{{ total.putts }}</td>
-        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-micro);">{{ total.fir_hits }}/{{ total.fir_eligible }}</td>
-        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-micro);">{{ total.gir_hits }}/{{ total.total_holes }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-eyebrow);">{{ total.fir_hits }}/{{ total.fir_eligible }}</td>
+        <td class="rd-td-c rd-td-meta" style="font-size:var(--ps-fs-eyebrow);">{{ total.gir_hits }}/{{ total.total_holes }}</td>
       </tr>
       {% if course_avgs %}
       <tr class="rd-course-avg-row">
