@@ -14,7 +14,7 @@
 @font-face {
     font-family: 'JetBrains Mono';
     src: url('/static/fonts/JetBrainsMono/JetBrainsMonoNLNerdFontMono-ExtraLight.ttf') format('truetype');
-    font-weight: 200;
+    font-weight: var(--ps-fw-thin);
     font-style: normal;
     font-display: swap;
 }
@@ -81,6 +81,8 @@
     --ps-fw-body: 400;
     --ps-fw-label: 500;
     --ps-fw-strong: 600;
+    --ps-fw-thin: 200;
+    --ps-fw-light: 300;
 
     --ps-tracking-tight: -0.04em;
     --ps-tracking-display: -0.025em;
@@ -89,6 +91,7 @@
     --ps-tracking-chip: 0.12em;
     --ps-tracking-mono: 0.04em;
     --ps-tracking-label: 0.06em;
+    --ps-tracking-score: -0.02em;
 
     --ps-lh-hero: 0.82;
     --ps-lh-tight: 1;
@@ -323,7 +326,7 @@ body {
 .ps-serif {
     font-family: var(--ps-font-mono);
     font-weight: var(--ps-fw-body);
-    letter-spacing: -0.02em;
+    letter-spacing: var(--ps-tracking-score);
 }
 
 /* ── Hero numeral ──────────────────────────────────────────────────── */
@@ -462,7 +465,7 @@ body {
 .ps-score {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-score);
-    letter-spacing: -0.02em;
+    letter-spacing: var(--ps-tracking-score);
     color: var(--ps-ink);
 }
 .ps-score.is-under { color: var(--ps-accent); }
@@ -1036,9 +1039,9 @@ select.hole-input { width: 3rem; appearance: none; }
 .stat-cell-value {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-stat-cell);
-    font-weight: 400;
+    font-weight: var(--ps-fw-body);
     line-height: var(--ps-lh-tight);
-    letter-spacing: -0.02em;
+    letter-spacing: var(--ps-tracking-score);
     color: var(--ps-ink);
     margin-bottom: 4px;
 }
@@ -1855,16 +1858,16 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-hero {
     font-family: var(--ps-font-display);
     font-size: var(--ps-fs-round-hero);
-    font-weight: 200;
-    line-height: 0.82;
-    letter-spacing: -0.04em;
+    font-weight: var(--ps-fw-thin);
+    line-height: var(--ps-lh-hero);
+    letter-spacing: var(--ps-tracking-tight);
     color: var(--ps-ink);
 }
 
 .rd-to-par-value {
     font-size: var(--ps-fs-lg);
-    font-weight: 500;
-    letter-spacing: -0.02em;
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-score);
 }
 .rd-to-par-value.is-mint { color: var(--ps-accent); }
 .rd-to-par-value.is-warn { color: var(--ps-warn); }
@@ -1884,10 +1887,10 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .rd-stat-value {
     font-size: var(--ps-fs-round-stat);
-    font-weight: 300;
+    font-weight: var(--ps-fw-light);
     margin-top: 2px;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    letter-spacing: var(--ps-tracking-score);
+    line-height: var(--ps-lh-tight);
 }
 .rd-stat-avg {
     font-size: var(--ps-fs-micro);
@@ -1899,9 +1902,9 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-hcp-numeral {
     font-family: var(--ps-font-display);
     font-size: var(--ps-fs-round-hcp);
-    font-weight: 200;
+    font-weight: var(--ps-fw-thin);
     line-height: 0.85;
-    letter-spacing: -0.04em;
+    letter-spacing: var(--ps-tracking-tight);
     color: var(--ps-ink);
 }
 .rd-hcp-numeral .ps-decimal { color: var(--ps-ink-3); }
@@ -1923,7 +1926,7 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .rd-dist-num {
     font-size: var(--ps-fs-eyebrow);
-    font-weight: 500;
+    font-weight: var(--ps-fw-label);
     font-family: var(--ps-font-mono);
 }
 .rd-dist-item.mint .rd-dist-lbl,
@@ -1983,7 +1986,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .rd-td-label {
     font-size: var(--ps-fs-micro);
     font-weight: var(--ps-fw-label);
-    letter-spacing: 0.12em;
+    letter-spacing: var(--ps-tracking-chip);
     text-transform: uppercase;
     color: var(--ps-ink-3);
     text-align: center;
@@ -2008,7 +2011,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .rd-score-cell {
     font-size: var(--ps-fs-round-score);
-    font-weight: 400;
+    font-weight: var(--ps-fw-body);
 }
 .rd-score-cell.is-mint  { color: var(--ps-accent); }
 .rd-score-cell.is-ink   { color: var(--ps-ink); }
@@ -2041,7 +2044,7 @@ select.hole-input { width: 3rem; appearance: none; }
 
 .rd-score-bold {
     font-size: var(--ps-fs-round-bold);
-    font-weight: 500;
+    font-weight: var(--ps-fw-label);
     color: var(--ps-ink);
 }
 
@@ -2055,12 +2058,12 @@ select.hole-input { width: 3rem; appearance: none; }
 }
 .rd-total-score {
     font-size: var(--ps-fs-lg);
-    font-weight: 500;
+    font-weight: var(--ps-fw-label);
     text-align: right;
 }
 .rd-total-topar {
     font-size: var(--ps-fs-eyebrow);
-    font-weight: 500;
+    font-weight: var(--ps-fw-label);
     text-align: right;
 }
 .rd-total-topar.is-mint  { color: var(--ps-accent); }
