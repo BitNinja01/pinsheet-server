@@ -64,12 +64,11 @@
     --ps-fs-stat: 38px;
     --ps-fs-hero: 200px;
     --ps-fs-lg: 20px;
-    --ps-fs-xs: 10px;
     --ps-fs-2xs: 5px;
     --ps-fs-detail: 0.875rem;
     --ps-fs-caption: 0.75rem;
     --ps-fs-table-cell: 0.8rem;
-    --ps-fs-round-label: 10px;
+    --ps-fs-round-label: 11px;
     --ps-fs-round-meta: 12px;
     --ps-fs-round-sm: 13px;
     --ps-fs-round-bold: 15px;
@@ -78,7 +77,7 @@
     --ps-fs-round-stat: 24px;
     --ps-fs-round-hcp: 44px;
     --ps-fs-round-hero: 140px;
-    --ps-fs-stat-label-sm: 9px;
+    --ps-fs-stat-label-sm: 11px;
     --ps-fs-stat-cell: 28px;
     --ps-fs-icon: 40px;
     --ps-fs-hero-phone: 64px;
@@ -908,7 +907,7 @@ select.hole-input { width: 3rem; appearance: none; }
     color: var(--ps-ink-2);
     font-family: var(--ps-font-mono);
     font-weight: var(--ps-fw-label);
-    font-size: var(--ps-fs-xs);
+    font-size: var(--ps-fs-micro);
     letter-spacing: var(--ps-tracking-mono);
     flex-shrink: 0;
 }
