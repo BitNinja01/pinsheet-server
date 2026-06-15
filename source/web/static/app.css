@@ -1829,7 +1829,8 @@ select.hole-input { width: 3rem; appearance: none; }
 
 /* Zebra striping for data tables */
 .data-table tbody tr:nth-child(even) td,
-.ps-table tbody tr:nth-child(even) td {
+.ps-table tbody tr:nth-child(even) td,
+.rd-table tbody tr:nth-child(even) td {
     background: var(--ps-paper-2);
 }
 
