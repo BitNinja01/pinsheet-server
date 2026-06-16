@@ -1,6 +1,4 @@
 import pytest
-import hashlib
-from datetime import datetime, timedelta
 
 from store import (
     generate_password_reset_token,
@@ -9,7 +7,6 @@ from store import (
     update_password,
     create_user,
     verify_user,
-    get_user_by_id,
 )
 from database import set_db_path, init_db
 

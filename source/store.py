@@ -406,6 +406,7 @@ def generate_password_reset_token(user_id: int) -> str:
     )
     db.commit()
     db.close()
+    _log.info("password reset token generated for user_id=%s", user_id)
     return token
 
 
@@ -429,12 +430,18 @@ def verify_password_reset_token(token: str) -> dict | None:
 def consume_password_reset_token(token: str) -> None:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     db = get_db()
+    row = db.execute(
+        "SELECT user_id FROM password_reset_tokens WHERE token_hash = ?",
+        (token_hash,),
+    ).fetchone()
+    user_id = row["user_id"] if row else None
     db.execute(
         "UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?",
         (token_hash,),
     )
     db.commit()
     db.close()
+    _log.info("password reset token consumed for user_id=%s", user_id)
 
 
 def update_password(user_id: int, new_password: str) -> None:
@@ -447,6 +454,7 @@ def update_password(user_id: int, new_password: str) -> None:
     )
     db.commit()
     db.close()
+    _log.info("password updated for user_id=%s", user_id)
 
 
 def _generate_invite_code() -> str:
