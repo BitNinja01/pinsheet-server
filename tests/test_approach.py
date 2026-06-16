@@ -173,6 +173,36 @@ def test_ob_stats_empty():
     assert result["total_ob_per_round"] is None
 
 
+def test_ob_stats_excludes_n_fairway(make_course):
+    from source.models import dict_to_round
+    holes_hit = {"5": {"gross": "4", "putts": "2", "fairway": "H", "gir": "H", "penalties": "0"}}
+    holes_n   = {"5": {"gross": "4", "putts": "2", "fairway": "N", "gir": "H", "penalties": "0"}}
+    rounds = [
+        dict_to_round({"date": "2026-01-01", "course": "Test GC", "tees": "White",
+                       "holes_selection": "all", "total_gross": "4", "holes": holes_hit}),
+        dict_to_round({"date": "2026-01-02", "course": "Test GC", "tees": "White",
+                       "holes_selection": "all", "total_gross": "4", "holes": holes_n}),
+    ]
+    courses = make_course()
+    result = calc_ob_stats(rounds, courses)
+    assert result["fir_clean_avg_vs_par"] == 0.0
+
+
+def test_ob_stats_excludes_n_gir(make_course):
+    from source.models import dict_to_round
+    holes_hit = {"1": {"gross": "4", "putts": "2", "fairway": "H", "gir": "H", "penalties": "0"}}
+    holes_n   = {"1": {"gross": "4", "putts": "2", "fairway": "H", "gir": "N", "penalties": "0"}}
+    rounds = [
+        dict_to_round({"date": "2026-01-01", "course": "Test GC", "tees": "White",
+                       "holes_selection": "all", "total_gross": "4", "holes": holes_hit}),
+        dict_to_round({"date": "2026-01-02", "course": "Test GC", "tees": "White",
+                       "holes_selection": "all", "total_gross": "4", "holes": holes_n}),
+    ]
+    courses = make_course()
+    result = calc_ob_stats(rounds, courses)
+    assert result["gir_clean_avg_vs_par"] == 0.0
+
+
 def test_percentage_functions_range(make_round, make_course):
     rounds = [make_round(gross=g, fir_hits=f, gir_hits=gi)
               for g, f, gi in [

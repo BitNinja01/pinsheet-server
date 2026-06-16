@@ -19,7 +19,9 @@ def calc_personal_bests(rounds: list[RoundData], courses: dict[str, CourseData])
                 best_diff_date = date
         if not r.holes:
             continue
-        fir = sum(1 for h in r.holes.values() if not h.fairway or h.fairway == "H")
+        course = courses.get(r.course)
+        holes = course.holes if course else {}
+        fir = sum(1 for hn, h in r.holes.items() if (not h.fairway or h.fairway == "H") and holes.get(str(hn), HoleDef()).par != 3)
         if most_fir is None or fir > most_fir:
             most_fir = fir
             most_fir_date = date

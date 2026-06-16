@@ -166,6 +166,17 @@ def test_score_components_normal(make_round, make_course):
     assert result["putting"] is not None
 
 
+def test_score_components_excludes_n_fairway(make_course):
+    from source.models import dict_to_round
+    holes = {"1": {"gross": "4", "putts": "2", "fairway": "N", "gir": "H", "penalties": "0"}}
+    rounds = [dict_to_round({"date": "2026-01-01", "course": "Test GC", "tees": "White",
+                             "holes_selection": "all", "total_gross": "4", "holes": holes})]
+    courses = make_course()
+    result = calc_score_components(rounds, courses)
+    assert result["approach"] is None
+    assert result["scramble"] is None
+
+
 def test_penalty_stats_empty():
     result = calc_penalty_stats([], {})
     assert result["rate_per_round"] is None
@@ -204,6 +215,20 @@ def test_personal_bests_normal(make_round, make_course):
     result = calc_personal_bests(rounds, courses)
     assert result["best_gross"] == 75
     assert result["best_gross_date"] == "2026-01-02"
+
+
+def test_personal_bests_excludes_par3_fairway(make_course):
+    from source.models import dict_to_round
+    holes = {}
+    for n in range(1, 19):
+        pars = {1:4,2:5,3:4,4:3,5:4,6:5,7:4,8:3,9:4,10:5,11:4,12:3,13:4,14:5,15:4,16:3,17:4,18:5}
+        fw = "H" if pars[n] != 3 else "H"
+        holes[str(n)] = {"gross": str(pars[n]), "putts": "2", "fairway": fw, "gir": "H", "penalties": "0"}
+    rounds = [dict_to_round({"date": "2026-01-01", "course": "Test GC", "tees": "White",
+                             "holes_selection": "all", "total_gross": "72", "holes": holes})]
+    courses = make_course()
+    result = calc_personal_bests(rounds, courses)
+    assert result["most_fir"] == 14
 
 
 def test_nemesis_empty():

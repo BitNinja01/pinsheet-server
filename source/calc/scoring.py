@@ -184,7 +184,7 @@ def calc_score_components(rounds: list[RoundData], courses: dict[str, CourseData
             fw = h.fairway
             if fw == "H":
                 approach.append(ball_striking)
-            elif fw:
+            elif fw and fw != "N":
                 scramble.append(ball_striking)
     return {
         "approach": sum(approach) / len(approach) if approach else None,

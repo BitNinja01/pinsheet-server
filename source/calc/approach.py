@@ -297,7 +297,7 @@ def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> di
             gir = h.gir
             key_fir = (course_name, hole_num)
             key_gir = (course_name, hole_num)
-            if par != 3:
+            if par != 3 and fw != "N":
                 hole_fir_counts[key_fir] = hole_fir_counts.get(key_fir, 0) + 1
                 if fw in _FIR_OB:
                     fir_ob_count += 1
@@ -306,14 +306,15 @@ def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> di
                         fir_ob_vs_par.append(gross - par)
                 elif par and gross is not None:
                     fir_clean_vs_par.append(gross - par)
-            hole_gir_counts[key_gir] = hole_gir_counts.get(key_gir, 0) + 1
-            if gir in _GIR_OB:
-                gir_ob_count += 1
-                hole_gir_ob[key_gir] = hole_gir_ob.get(key_gir, 0) + 1
-                if par and gross is not None:
-                    gir_ob_vs_par.append(gross - par)
-            elif par and gross is not None:
-                gir_clean_vs_par.append(gross - par)
+            if gir != "N":
+                hole_gir_counts[key_gir] = hole_gir_counts.get(key_gir, 0) + 1
+                if gir in _GIR_OB:
+                    gir_ob_count += 1
+                    hole_gir_ob[key_gir] = hole_gir_ob.get(key_gir, 0) + 1
+                    if par and gross is not None:
+                        gir_ob_vs_par.append(gross - par)
+                elif par and gross is not None:
+                    gir_clean_vs_par.append(gross - par)
         fir_ob_round_totals.append(fir_ob_count)
         gir_ob_round_totals.append(gir_ob_count)
     fir_worst = sorted(
