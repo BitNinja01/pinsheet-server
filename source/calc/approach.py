@@ -12,7 +12,7 @@ def calc_fir_percent(rounds: list[RoundData], courses: dict[str, CourseData]) ->
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             par = holes.get(str(hole_num), HoleDef()).par
-            if par == 3:
+            if par == 3 or h.fairway == "N":
                 continue
             eligible += 1
             if not h.fairway or h.fairway == "H":
@@ -27,6 +27,8 @@ def calc_gir_percent(rounds: list[RoundData]) -> float | None:
         if not r.holes:
             continue
         for h in r.holes.values():
+            if h.gir == "N":
+                continue
             total += 1
             if not h.gir or h.gir == "H":
                 hits += 1
@@ -42,7 +44,7 @@ def calc_scramble_percent(rounds: list[RoundData], courses: dict[str, CourseData
         course = courses.get(r.course)
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
-            if not h.gir or h.gir == "H":
+            if not h.gir or h.gir in ("H", "N"):
                 continue
             missed_gir += 1
             par = holes.get(str(hole_num), HoleDef()).par
@@ -96,13 +98,13 @@ def calc_scoring_by_fairway(rounds: list[RoundData], courses: dict[str, CourseDa
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             par = holes.get(str(hole_num), HoleDef()).par
-            if par == 3 or not h.gross:
+            if par == 3 or not h.gross or h.fairway == "N":
                 continue
             diff = h.gross - par
             fw = h.fairway
             if not fw or fw == "H":
                 hit_diffs.append(diff)
-            elif fw in {"L", "OBL", "R", "OBR"}:
+            else:
                 missed_diffs.append(diff)
     return {
         "hit": sum(hit_diffs) / len(hit_diffs) if hit_diffs else None,
@@ -144,7 +146,7 @@ def calc_gir_by_par_type(rounds: list[RoundData], courses: dict[str, CourseData]
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             par = holes.get(str(hole_num), HoleDef()).par
-            if par not in totals:
+            if par not in totals or h.gir == "N":
                 continue
             totals[par] += 1
             if not h.gir or h.gir == "H":
@@ -182,7 +184,7 @@ def calc_gir_from_fairway_vs_rough(rounds: list[RoundData], courses: dict[str, C
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             par = holes.get(str(hole_num), HoleDef()).par
-            if par == 3:
+            if par == 3 or h.fairway == "N" or h.gir == "N":
                 continue
             fw = h.fairway
             gir_hit = not h.gir or h.gir == "H"
@@ -190,7 +192,7 @@ def calc_gir_from_fairway_vs_rough(rounds: list[RoundData], courses: dict[str, C
                 fw_total += 1
                 if gir_hit:
                     fw_hits += 1
-            elif fw in {"L", "OBL", "R", "OBR"}:
+            elif fw in {"L", "OBL", "R", "OBR", "S", "LO", "OBS", "OBLO"}:
                 rough_total += 1
                 if gir_hit:
                     rough_hits += 1
@@ -210,7 +212,7 @@ def calc_scoring_by_gir(rounds: list[RoundData], courses: dict[str, CourseData])
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             par = holes.get(str(hole_num), HoleDef()).par
-            if not par or not h.gross:
+            if not par or not h.gross or h.gir == "N":
                 continue
             diff = h.gross - par
             if not h.gir or h.gir == "H":
@@ -235,7 +237,7 @@ def calc_scramble_by_miss_direction(rounds: list[RoundData], courses: dict[str, 
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
             gir = h.gir
-            if gir == "H" or gir not in _map or not h.gross:
+            if not gir or gir in ("H", "N") or gir not in _map or not h.gross:
                 continue
             par = holes.get(str(hole_num), HoleDef()).par
             if not par:
@@ -256,7 +258,7 @@ def calc_scramble_by_par_type(rounds: list[RoundData], courses: dict[str, Course
         course = courses.get(r.course)
         holes = course.holes if course else {}
         for hole_num, h in r.holes.items():
-            if (not h.gir or h.gir == "H") or not h.gross:
+            if not h.gir or h.gir in ("H", "N") or not h.gross:
                 continue
             par = holes.get(str(hole_num), HoleDef()).par
             if par not in missed:
@@ -362,13 +364,16 @@ def per_round_hole_stats(holes, course_holes_data):
             if not fw or fw == "H":
                 fir_hit += 1
         gi = h.gir
-        if not gi or gi == "H":
+        if gi == "N":
+            pass
+        elif not gi or gi == "H":
             gir_hit += 1
+            gir_total += 1
         else:
             scr_opps += 1
+            gir_total += 1
             if h.gross <= hole_par:
                 scr_updown += 1
-        gir_total += 1
         try:
             total_putts += h.putts
         except (ValueError, TypeError):
