@@ -314,7 +314,7 @@ def register_stats_routes(app):
         putts_t = calc_putts_trend(all_rounds)
         scramble_t = calc_scramble_trend(all_rounds, courses_dict)
         hi_t = calc_handicap_trend(all_rounds, include_9hole)
-        pth = calc_playing_to_handicap_rate(all_rounds)
+        pth = calc_playing_to_handicap_rate(all_rounds, include_9hole)
 
         return render_template("stats/trends.html", **base_context(
             current_page="stats",

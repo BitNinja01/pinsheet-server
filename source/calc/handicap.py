@@ -112,14 +112,18 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
     return result
 
 
-def calc_playing_to_handicap_rate(rounds: list[RoundData]) -> float | None:
-    valid = [
-        (float(r.differential), float(r.computed_handicap))
-        for r in rounds
-        if not r.excluded
-        and r.differential and r.computed_handicap
-        and r.differential not in ("0", "") and r.computed_handicap not in ("0", "")
-    ]
+def calc_playing_to_handicap_rate(rounds: list[RoundData], include_9hole: bool = False) -> float | None:
+    overall_hi = calc_handicap_index(rounds, include_9hole)
+    valid = []
+    for r in rounds:
+        if r.excluded:
+            continue
+        if not r.differential or r.differential in ("0", ""):
+            continue
+        hc = r.computed_handicap if r.computed_handicap and r.computed_handicap not in ("0", "") else overall_hi
+        if hc is None:
+            continue
+        valid.append((float(r.differential), float(hc)))
     if not valid:
         return None
     return sum(1 for diff, hc in valid if diff <= hc) / len(valid) * 100
