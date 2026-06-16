@@ -84,4 +84,39 @@
     </div>
 </div>
 {% endif %}
+
+<div class="ps-card" style="margin-top: 24px;">
+    <div style="padding: 24px;">
+        <h2 class="ps-headline" style="margin: 0 0 16px;">Password Reset</h2>
+
+        {% if generated_token %}
+        <div style="padding: 16px; background: var(--ps-mint-1); border: 1px solid var(--ps-accent); margin-bottom: 16px;">
+            <p style="color: var(--ps-accent); font-weight: 500; margin: 0 0 8px;">Reset Link Generated</p>
+            <p style="font-size: var(--ps-fs-round-stat); margin: 0 0 4px;">
+                <code style="user-select: all; word-break: break-all;">{{ token_url }}</code>
+            </p>
+            <p style="color: var(--ps-ink-2); font-size: var(--ps-fs-round-meta); margin: 0;">
+                Token: <code style="user-select: all;">{{ generated_token }}</code>
+            </p>
+            <p style="color: var(--ps-ink-3); font-size: var(--ps-fs-micro); margin: 8px 0 0;">
+                Expires in 24 hours — one-time use.
+            </p>
+        </div>
+        {% endif %}
+
+        <form method="POST" style="display: flex; gap: 12px; align-items: flex-end;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="auth-field" style="flex: 1; margin: 0;">
+                <label for="reset_user_id">User</label>
+                <select id="reset_user_id" name="reset_user_id" required style="width: 100%;">
+                    <option value="">— Select user —</option>
+                    {% for u in all_users %}
+                    <option value="{{ u.id }}">{{ u.display_name }} (@{{ u.username }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-accent" style="white-space: nowrap;">Generate Reset Link</button>
+        </form>
+    </div>
+</div>
 {% endblock %}

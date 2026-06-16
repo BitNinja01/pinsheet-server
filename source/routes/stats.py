@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from flask import render_template, request, jsonify, g, current_app
+from flask import render_template, request, jsonify, g, current_app, url_for
 from flask_login import login_required, current_user
 
-from store import create_invite_code, get_invite_codes, get_plugin_states
+from store import create_invite_code, get_invite_codes, get_plugin_states, generate_password_reset_token
 from calc import (
     calc_scoring_average, calc_fir_percent, calc_gir_percent,
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
@@ -312,13 +312,25 @@ def register_stats_routes(app):
             return "Forbidden", 403
 
         if request.method == "POST":
-            code = create_invite_code(current_user.id)
             base_url = request.host_url.rstrip("/")
+            generated_token = None
+            token_url = None
+            code = None
+
+            if request.form.get("reset_user_id"):
+                reset_user_id = int(request.form.get("reset_user_id"))
+                raw_token = generate_password_reset_token(reset_user_id)
+                generated_token = raw_token
+                token_url = base_url + url_for("reset_password", token=raw_token)
+            else:
+                code = create_invite_code(current_user.id)
+
             return render_template("admin_invites.html", **base_context(
                 codes=get_invite_codes(), new_code=code, base_url=base_url,
                 plugin_states=get_plugin_states(),
                 discovered_plugins=getattr(current_app, "_discovered_plugins", []),
                 plugin_states_at_startup=getattr(current_app, "_plugin_states_at_startup", {}),
+                generated_token=generated_token, token_url=token_url,
             ))
 
         return render_template("admin_invites.html", **base_context(
@@ -326,4 +338,5 @@ def register_stats_routes(app):
             plugin_states=get_plugin_states(),
             discovered_plugins=getattr(current_app, "_discovered_plugins", []),
             plugin_states_at_startup=getattr(current_app, "_plugin_states_at_startup", {}),
+            generated_token=None, token_url=None,
         ))
