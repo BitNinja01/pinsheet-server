@@ -27,6 +27,7 @@ from calc import (
     calc_nemesis_best_holes, calc_scoring_trend, calc_fir_trend, calc_gir_trend,
     calc_putts_trend, calc_scramble_trend, calc_handicap_trend,
     calc_playing_to_handicap_rate,
+    calc_par_or_better_percent,
 )
 from calc import stat_delta
 from source.models import dict_to_course
