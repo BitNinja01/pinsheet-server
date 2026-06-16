@@ -27,15 +27,7 @@ def get_users():
     return g._users
 
 
-def _fmt(val, suffix="", precision=1):
-    if val is None:
-        return "\u2014"
-    if suffix == "%":
-        return f"{val:.{precision}f}%"
-    return f"{val:.{precision}f}{suffix}"
-
-
 def base_context(**extra):
-    ctx = {"settings": get_settings(), "all_users": get_users(), "_fmt": _fmt}
+    ctx = {"settings": get_settings(), "all_users": get_users()}
     ctx.update(extra)
     return ctx

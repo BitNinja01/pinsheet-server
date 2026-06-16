@@ -98,6 +98,17 @@ def inject_version():
 
 
 @app.context_processor
+def inject_helpers():
+    def _fmt(val, suffix="", precision=1):
+        if val is None:
+            return "\u2014"
+        if suffix == "%":
+            return f"{val:.{precision}f}%"
+        return f"{val:.{precision}f}{suffix}"
+    return dict(_fmt=_fmt)
+
+
+@app.context_processor
 def inject_plugin_globals():
     return {
         "plugin_blocks": getattr(app, "_plugin_blocks", {}),
