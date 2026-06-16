@@ -3,7 +3,7 @@ from functools import wraps
 from flask import render_template, request, redirect, url_for, g
 from flask_login import login_user, logout_user, login_required, current_user
 
-from store import verify_user, get_user, real_user_count, create_user, is_invite_code_valid, consume_invite_code
+from store import verify_user, get_user, real_user_count, create_user, is_invite_code_valid, consume_invite_code, verify_password_reset_token, consume_password_reset_token, update_password
 
 
 def register_auth_routes(app, limiter, User):
@@ -80,3 +80,37 @@ def register_auth_routes(app, limiter, User):
     def logout():
         logout_user()
         return redirect(url_for("login_page"))
+
+    @app.route("/reset-password", methods=["GET", "POST"])
+    @limiter.limit("5 per minute")
+    def reset_password():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        if request.method == "POST":
+            token = request.form.get("token", "")
+            new_password = request.form.get("new_password", "")
+            confirm = request.form.get("confirm", "")
+
+            user_dict = verify_password_reset_token(token)
+            if not user_dict:
+                return render_template("reset_password.html", valid=False, error="Invalid or expired reset token. Please request a new one.", token="")
+
+            errors = []
+            if len(new_password) < 8:
+                errors.append("Password must be at least 8 characters.")
+            if new_password != confirm:
+                errors.append("Passwords do not match.")
+            if errors:
+                return render_template("reset_password.html", valid=True, token=token, error=errors[0])
+
+            consume_password_reset_token(token)
+            update_password(user_dict["id"], new_password)
+            return redirect(url_for("login_page"))
+
+        token = request.args.get("token", "")
+        user_dict = verify_password_reset_token(token)
+        if not user_dict:
+            return render_template("reset_password.html", valid=False, error="Invalid or expired reset token. Please request a new one.", token="")
+
+        return render_template("reset_password.html", valid=True, token=token, error=None)
