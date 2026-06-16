@@ -41,7 +41,8 @@
   {% if spark_data %}
   <div class="ps-hero-right">
     <div class="ps-eyebrow">{{ trend_label or "Trend" }}</div>
-    <div class="ps-hero-chart">
+    <div class="ps-hero-chart" style="position: relative;">
+      <div class="ps-chart-tip"></div>
       <svg class="ps-area-chart" viewBox="0 0 900 110" preserveAspectRatio="none">
         {% if spark_data|length > 1 %}
         {% set mn = spark_data|min %}
@@ -51,26 +52,32 @@
         {% set _py = 6 %}
         {% set _h = 110 %}
         {% set avail = _h - _py * 2 %}
-        <line x1="0" y1="{{ _py + 0.25 * avail }}" x2="900" y2="{{ _py + 0.25 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
-        <line x1="0" y1="{{ _py + 0.5 * avail }}" x2="900" y2="{{ _py + 0.5 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
-        <line x1="0" y1="{{ _py + 0.75 * avail }}" x2="900" y2="{{ _py + 0.75 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
-        {% set pts = [] %}
+        {% set _xs = [] %}
+        {% set _ys = [] %}
         {% for v in spark_data %}
           {% set x = 4 + (loop.index0 / last_i) * (900 - 8) %}
           {% set y = _py + (1 - (v - mn) / rng) * avail %}
-          {% set _d = pts.append(x ~ "," ~ y) %}
+          {% set _d = _xs.append(x) %}
+          {% set _d = _ys.append(y) %}
         {% endfor %}
-        {% set line_pts = pts|join(" ") %}
-        {% set last_pt = pts[-1] %}
-        {% set first_x = 4 %}
-        <polygon points="{{ first_x }},{{ _h }} {{ line_pts }} {{ last_pt.split(",")[0] }},{{ _h }}" fill="var(--ps-accent-dim)"/>
+        {% set _coords = [] %}
+        {% for i in range(_xs|length) %}{% set _d = _coords.append(_xs[i] ~ "," ~ _ys[i]) %}{% endfor %}
+        {% set line_pts = _coords|join(" ") %}
+        {% set last_x = _xs[-1] %}
+        {% set last_y = _ys[-1] %}
+        <polygon points="4,{{ _h }} {{ line_pts }} {{ last_x }},{{ _h }}" fill="var(--ps-accent-dim)"/>
         <polyline points="{{ line_pts }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-        {% for pt in pts %}
-        <circle cx="{{ pt.split(",")[0] }}" cy="{{ pt.split(",")[1] }}" r="2" fill="var(--ps-paper)" stroke="var(--ps-accent)" stroke-width="1.2"/>
+        {% for i in range(_xs|length) %}
+        <circle class="ps-chart-dot" cx="{{ _xs[i] }}" cy="{{ _ys[i] }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ _fmt(spark_data[i], "", 1) }}"/>
+        <circle cx="{{ _xs[i] }}" cy="{{ _ys[i] }}" r="2" fill="var(--ps-paper)" stroke="var(--ps-accent)" stroke-width="1.2" pointer-events="none"/>
         {% endfor %}
-        <circle cx="{{ last_pt.split(",")[0] }}" cy="{{ last_pt.split(",")[1] }}" r="4" fill="var(--ps-accent)"/>
+        <circle class="ps-chart-dot-last" cx="{{ last_x }}" cy="{{ last_y }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ _fmt(spark_data[-1], "", 1) }}"/>
+        <circle cx="{{ last_x }}" cy="{{ last_y }}" r="4" fill="var(--ps-accent)" pointer-events="none"/>
         {% endif %}
       </svg>
+      <script>
+        (function(){var c=document.currentScript.parentElement,q=c.querySelector("svg"),t=c.querySelector(".ps-chart-tip");if(!q||!t)return;var d=q.querySelectorAll(".ps-chart-dot,.ps-chart-dot-last");d.forEach(function(n){n.addEventListener("mouseenter",function(e){t.textContent=this.dataset.value,t.style.opacity="1";var r=c.getBoundingClientRect();t.style.left=(e.clientX-r.left+12)+"px",t.style.top=(e.clientY-r.top-28)+"px"}),n.addEventListener("mouseleave",function(){t.style.opacity="0"})})})();
+      </script>
     </div>
   </div>
   {% endif %}
