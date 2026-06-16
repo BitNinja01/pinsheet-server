@@ -104,8 +104,8 @@ def register_auth_routes(app, limiter, User):
             if errors:
                 return render_template("reset_password.html", valid=True, token=token, error=errors[0])
 
-            update_password(user_dict["id"], new_password)
             consume_password_reset_token(token)
+            update_password(user_dict["id"], new_password)
             return redirect(url_for("login_page"))
 
         token = request.args.get("token", "")
