@@ -92,20 +92,17 @@ def _setup_globals():
         g.is_own_data = False
 
 
+def _fmt(val, suffix="", precision=1):
+    if val is None:
+        return "\u2014"
+    if suffix == "%":
+        return f"{val:.{precision}f}%"
+    return f"{val:.{precision}f}{suffix}"
+
+
 @app.context_processor
 def inject_version():
     return dict(version=__version__)
-
-
-@app.context_processor
-def inject_helpers():
-    def _fmt(val, suffix="", precision=1):
-        if val is None:
-            return "\u2014"
-        if suffix == "%":
-            return f"{val:.{precision}f}%"
-        return f"{val:.{precision}f}{suffix}"
-    return dict(_fmt=_fmt)
 
 
 @app.context_processor
@@ -118,6 +115,7 @@ def inject_plugin_globals():
 
 
 app.jinja_env.globals.setdefault("plugin_info", {})
+app.jinja_env.globals["_fmt"] = _fmt
 
 @app.template_filter("split")
 def _jinja_split(value, separator):
