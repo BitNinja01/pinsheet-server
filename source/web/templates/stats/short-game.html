@@ -37,7 +37,7 @@
       {"label": "Scramble from Short", "value": _fmt(scramble_short, "%", 1) if scramble_short is not none else None},
       {"label": "Scramble from Long", "value": _fmt(scramble_long, "%", 1) if scramble_long is not none else None},
     ]) }}
-    {{ DistSection(title="Key Scramble", bars=None, footer_rows=[
+    {{ DistSection(title="Key Scramble", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "Short", "value": _fmt(scramble_short, "%", 1) if scramble_short is not none else None},
       {"label": "Long", "value": _fmt(scramble_long, "%", 1) if scramble_long is not none else None},
       {"label": "Overall", "value": _fmt(scramble_pct, "%", 0)},

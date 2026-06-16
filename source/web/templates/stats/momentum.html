@@ -33,7 +33,7 @@
       {"label": "Scoring on Opening 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else None},
       {"label": "Scoring on Closing 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else None, "warn": True},
     ]) }}
-    {{ DistSection(title="Closing Stretch", bars=None, footer_rows=[
+    {{ DistSection(title="Closing Stretch", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "Open 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else None},
       {"label": "Close 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else None},
     ]) }}

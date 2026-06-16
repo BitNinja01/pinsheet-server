@@ -39,7 +39,7 @@
       {"label": "Avg vs Par \u2014 FIR OB", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2), "warn": true},
       {"label": "Avg vs Par \u2014 FIR Clean", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},
     ]) }}
-    {{ DistSection(title="OB Summary", bars=None, footer_rows=[
+    {{ DistSection(title="OB Summary", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "OB / Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
       {"label": "FIR OB \u2192", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2)},
       {"label": "FIR Clean \u2192", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},

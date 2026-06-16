@@ -37,7 +37,7 @@
       {"label": "Putts on Par 4", "value": _fmt(putts_by_par.get(4), "", 2)},
       {"label": "Putts on Par 5", "value": _fmt(putts_by_par.get(5), "", 2)},
     ]) }}
-    {{ DistSection(title="Key Putting", bars=None, footer_rows=[
+    {{ DistSection(title="Key Putting", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "GIR Putts", "value": _fmt(putts_per_gir, "", 2)},
       {"label": "1-Putt", "value": _fmt(one_putt_pct, "%", 0)},
       {"label": "3-Putt", "value": _fmt(three_putt_pct, "%", 0)},

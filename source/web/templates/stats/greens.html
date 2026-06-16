@@ -42,7 +42,7 @@
       {"label": "Avg vs Par \u2014 GIR OB", "value": _fmt(ob_stats.get("gir_ob_avg_vs_par"), "", 2), "warn": true},
       {"label": "Avg vs Par \u2014 GIR Clean", "value": _fmt(ob_stats.get("gir_clean_avg_vs_par"), "", 2)},
     ]) }}
-    {{ DistSection(title="GIR Impact", bars=None, footer_rows=[
+    {{ DistSection(title="GIR Impact", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "GIR Hit \u2192", "value": _fmt(gir_scoring_hit, "", 2) if gir_scoring_hit is not none else None},
       {"label": "GIR Miss \u2192", "value": _fmt(gir_scoring_missed, "", 2) if gir_scoring_missed is not none else None},
       {"label": "From FW", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else None},

@@ -45,7 +45,7 @@
     {% if clean_card_pct is not none %}{% set _ = ns.footer.append({"label": "Clean Card", "value": clean_card_pct|round(1)|string, "unit": "%"}) %}{% endif %}
     {% if blow_up_rate is not none %}{% set _ = ns.footer.append({"label": "Blow-up", "value": blow_up_rate|round(1)|string, "unit": "%"}) %}{% endif %}
     {% if std_dev is not none %}{% set _ = ns.footer.append({"label": "Std Dev", "value": std_dev|round(1)|string}) %}{% endif %}
-    {{ DistSection(title="Key Rates", bars=None, footer_rows=ns.footer) }}
+    {{ DistSection(title="Key Rates", bars=None, footer_rows=ns.footer, class="stats-section--footer") }}
   </div>
 </div>
 {{ Footnote(text="Best 8 of last 20 rounds. Delta vs last 20.") }}

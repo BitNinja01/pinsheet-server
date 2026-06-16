@@ -38,9 +38,9 @@
       {% endif %}
     </div>
   </div>
+  {% if spark_data %}
   <div class="ps-hero-right">
     <div class="ps-eyebrow">{{ trend_label or "Trend" }}</div>
-    {% if spark_data %}
     <div class="ps-hero-chart">
       <svg class="ps-area-chart" viewBox="0 0 900 110" preserveAspectRatio="none">
         {% if spark_data|length > 1 %}
@@ -65,8 +65,8 @@
         {% endif %}
       </svg>
     </div>
-    {% endif %}
   </div>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -81,8 +81,8 @@
 </div>
 {% endmacro %}
 
-{% macro DistSection(title, bars, has_stacked_bar=False, stacked_max=50, footer_rows=None) %}
-<div class="stats-section">
+{% macro DistSection(title, bars, has_stacked_bar=False, stacked_max=50, footer_rows=None, class="") %}
+<div class="stats-section{% if class %} {{ class }}{% endif %}">
   <div class="ps-eyebrow">{{ title }}</div>
   {% if has_stacked_bar and bars %}
   <div class="ps-stacked-bar">
@@ -154,6 +154,14 @@
   <div>
     <div class="ps-eyebrow" style="color: var(--ps-ink-3);">&larr; Stats</div>
     <h1 class="ps-h1">{{ title }} <em style="font-style: italic; color: var(--ps-accent); font-weight: 400;" class="ps-h1">{{ accent }}</em></h1>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; gap: 8px;">
+      <span class="ps-chip is-active">12M</span>
+      <span class="ps-chip">2Y</span>
+      <span class="ps-chip">All</span>
+    </div>
+    <span style="font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); font-weight: var(--ps-fw-label); padding: 8px 16px; border: var(--ps-rule) solid var(--ps-ink); color: var(--ps-ink); letter-spacing: var(--ps-tracking-label); text-transform: uppercase;">Export CSV</span>
   </div>
 </div>
 {% endmacro %}
