@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "stats/macros.html" import CatTabs, PageShell, AreaChart, Footnote %}
+{% block content %}
+{{ PageShell(title="Every metric tells a story,", accent="follow the lines.") }}
+{{ CatTabs(active="trends") }}
+<div class="stats-trends-grid">
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">Scoring Avg</div>
+    <div class="stats-trend-value">{{ scoring_trend[-1][1] if scoring_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=scoring_trend|map(attribute=1)|list, w=680, h=80) if scoring_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">FIR %</div>
+    <div class="stats-trend-value">{{ _fmt(fir_trend[-1][1], "%", 0) if fir_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=fir_trend|map(attribute=1)|list, w=680, h=80) if fir_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">GIR %</div>
+    <div class="stats-trend-value">{{ _fmt(gir_trend[-1][1], "%", 0) if gir_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=gir_trend|map(attribute=1)|list, w=680, h=80) if gir_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">Putts / Round</div>
+    <div class="stats-trend-value">{{ putts_trend[-1][1] if putts_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=putts_trend|map(attribute=1)|list, w=680, h=80) if putts_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">Scramble %</div>
+    <div class="stats-trend-value">{{ _fmt(scramble_trend[-1][1], "%", 0) if scramble_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=scramble_trend|map(attribute=1)|list, w=680, h=80) if scramble_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">Handicap Index</div>
+    <div class="stats-trend-value">{{ handicap_trend[-1][1] if handicap_trend else "\u2014" }}</div>
+    <div class="stats-trend-spark">{{ AreaChart(data=handicap_trend|map(attribute=1)|list, w=680, h=80) if handicap_trend else "" }}</div>
+  </div>
+  <div class="stats-trend-cell">
+    <div class="ps-eyebrow">Playing to HCP</div>
+    <div class="stats-trend-value">{{ _fmt(playing_to_handicap_rate, "%", 1) if playing_to_handicap_rate is not none else "\u2014" }}</div>
+    <div class="stats-trend-spark"></div>
+  </div>
+  <div class="stats-trend-cell stats-trend-cell--info">
+    <div class="ps-eyebrow">All trends &middot; last 20 rounds</div>
+    <div class="stats-trend-context">spring &rsquo;26</div>
+  </div>
+</div>
+{{ Footnote(text="Each sparkline shows the last 20 rounds. Higher is better for FIR/GIR/Scramble. Lower is better for Scoring/Putts/HCP.") }}
+{% endblock %}

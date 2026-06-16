@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
+{% block content %}
+{{ PageShell(title="Up-and-down from short-sided,", accent="the real separator.") }}
+{{ CatTabs(active="short-game") }}
+{{ HeroBand(value=scramble_pct, label="scramble rate %", delta=sc_delta.delta, delta_dir=sc_delta.delta_dir, context="64 rounds", precision=0, spark_data=scramble_spark, trend_label="Scramble Trend \u00b7 20 rounds") }}
+{{ StatStrip(items=[
+  {"label": "Scramble %", "value": _fmt(scramble_pct, "%", 0)},
+  {"label": "From Left", "value": _fmt(scramble_left, "%", 1) if scramble_left is not none else "\u2014"},
+  {"label": "From Right", "value": _fmt(scramble_right, "%", 1) if scramble_right is not none else "\u2014"},
+  {"label": "From Short", "value": _fmt(scramble_short, "%", 1) if scramble_short is not none else "\u2014"},
+  {"label": "From Long", "value": _fmt(scramble_long, "%", 1) if scramble_long is not none else "\u2014"},
+  {"label": "Par 3", "value": _fmt(scramble_par_3, "%", 1) if scramble_par_3 is not none else "\u2014"},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Direction Breakdown", bars=[
+      {"label": "From Short", "pct": scramble_short or 0, "display": _fmt(scramble_short, "%", 1) if scramble_short is not none else "\u2014", "max": 60, "color": "var(--ps-accent)"},
+      {"label": "From Long", "pct": scramble_long or 0, "display": _fmt(scramble_long, "%", 1) if scramble_long is not none else "\u2014", "max": 60, "color": "var(--ps-ink-2)"},
+      {"label": "From Left", "pct": scramble_left or 0, "display": _fmt(scramble_left, "%", 1) if scramble_left is not none else "\u2014", "max": 60, "color": "var(--ps-ink-2)"},
+      {"label": "From Right", "pct": scramble_right or 0, "display": _fmt(scramble_right, "%", 1) if scramble_right is not none else "\u2014", "max": 60, "color": "var(--ps-ink-2)"},
+    ], has_stacked_bar=True, stacked_max=60, footer_rows=[
+      {"label": "Par 3", "value": _fmt(scramble_par_3, "%", 1) if scramble_par_3 is not none else None},
+      {"label": "Par 4", "value": _fmt(scramble_par_4, "%", 1) if scramble_par_4 is not none else None},
+      {"label": "Par 5", "value": _fmt(scramble_par_5, "%", 1) if scramble_par_5 is not none else None},
+    ]) }}
+  </div>
+  <div class="stats-right">
+    {{ DRowSection(title="By Par", rows=[
+      {"label": "Scramble on Par 3", "value": _fmt(scramble_par_3, "%", 1) if scramble_par_3 is not none else None},
+      {"label": "Scramble on Par 4", "value": _fmt(scramble_par_4, "%", 1) if scramble_par_4 is not none else None},
+      {"label": "Scramble on Par 5", "value": _fmt(scramble_par_5, "%", 1) if scramble_par_5 is not none else None},
+    ]) }}
+    {{ DRowSection(title="Direction Detail", rows=[
+      {"label": "Scramble from Left", "value": _fmt(scramble_left, "%", 1) if scramble_left is not none else None},
+      {"label": "Scramble from Right", "value": _fmt(scramble_right, "%", 1) if scramble_right is not none else None},
+      {"label": "Scramble from Short", "value": _fmt(scramble_short, "%", 1) if scramble_short is not none else None},
+      {"label": "Scramble from Long", "value": _fmt(scramble_long, "%", 1) if scramble_long is not none else None},
+    ]) }}
+    {{ DistSection(title="Key Scramble", bars=None, class="stats-section--footer", footer_rows=[
+      {"label": "Short", "value": _fmt(scramble_short, "%", 1) if scramble_short is not none else None},
+      {"label": "Long", "value": _fmt(scramble_long, "%", 1) if scramble_long is not none else None},
+      {"label": "Overall", "value": _fmt(scramble_pct, "%", 0)},
+    ]) }}
+  </div>
+</div>
+{{ Footnote(text="Scramble = up-and-down when missing GIR. Direction relative to pin.") }}
+{% endblock %}

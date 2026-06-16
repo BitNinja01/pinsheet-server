@@ -1,0 +1,215 @@
+{% macro CatTabs(active) %}
+<div class="ps-chip-group">
+  {% set tabs = [
+    ("scoring", "Scoring"), ("penalties", "Penalties"), ("fairways", "Fairways"),
+    ("greens", "Greens"), ("putting", "Putting"), ("short-game", "Short Game"),
+    ("momentum", "Momentum"), ("trends", "Trends"), ("bests", "Bests"),
+  ] %}
+  {% for slug, label in tabs %}
+  <a href="/stats/{{ slug }}" class="ps-chip{% if slug == active %} is-active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro HeroBand(value, label, delta=None, delta_dir=None, context=None, spark_data=None, trend_label=None, precision=1, decimal_only=False) %}
+<div class="ps-hero-band">
+  <div class="ps-hero-left">
+    <div class="ps-hero-num">
+      {% if value is not none %}
+        {% set val_str = _fmt(value, "", precision) %}
+        {% if "." in val_str %}
+          {% set int_part = val_str.split(".")[0] %}
+          {% set dec_part = val_str.split(".")[1] %}
+          <span class="ps-hero-int">{{ int_part }}</span><span class="ps-hero-dot">.</span><span class="ps-hero-dec">{{ dec_part }}</span>
+        {% else %}
+          <span class="ps-hero-int">{{ val_str }}</span>
+        {% endif %}
+      {% else %}
+        <span class="ps-hero-int">&mdash;</span>
+      {% endif %}
+    </div>
+    <div class="ps-eyebrow">{{ label }}</div>
+    <div class="ps-hero-meta">
+      {% if delta is not none %}
+      <span class="ps-stat-delta{% if delta_dir == 'up' %} is-up{% elif delta_dir == 'down' %} is-down{% endif %}">{{ delta }}</span>
+      {% endif %}
+      {% if context %}
+      <span class="ps-hero-context">{{ context }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% if spark_data %}
+  <div class="ps-hero-right">
+    <div class="ps-eyebrow">{{ trend_label or "Trend" }}</div>
+    <div class="ps-hero-chart" style="position: relative;">
+      <div class="ps-chart-tip"></div>
+      <svg class="ps-area-chart" viewBox="0 0 900 110" preserveAspectRatio="none">
+        {% if spark_data|length > 1 %}
+        {% set mn = spark_data|min %}
+        {% set mx = spark_data|max %}
+        {% set rng = (mx - mn) or 1 %}
+        {% set last_i = spark_data|length - 1 %}
+        {% set _py = 6 %}
+        {% set _h = 110 %}
+        {% set avail = _h - _py * 2 %}
+        {% set _xs = [] %}
+        {% set _ys = [] %}
+        {% for v in spark_data %}
+          {% set x = 4 + (loop.index0 / last_i) * (900 - 8) %}
+          {% set y = _py + (1 - (v - mn) / rng) * avail %}
+          {% set _d = _xs.append(x) %}
+          {% set _d = _ys.append(y) %}
+        {% endfor %}
+        {% set _coords = [] %}
+        {% for i in range(_xs|length) %}{% set _d = _coords.append(_xs[i] ~ "," ~ _ys[i]) %}{% endfor %}
+        {% set line_pts = _coords|join(" ") %}
+        {% set last_x = _xs[-1] %}
+        {% set last_y = _ys[-1] %}
+        <polygon points="4,{{ _h }} {{ line_pts }} {{ last_x }},{{ _h }}" fill="var(--ps-accent-dim)"/>
+        <polyline points="{{ line_pts }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        {% for i in range(_xs|length) %}
+        <circle class="ps-chart-dot" cx="{{ _xs[i] }}" cy="{{ _ys[i] }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ _fmt(spark_data[i], "", 1) }}"/>
+        <circle cx="{{ _xs[i] }}" cy="{{ _ys[i] }}" r="2" fill="var(--ps-paper)" stroke="var(--ps-accent)" stroke-width="1.2" pointer-events="none"/>
+        {% endfor %}
+        <circle class="ps-chart-dot-last" cx="{{ last_x }}" cy="{{ last_y }}" r="10" fill="transparent" style="pointer-events: all;" data-value="{{ _fmt(spark_data[-1], "", 1) }}"/>
+        <circle cx="{{ last_x }}" cy="{{ last_y }}" r="4" fill="var(--ps-accent)" pointer-events="none"/>
+        {% endif %}
+      </svg>
+      <script>
+        (function(){var c=document.currentScript.parentElement,q=c.querySelector("svg"),t=c.querySelector(".ps-chart-tip");if(!q||!t)return;var d=q.querySelectorAll(".ps-chart-dot,.ps-chart-dot-last");d.forEach(function(n){n.addEventListener("mouseenter",function(e){t.textContent=this.dataset.value,t.style.opacity="1";var r=c.getBoundingClientRect();t.style.left=(e.clientX-r.left+12)+"px",t.style.top=(e.clientY-r.top-28)+"px"}),n.addEventListener("mouseleave",function(){t.style.opacity="0"})})})();
+      </script>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro StatStrip(items) %}
+<div class="ps-stat-strip">
+  {% for item in items %}
+  <div class="ps-stat">
+    <div class="ps-eyebrow">{{ item.label }}</div>
+    <div class="ps-stat-v{% if item.warn %} is-warn{% endif %}">{{ item.value }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro DistSection(title, bars, has_stacked_bar=False, stacked_max=50, footer_rows=None, class="") %}
+<div class="stats-section{% if class %} {{ class }}{% endif %}">
+  <div class="ps-eyebrow">{{ title }}</div>
+  {% if has_stacked_bar and bars %}
+  <div class="ps-stacked-bar">
+    {% for bar in bars %}
+    <div class="ps-stacked-bar-seg" style="flex: {{ (bar.pct or 0) }}; background: {{ bar.color or 'var(--ps-accent)' }};{% if not loop.last %} margin-right: 2px;{% endif %}"></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if bars %}
+  <div class="stats-dist">
+    {% for bar in bars %}
+    <div class="stats-dist-row">
+      <div class="stats-dist-label">{{ bar.label }}</div>
+      <div class="stats-dist-bar-wrap">
+        <div class="ps-minibar" style="background: var(--ps-rule-c);">
+          <div class="ps-minibar-fill" style="width: {{ ((bar.pct or 0) / (bar.max or 50)) * 100 if (bar.max or 0) > 0 else 0 }}%; background: {{ bar.color or 'var(--ps-accent)' }};"></div>
+        </div>
+      </div>
+      <div class="stats-dist-value">{{ bar.display }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if footer_rows %}
+  <div class="ps-display-footer">
+    {% for row in footer_rows %}
+    <div class="ps-display-footer-item">
+      <div class="ps-eyebrow">{{ row.label }}</div>
+      <div class="ps-display-footer-num">
+        {% if row.value is not none %}
+          {% set val_str = row.value %}
+          {% if "." in val_str %}
+            {% set int_part = val_str.split(".")[0] %}
+            {% set dec_part = val_str.split(".")[1] %}
+            <span class="ps-df-int">{{ int_part }}</span><span class="ps-df-dot">.</span><span class="ps-df-dec">{{ dec_part }}</span>
+          {% else %}
+            <span class="ps-df-int">{{ val_str }}</span>
+          {% endif %}
+          {% if row.unit %}<span class="ps-df-unit"> {{ row.unit }}</span>{% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro DRowSection(title, rows) %}
+<div class="stats-section">
+  <div class="ps-eyebrow">{{ title }}</div>
+  <div class="stats-drows">
+    {% for row in rows %}
+    <div class="stats-drow{% if row.warn %} is-warn{% endif %}">
+      <span class="stats-drow-label">{{ row.label }}</span>
+      {% if row.value is not none %}
+      <span class="stats-drow-value">{{ row.value }}</span>
+      {% else %}
+      <span class="stats-drow-value">&mdash;</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro PageShell(title, accent) %}
+<div class="ps-topbar">
+  <div>
+    <div class="ps-eyebrow" style="color: var(--ps-ink-3);">&larr; Stats</div>
+    <h1 class="ps-h1">{{ title }} <em style="font-style: italic; color: var(--ps-accent); font-weight: 400;" class="ps-h1">{{ accent }}</em></h1>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; gap: 8px;">
+      <span class="ps-chip is-active">12M</span>
+      <span class="ps-chip">2Y</span>
+      <span class="ps-chip">All</span>
+    </div>
+    <span style="font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); font-weight: var(--ps-fw-label); padding: 8px 16px; border: var(--ps-rule) solid var(--ps-ink); color: var(--ps-ink); letter-spacing: var(--ps-tracking-label); text-transform: uppercase;">Export CSV</span>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro Footnote(text) %}
+<div class="stats-footnote">{{ text }}</div>
+{% endmacro %}
+
+{% macro AreaChart(data, w=680, h=80, show_grid=True) %}
+{% if data and data|length > 1 %}
+{% set mn = data|min %}
+{% set mx = data|max %}
+{% set rng = (mx - mn) or 1 %}
+{% set last_i = data|length - 1 %}
+{% set _py = 6 %}
+{% set avail = h - _py * 2 %}
+<svg class="ps-area-chart-sm" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
+  {% if show_grid %}
+  <line x1="0" y1="{{ _py + 0.25 * avail }}" x2="{{ w }}" y2="{{ _py + 0.25 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ _py + 0.5 * avail }}" x2="{{ w }}" y2="{{ _py + 0.5 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ _py + 0.75 * avail }}" x2="{{ w }}" y2="{{ _py + 0.75 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  {% endif %}
+  {% set pts = [] %}
+  {% for v in data %}
+    {% set x = 4 + (loop.index0 / last_i) * (w - 8) %}
+    {% set y = _py + (1 - (v - mn) / rng) * avail %}
+    {% set _d = pts.append(x ~ "," ~ y) %}
+  {% endfor %}
+  {% set line_pts = pts|join(" ") %}
+  {% set last_pt = pts[-1] %}
+  {% set first_x = 4 %}
+  <polygon points="{{ first_x }},{{ h }} {{ line_pts }} {{ last_pt.split(",")[0] }},{{ h }}" fill="var(--ps-accent-dim)"/>
+  <polyline points="{{ line_pts }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="{{ last_pt.split(",")[0] }}" cy="{{ last_pt.split(",")[1] }}" r="4" fill="var(--ps-accent)"/>
+</svg>
+{% endif %}
+{% endmacro %}

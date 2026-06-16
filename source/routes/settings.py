@@ -8,7 +8,8 @@ from flask_login import login_required, current_user
 
 from store import (
     save_settings, save_course, save_round,
-    get_all_rounds, update_round_handicap,
+    get_all_rounds, update_round_handicap, update_round_differential,
+    get_slope_rating,
 )
 from calc import calc_handicap_index
 from source.request_data import get_settings, get_courses, base_context
@@ -68,8 +69,17 @@ def register_settings_routes(app, csrf):
 
             all_imported = get_all_rounds(user_id)
             chronological = list(reversed(all_imported))
+            courses_data = get_courses()
             include_9hole = get_settings().get("include_9hole", True)
             for i, r in enumerate(chronological):
+                if not r.differential or r.differential == "0":
+                    course_data = courses_data.get(r.course)
+                    if course_data:
+                        tee_data = course_data.get("tees", {}).get(r.tees)
+                        if tee_data and r.total_gross and r.total_gross != "0":
+                            slope, rating = get_slope_rating(tee_data, r.holes_selection)
+                            diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                            update_round_differential(r.date, r.index, diff, user_id)
                 window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:

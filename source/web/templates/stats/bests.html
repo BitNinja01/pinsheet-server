@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "stats/macros.html" import CatTabs, PageShell, Footnote %}
+{% block content %}
+{{ PageShell(title="The rounds that define", accent="the ceiling.") }}
+{{ CatTabs(active="bests") }}
+<div class="ps-eyebrow" style="margin-top: var(--ps-sp-4);">Personal Records</div>
+<div class="stats-bests-list">
+  <div class="stats-best-row">
+    <div class="stats-best-left">
+      <div class="ps-eyebrow">Best Gross Score</div>
+      <div class="stats-best-num">{{ best_gross if best_gross is not none else "\u2014" }}</div>
+    </div>
+    <div class="stats-best-right">
+      <div class="stats-best-note">{{ best_gross_date if best_gross_date else "" }}</div>
+    </div>
+  </div>
+  <div class="stats-best-row">
+    <div class="stats-best-left">
+      <div class="ps-eyebrow">Best Differential</div>
+      <div class="stats-best-num">{{ best_diff if best_diff is not none else "\u2014" }}</div>
+    </div>
+    <div class="stats-best-right">
+      <div class="stats-best-note">{{ best_diff_date if best_diff_date else "" }}</div>
+    </div>
+  </div>
+  <div class="stats-best-row">
+    <div class="stats-best-left">
+      <div class="ps-eyebrow">Most Fairways</div>
+      <div class="stats-best-num">{{ most_fir if most_fir is not none else "\u2014" }}</div>
+    </div>
+    <div class="stats-best-right">
+      <div class="stats-best-note">{{ most_fir_date if most_fir_date else "" }}</div>
+    </div>
+  </div>
+  <div class="stats-best-row">
+    <div class="stats-best-left">
+      <div class="ps-eyebrow">Most GIR</div>
+      <div class="stats-best-num">{{ most_gir if most_gir is not none else "\u2014" }}</div>
+    </div>
+    <div class="stats-best-right">
+      <div class="stats-best-note">{{ most_gir_date if most_gir_date else "" }}</div>
+    </div>
+  </div>
+  <div class="stats-best-row">
+    <div class="stats-best-left">
+      <div class="ps-eyebrow">Fewest Putts</div>
+      <div class="stats-best-num">{{ fewest_putts if fewest_putts is not none else "\u2014" }}</div>
+    </div>
+    <div class="stats-best-right">
+      <div class="stats-best-note">{{ fewest_putts_date if fewest_putts_date else "" }}</div>
+    </div>
+  </div>
+</div>
+{{ Footnote(text="Personal records across all tracked rounds.") }}
+{% endblock %}
