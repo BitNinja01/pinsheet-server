@@ -86,8 +86,6 @@ def test_full_reset_flow(store_db):
 
 
 def test_admin_can_generate_reset_token(store_db):
-    main_mod.limiter.enabled = False
-
     admin = create_user("admin1", "Admin", "adminpass123")
     create_user("userx", "User X", "userpass123")
 
@@ -100,8 +98,6 @@ def test_admin_can_generate_reset_token(store_db):
 
 
 def test_non_admin_cannot_generate_reset_token(store_db):
-    main_mod.limiter.enabled = False
-
     create_user("admin1", "Admin", "adminpass123")
     regular = create_user("regular", "Regular", "regularpass")
 

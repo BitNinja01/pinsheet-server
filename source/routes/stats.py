@@ -319,9 +319,8 @@ def register_stats_routes(app):
 
             if request.form.get("reset_user_id"):
                 reset_user_id = int(request.form.get("reset_user_id"))
-                raw_token = generate_password_reset_token(reset_user_id)
-                generated_token = raw_token
-                token_url = base_url + url_for("reset_password", token=raw_token)
+                generated_token = generate_password_reset_token(reset_user_id)
+                token_url = url_for("reset_password", token=generated_token, _external=True)
             else:
                 code = create_invite_code(current_user.id)
 
