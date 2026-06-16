@@ -1,7 +1,9 @@
+import hashlib
 import json
 import logging
 import secrets
 import string
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import bcrypt
@@ -391,6 +393,60 @@ def real_user_count() -> int:
     count = db.execute("SELECT COUNT(*) FROM users WHERE password_hash != ''").fetchone()[0]
     db.close()
     return count
+
+
+def generate_password_reset_token(user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    db = get_db()
+    db.execute(
+        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+        (user_id, token_hash, expires_at),
+    )
+    db.commit()
+    db.close()
+    return token
+
+
+def verify_password_reset_token(token: str) -> dict | None:
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    db = get_db()
+    row = db.execute(
+        "SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token_hash = ?",
+        (token_hash,),
+    ).fetchone()
+    db.close()
+    if not row:
+        return None
+    if row["used"]:
+        return None
+    if datetime.fromisoformat(row["expires_at"]) < datetime.utcnow():
+        return None
+    return get_user_by_id(row["user_id"])
+
+
+def consume_password_reset_token(token: str) -> None:
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    db = get_db()
+    db.execute(
+        "UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?",
+        (token_hash,),
+    )
+    db.commit()
+    db.close()
+
+
+def update_password(user_id: int, new_password: str) -> None:
+    password_hash_bytes = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+    password_hash = password_hash_bytes.decode()
+    db = get_db()
+    db.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (password_hash, user_id),
+    )
+    db.commit()
+    db.close()
 
 
 def _generate_invite_code() -> str:
