@@ -58,6 +58,14 @@ def init_db() -> None:
             created_at    TEXT DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id         INTEGER PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            token_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used       INTEGER DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS courses (
             id          INTEGER PRIMARY KEY,
             name        TEXT UNIQUE NOT NULL,
