@@ -48,20 +48,27 @@
         {% set mx = spark_data|max %}
         {% set rng = (mx - mn) or 1 %}
         {% set last_i = spark_data|length - 1 %}
+        {% set _py = 6 %}
+        {% set _h = 110 %}
+        {% set avail = _h - _py * 2 %}
+        <line x1="0" y1="{{ _py + 0.25 * avail }}" x2="900" y2="{{ _py + 0.25 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+        <line x1="0" y1="{{ _py + 0.5 * avail }}" x2="900" y2="{{ _py + 0.5 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+        <line x1="0" y1="{{ _py + 0.75 * avail }}" x2="900" y2="{{ _py + 0.75 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
         {% set pts = [] %}
         {% for v in spark_data %}
           {% set x = 4 + (loop.index0 / last_i) * (900 - 8) %}
-          {% set y = 6 + (1 - (v - mn) / rng) * (110 - 12) %}
-          {% if loop.first %}{% set _d = pts.append("M" ~ x ~ "," ~ y) %}{% else %}{% set _d = pts.append("L" ~ x ~ "," ~ y) %}{% endif %}
+          {% set y = _py + (1 - (v - mn) / rng) * avail %}
+          {% set _d = pts.append(x ~ "," ~ y) %}
         {% endfor %}
-        {% set line_d = pts|join(" ") %}
+        {% set line_pts = pts|join(" ") %}
+        {% set last_pt = pts[-1] %}
         {% set first_x = 4 %}
-        {% set last_x = 4 + (last_i / last_i) * (900 - 8) %}
-        {% set last_v = spark_data[-1] %}
-        {% set last_y = 6 + (1 - (last_v - mn) / rng) * (110 - 12) %}
-        <polygon points="{{ first_x }},110 {{ line_d[1:] }} {{ last_x }},110" fill="var(--ps-accent-dim)"/>
-        <path d="{{ line_d }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-        <circle cx="{{ last_x }}" cy="{{ last_y }}" r="4" fill="var(--ps-accent)"/>
+        <polygon points="{{ first_x }},{{ _h }} {{ line_pts }} {{ last_pt.split(",")[0] }},{{ _h }}" fill="var(--ps-accent-dim)"/>
+        <polyline points="{{ line_pts }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        {% for pt in pts %}
+        <circle cx="{{ pt.split(",")[0] }}" cy="{{ pt.split(",")[1] }}" r="2" fill="var(--ps-paper)" stroke="var(--ps-accent)" stroke-width="1.2"/>
+        {% endfor %}
+        <circle cx="{{ last_pt.split(",")[0] }}" cy="{{ last_pt.split(",")[1] }}" r="4" fill="var(--ps-accent)"/>
         {% endif %}
       </svg>
     </div>
@@ -176,26 +183,26 @@
 {% set mx = data|max %}
 {% set rng = (mx - mn) or 1 %}
 {% set last_i = data|length - 1 %}
+{% set _py = 6 %}
+{% set avail = h - _py * 2 %}
 <svg class="ps-area-chart-sm" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
   {% if show_grid %}
-  <line x1="0" y1="{{ h * 0.75 }}" x2="{{ w }}" y2="{{ h * 0.75 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
-  <line x1="0" y1="{{ h * 0.5 }}" x2="{{ w }}" y2="{{ h * 0.5 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
-  <line x1="0" y1="{{ h * 0.25 }}" x2="{{ w }}" y2="{{ h * 0.25 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ _py + 0.25 * avail }}" x2="{{ w }}" y2="{{ _py + 0.25 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ _py + 0.5 * avail }}" x2="{{ w }}" y2="{{ _py + 0.5 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ _py + 0.75 * avail }}" x2="{{ w }}" y2="{{ _py + 0.75 * avail }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
   {% endif %}
   {% set pts = [] %}
   {% for v in data %}
     {% set x = 4 + (loop.index0 / last_i) * (w - 8) %}
-    {% set y = 6 + (1 - (v - mn) / rng) * (h - 12) %}
-    {% if loop.first %}{% set _d = pts.append("M" ~ x ~ "," ~ y) %}{% else %}{% set _d = pts.append("L" ~ x ~ "," ~ y) %}{% endif %}
+    {% set y = _py + (1 - (v - mn) / rng) * avail %}
+    {% set _d = pts.append(x ~ "," ~ y) %}
   {% endfor %}
-  {% set line_d = pts|join(" ") %}
+  {% set line_pts = pts|join(" ") %}
+  {% set last_pt = pts[-1] %}
   {% set first_x = 4 %}
-  {% set last_x = 4 + (1) * (w - 8) %}
-  {% set last_v = data[-1] %}
-  {% set last_y = 6 + (1 - (last_v - mn) / rng) * (h - 12) %}
-  <polygon points="{{ first_x }},{{ h }} {{ line_d[1:] }} {{ last_x }},{{ h }}" fill="var(--ps-accent-dim)"/>
-  <path d="{{ line_d }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="{{ last_x }}" cy="{{ last_y }}" r="3" fill="var(--ps-accent)"/>
+  <polygon points="{{ first_x }},{{ h }} {{ line_pts }} {{ last_pt.split(",")[0] }},{{ h }}" fill="var(--ps-accent-dim)"/>
+  <polyline points="{{ line_pts }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="{{ last_pt.split(",")[0] }}" cy="{{ last_pt.split(",")[1] }}" r="4" fill="var(--ps-accent)"/>
 </svg>
 {% endif %}
 {% endmacro %}
