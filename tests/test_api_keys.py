@@ -1,11 +1,33 @@
 """Tests for user-bound API-key authentication (UC-APIKEY-001 / GAP-024).
 
-Covers the six required cases from the quality gate: issuance, hash-at-rest,
-revocation, ownership isolation, session-still-works regression, and
-admin-key-denied — plus constant-time/expiry/unknown-key edges.
+Coverage here is mapped to the use case's acceptance criteria (UC-APIKEY-001 §10),
+not just to line counts — every AC-1..AC-16 has at least one test below.
+
+    AC-1  issuance + one-time display     -> test_create_api_key_returns_one_time_plaintext_and_meta
+                                             test_management_ui_create_lists_and_revokes
+    AC-2  key format / hash-at-rest row   -> test_create_api_key_returns_one_time_plaintext_and_meta
+                                             test_hash_at_rest_plaintext_never_persisted
+    AC-3  hashed at rest (no plaintext)   -> test_hash_at_rest_plaintext_never_persisted
+    AC-4  no secret in logs               -> test_plaintext_never_appears_in_logs
+    AC-5  bearer succeeds (200)           -> test_bearer_call_non_admin_returns_200
+    AC-6  session still works (no regr.)  -> test_session_auth_unaffected_by_request_loader
+                                             test_unauthenticated_web_route_still_redirects
+    AC-7  constant-time / unknown key     -> test_unknown_key_returns_none, test_unknown_bearer_returns_401
+    AC-8  revocation immediate (401)      -> test_revoked_key_returns_none, test_revoked_bearer_returns_401
+    AC-9  owner-scoped revocation         -> test_revoke_is_owner_scoped
+    AC-10 expiry enforced                 -> test_expired_key_returns_none, test_expiry_accepts_space_separated_format,
+                                             test_future_expiry_still_valid
+    AC-11 listing excludes secrets        -> test_list_api_keys_exposes_no_secret, test_list_keys_are_per_user
+    AC-12 ownership isolation             -> test_get_user_by_api_key_resolves_owner, test_revoke_is_owner_scoped
+    AC-13 admin route denied via key      -> test_admin_route_denied_for_api_key,
+                                             test_request_loader_forces_is_admin_false, test_store_layer_sanitizes_is_admin
+    AC-14 @require_permission scaffold    -> test_require_permission_scaffold_allows_and_denies
+    AC-15 zero new dependencies           -> test_no_new_dependencies_added
+    AC-16 idempotent migration            -> test_init_db_is_idempotent
 """
 
 import hashlib
+import logging
 from datetime import datetime, timedelta
 
 import pytest
@@ -304,3 +326,72 @@ def test_future_expiry_still_valid(test_app):
     future = (datetime.utcnow() + timedelta(days=30)).isoformat()
     plaintext, _ = create_api_key(user["id"], "k", [], expires_at=future)
     assert get_user_by_api_key(plaintext) is not None
+
+
+# --------------------------------------------------------------------------- #
+# AC-4 / AC-14 / AC-15 / AC-16 — criteria that need dedicated, UC-mapped tests
+# --------------------------------------------------------------------------- #
+
+def test_plaintext_never_appears_in_logs(test_app, caplog):
+    """AC-4: no log line (creation or auth attempt) contains the plaintext key."""
+    user = create_user("alice", "Alice", "pass1234")
+    with caplog.at_level(logging.DEBUG, logger="pinsheet"):
+        plaintext, _ = create_api_key(user["id"], "k", ["rounds:read"])
+        get_user_by_api_key(plaintext)          # successful auth
+        get_user_by_api_key("psk_wrong_key")    # failed auth
+    assert plaintext not in caplog.text
+
+
+def test_require_permission_scaffold_allows_and_denies(test_app, monkeypatch):
+    """AC-14: the decorator is functional in isolation — passes when the permission
+    is present, 403s when absent, and session (non-key) identities bypass."""
+    import auth_keys
+
+    @auth_keys.require_permission("rounds:read")
+    def view():
+        return "ok"
+
+    class FakeUser:
+        pass
+
+    granted = FakeUser(); granted.via_api_key = True; granted.api_permissions = ["rounds:read"]
+    missing = FakeUser(); missing.via_api_key = True; missing.api_permissions = ["stats:read"]
+    session_user = FakeUser()  # no via_api_key attr -> treated as session user
+
+    with test_app.test_request_context():
+        monkeypatch.setattr(auth_keys, "current_user", granted)
+        assert view() == "ok"                       # key has the scope
+
+        monkeypatch.setattr(auth_keys, "current_user", session_user)
+        assert view() == "ok"                       # session users bypass the scaffold
+
+        monkeypatch.setattr(auth_keys, "current_user", missing)
+        body, status = view()                       # key lacks the scope
+        assert status == 403
+
+
+def test_no_new_dependencies_added(test_app):
+    """AC-15: the feature adds no new third-party dependency (stdlib + Flask-Login only)."""
+    import tomllib
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    data = tomllib.loads((root / "pyproject.toml").read_text())
+    names = sorted(
+        d.split(">")[0].split("=")[0].split("[")[0].strip().lower()
+        for d in data["project"]["dependencies"]
+    )
+    assert names == sorted(
+        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf"]
+    )
+
+
+def test_init_db_is_idempotent(test_app):
+    """AC-16: re-running init_db() does not error and the api_keys table persists."""
+    from database import init_db, get_db
+    init_db()  # second run on an already-initialised DB
+    db = get_db()
+    row = db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='api_keys'"
+    ).fetchone()
+    db.close()
+    assert row is not None
