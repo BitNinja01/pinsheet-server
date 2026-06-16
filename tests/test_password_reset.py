@@ -14,8 +14,6 @@ from store import (
 )
 from database import set_db_path, init_db
 
-register_routes(app, limiter, csrf, User)
-
 
 @pytest.fixture
 def store_db(tmp_path):
@@ -28,11 +26,15 @@ def store_db(tmp_path):
     init_db()
 
     import store as store_mod
-    import main as main_mod2
-    main_mod2.limiter.enabled = False
+    main_mod.limiter.enabled = False
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
+
+    try:
+        register_routes(app, limiter, csrf, User)
+    except AssertionError:
+        pass
 
     return db_path
 
