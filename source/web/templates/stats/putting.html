@@ -3,7 +3,7 @@
 {% block content %}
 {{ PageShell(title="Best from inside 10 feet,", accent="right at scratch elsewhere.") }}
 {{ CatTabs(active="putting") }}
-{{ HeroBand(value=putts_per_round, label="putts / round", delta=pt_rd_delta.delta, delta_dir=pt_rd_delta.delta_dir, context="scratch baseline \u00b7 29.4 PPR", precision=1) }}
+{{ HeroBand(value=putts_per_round, label="putts / round", delta=pt_rd_delta.delta, delta_dir=pt_rd_delta.delta_dir, context="scratch baseline \u00b7 29.4 PPR", precision=1, spark_data=putts_spark, trend_label="Putting Trend \u00b7 20 rounds") }}
 {{ StatStrip(items=[
   {"label": "Putts / Rd", "value": _fmt(putts_per_round, "", 1)},
   {"label": "Putts / GIR", "value": _fmt(putts_per_gir, "", 2)},

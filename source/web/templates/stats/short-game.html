@@ -3,7 +3,7 @@
 {% block content %}
 {{ PageShell(title="Up-and-down from short-sided,", accent="the real separator.") }}
 {{ CatTabs(active="short-game") }}
-{{ HeroBand(value=scramble_pct, label="scramble rate %", delta=sc_delta.delta, delta_dir=sc_delta.delta_dir, context="64 rounds", precision=0) }}
+{{ HeroBand(value=scramble_pct, label="scramble rate %", delta=sc_delta.delta, delta_dir=sc_delta.delta_dir, context="64 rounds", precision=0, spark_data=scramble_spark, trend_label="Scramble Trend \u00b7 20 rounds") }}
 {{ StatStrip(items=[
   {"label": "Scramble %", "value": _fmt(scramble_pct, "%", 0)},
   {"label": "From Left", "value": _fmt(scramble_left, "%", 1) if scramble_left is not none else "\u2014"},

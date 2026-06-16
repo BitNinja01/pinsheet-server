@@ -3,7 +3,7 @@
 {% block content %}
 {{ PageShell(title="Trending in the", accent="right direction.") }}
 {{ CatTabs(active="scoring") }}
-{{ HeroBand(value=scoring_avg, label="scoring avg", delta=to_par_delta.delta, delta_dir=to_par_delta.delta_dir, context="64 rounds", precision=1) }}
+{{ HeroBand(value=scoring_avg, label="scoring avg", delta=to_par_delta.delta, delta_dir=to_par_delta.delta_dir, context="64 rounds", precision=1, spark_data=scoring_spark, trend_label="Scoring Trend \u00b7 20 rounds") }}
 {{ StatStrip(items=[
   {"label": "To Par", "value": _fmt(to_par, "", 1)},
   {"label": "Par 3 Avg", "value": _fmt(par_3_avg, "", 2)},

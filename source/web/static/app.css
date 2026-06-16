@@ -2214,6 +2214,14 @@ select.hole-input { width: 3rem; appearance: none; }
 .stats-section--footer {
     margin-top: auto;
 }
+.stats-left .stats-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.stats-left .stats-section .ps-display-footer {
+    margin-top: auto;
+}
 
 /* ── Hero Band (two-column) ───────────────────────────────────────── */
 .ps-hero-band {

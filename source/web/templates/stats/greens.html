@@ -3,7 +3,7 @@
 {% block content %}
 {{ PageShell(title="Par 5 greens are a strength,", accent="par 3s need work.") }}
 {{ CatTabs(active="greens") }}
-{{ HeroBand(value=gir_pct, label="greens in reg %", delta=gir_delta.delta, delta_dir=gir_delta.delta_dir, context="64 rounds", precision=0) }}
+{{ HeroBand(value=gir_pct, label="greens in reg %", delta=gir_delta.delta, delta_dir=gir_delta.delta_dir, context="64 rounds", precision=0, spark_data=gir_spark, trend_label="GIR Trend \u00b7 20 rounds") }}
 {{ StatStrip(items=[
   {"label": "GIR %", "value": _fmt(gir_pct, "%", 0)},
   {"label": "Par 3", "value": _fmt(gir_par_3, "%", 1) if gir_par_3 is not none else "\u2014"},

@@ -3,7 +3,7 @@
 {% block content %}
 {{ PageShell(title="Finding more fairways,", accent="cutting the cost of misses.") }}
 {{ CatTabs(active="fairways") }}
-{{ HeroBand(value=fir_pct, label="fairways hit %", delta=fir_delta.delta, delta_dir=fir_delta.delta_dir, context="64 rounds", precision=0) }}
+{{ HeroBand(value=fir_pct, label="fairways hit %", delta=fir_delta.delta, delta_dir=fir_delta.delta_dir, context="64 rounds", precision=0, spark_data=fir_spark, trend_label="FIR Trend \u00b7 20 rounds") }}
 {{ StatStrip(items=[
   {"label": "FIR %", "value": _fmt(fir_pct, "%", 0)},
   {"label": "Miss Left", "value": _fmt(miss_left, "%", 1) if miss_left is not none else "\u2014"},

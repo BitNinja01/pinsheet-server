@@ -89,6 +89,7 @@ def register_stats_routes(app):
 
         scoring_by_fw = calc_scoring_by_fairway(b8, courses_dict)
         miss_cost = (scoring_by_fw.get("missed") - scoring_by_fw.get("hit")) if scoring_by_fw.get("hit") is not None and scoring_by_fw.get("missed") is not None else None
+        scoring_spark = [v for _, v in calc_scoring_trend(all_rounds)]
 
         return render_template("stats/scoring.html", **base_context(
             current_page="stats",
@@ -104,6 +105,7 @@ def register_stats_routes(app):
             score_distribution=score_dist_b8,
             score_components=components,
             fairway_miss_cost=miss_cost,
+            scoring_spark=scoring_spark,
         ))
 
     @app.route("/stats/penalties")
@@ -142,6 +144,7 @@ def register_stats_routes(app):
         scoring_fw = calc_scoring_by_fairway(b8, courses_dict)
         scoring_miss_side = calc_scoring_by_miss_side(b8, courses_dict)
         ob_stats = calc_ob_stats(b8, courses_dict)
+        fir_spark = [v for _, v in calc_fir_trend(all_rounds, courses_dict)]
 
         return render_template("stats/fairways.html", **base_context(
             current_page="stats",
@@ -153,6 +156,7 @@ def register_stats_routes(app):
             scoring_miss_left=scoring_miss_side.get("left"),
             scoring_miss_right=scoring_miss_side.get("right"),
             ob_stats=ob_stats,
+            fir_spark=fir_spark,
         ))
 
     @app.route("/stats/greens")
@@ -167,6 +171,7 @@ def register_stats_routes(app):
         gir_from = calc_gir_from_fairway_vs_rough(b8, courses_dict)
         scoring_gir = calc_scoring_by_gir(b8, courses_dict)
         ob_stats = calc_ob_stats(b8, courses_dict)
+        gir_spark = [v for _, v in calc_gir_trend(all_rounds)]
 
         return render_template("stats/greens.html", **base_context(
             current_page="stats",
@@ -180,6 +185,7 @@ def register_stats_routes(app):
             gir_scoring_hit=scoring_gir.get("hit"),
             gir_scoring_missed=scoring_gir.get("missed"),
             ob_stats=ob_stats,
+            gir_spark=gir_spark,
         ))
 
     @app.route("/stats/putting")
@@ -200,6 +206,7 @@ def register_stats_routes(app):
         o4p_b8 = calc_four_plus_putt_percent(b8)
         o4p_l20 = calc_four_plus_putt_percent(l20)
         pt_by_par = calc_putts_by_par_type(b8, courses_dict)
+        putts_spark = [v for _, v in calc_putts_trend(all_rounds)]
 
         return render_template("stats/putting.html", **base_context(
             current_page="stats",
@@ -210,6 +217,7 @@ def register_stats_routes(app):
             three_putt_pct=o3_b8, o3_delta=_delta(o3_b8, o3_l20, False, 1, "%"),
             four_plus_putt_pct=o4p_b8, o4p_delta=_delta(o4p_b8, o4p_l20, False, 1, "%"),
             putts_by_par=pt_by_par,
+            putts_spark=putts_spark,
         ))
 
     @app.route("/stats/short-game")
@@ -221,6 +229,7 @@ def register_stats_routes(app):
         sc_l20 = calc_scramble_percent(l20, courses_dict)
         sc_by_dir = calc_scramble_by_miss_direction(b8, courses_dict)
         sc_by_par = calc_scramble_by_par_type(b8, courses_dict)
+        scramble_spark = [v for _, v in calc_scramble_trend(all_rounds, courses_dict)]
 
         return render_template("stats/short-game.html", **base_context(
             current_page="stats",
@@ -232,6 +241,7 @@ def register_stats_routes(app):
             scramble_par_3=sc_by_par.get(3),
             scramble_par_4=sc_by_par.get(4),
             scramble_par_5=sc_by_par.get(5),
+            scramble_spark=scramble_spark,
         ))
 
     @app.route("/stats/momentum")
