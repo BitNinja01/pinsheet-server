@@ -1,45 +1,48 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Putting", accent="On the green") }}
+{{ PageShell(title="Best from inside 10 feet,", accent="right at scratch elsewhere.") }}
 {{ CatTabs(active="putting") }}
-<div class="stats-page">
-  {{ HeroBand(value=putts_per_round, label="Putts / Round", delta=pt_rd_delta.delta, delta_dir=pt_rd_delta.delta_dir) }}
-  {{ StatStrip(items=[
-    {"label": "Putts/Rd", "value": _fmt(putts_per_round, "", 1), "delta": pt_rd_delta.delta, "delta_dir": pt_rd_delta.delta_dir},
-    {"label": "Putts/GIR", "value": _fmt(putts_per_gir, "", 2), "delta": pt_gir_delta.delta, "delta_dir": pt_gir_delta.delta_dir},
-    {"label": "1-Putt %", "value": _fmt(one_putt_pct, "%", 1), "delta": o1_delta.delta, "delta_dir": o1_delta.delta_dir},
-    {"label": "2-Putt %", "value": _fmt(two_putt_pct, "%", 1), "delta": o2_delta.delta, "delta_dir": o2_delta.delta_dir},
-    {"label": "3-Putt %", "value": _fmt(three_putt_pct, "%", 1), "delta": o3_delta.delta, "delta_dir": o3_delta.delta_dir},
-    {"label": "4-Putt+ %", "value": _fmt(four_plus_putt_pct, "%", 1), "delta": o4p_delta.delta, "delta_dir": o4p_delta.delta_dir},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Putt Distribution", bars=[
-        {"label": "1-Putt", "pct": one_putt_pct or 0, "display": _fmt(one_putt_pct, "%", 1)},
-        {"label": "2-Putt", "pct": two_putt_pct or 0, "display": _fmt(two_putt_pct, "%", 1)},
-        {"label": "3-Putt", "pct": three_putt_pct or 0, "display": _fmt(three_putt_pct, "%", 1)},
-        {"label": "4-Putt+", "pct": four_plus_putt_pct or 0, "display": _fmt(four_plus_putt_pct, "%", 1)},
-      ], footer_rows=[
-        {"label": "Putts/GIR", "value": _fmt(putts_per_gir, "", 2)},
-        {"label": "1-Putt %", "value": _fmt(one_putt_pct, "%", 1)},
-        {"label": "3-Putt %", "value": _fmt(three_putt_pct, "%", 1)},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Per GIR", rows=[
-        {"label": "Putts/GIR", "value": _fmt(putts_per_gir, "", 2)},
-        {"label": "1-Putt %", "value": _fmt(one_putt_pct, "%", 1)},
-        {"label": "3-Putt %", "value": _fmt(three_putt_pct, "%", 1)},
-        {"label": "4-Putt+ %", "value": _fmt(four_plus_putt_pct, "%", 1)},
-      ]) }}
-      {{ DRowSection(title="By Hole Type", rows=[
-        {"label": "Par 3", "value": _fmt(putts_by_par.get(3), "", 2)},
-        {"label": "Par 4", "value": _fmt(putts_by_par.get(4), "", 2)},
-        {"label": "Par 5", "value": _fmt(putts_by_par.get(5), "", 2)},
-      ]) }}
-    </div>
+{{ HeroBand(value=putts_per_round, label="putts / round", delta=pt_rd_delta.delta, delta_dir=pt_rd_delta.delta_dir, context="scratch baseline \u00b7 29.4 PPR", precision=1) }}
+{{ StatStrip(items=[
+  {"label": "Putts / Rd", "value": _fmt(putts_per_round, "", 1)},
+  {"label": "Putts / GIR", "value": _fmt(putts_per_gir, "", 2)},
+  {"label": "1-Putt %", "value": _fmt(one_putt_pct, "%", 1)},
+  {"label": "2-Putt %", "value": _fmt(two_putt_pct, "%", 1)},
+  {"label": "3-Putt %", "value": _fmt(three_putt_pct, "%", 1)},
+  {"label": "4-Putt+", "value": _fmt(four_plus_putt_pct, "%", 1)},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Putt Distribution", bars=[
+      {"label": "1-Putt", "pct": one_putt_pct or 0, "display": _fmt(one_putt_pct, "%", 1), "max": 70, "color": "var(--ps-accent)"},
+      {"label": "2-Putt", "pct": two_putt_pct or 0, "display": _fmt(two_putt_pct, "%", 1), "max": 70, "color": "var(--ps-ink-2)"},
+      {"label": "3-Putt", "pct": three_putt_pct or 0, "display": _fmt(three_putt_pct, "%", 1), "max": 70, "color": "var(--ps-warn)"},
+      {"label": "4-Putt+", "pct": four_plus_putt_pct or 0, "display": _fmt(four_plus_putt_pct, "%", 1), "max": 70, "color": "var(--ps-warn)"},
+    ], has_stacked_bar=True, stacked_max=70, footer_rows=[
+      {"label": "Par 3", "value": _fmt(putts_by_par.get(3), "", 2) if putts_by_par.get(3) is not none else None},
+      {"label": "Par 4", "value": _fmt(putts_by_par.get(4), "", 2) if putts_by_par.get(4) is not none else None},
+      {"label": "Par 5", "value": _fmt(putts_by_par.get(5), "", 2) if putts_by_par.get(5) is not none else None},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds. Delta vs last 20.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Per GIR", rows=[
+      {"label": "Putts per GIR Hole", "value": _fmt(putts_per_gir, "", 2)},
+      {"label": "1-Putt Rate", "value": _fmt(one_putt_pct, "%", 1)},
+      {"label": "3-Putt Rate", "value": _fmt(three_putt_pct, "%", 1), "warn": true},
+      {"label": "4-Putt+ Rate", "value": _fmt(four_plus_putt_pct, "%", 1), "warn": true},
+    ]) }}
+    {{ DRowSection(title="By Hole Type", rows=[
+      {"label": "Putts on Par 3", "value": _fmt(putts_by_par.get(3), "", 2)},
+      {"label": "Putts on Par 4", "value": _fmt(putts_by_par.get(4), "", 2)},
+      {"label": "Putts on Par 5", "value": _fmt(putts_by_par.get(5), "", 2)},
+    ]) }}
+    {{ DistSection(title="Key Putting", bars=None, footer_rows=[
+      {"label": "GIR Putts", "value": _fmt(putts_per_gir, "", 2)},
+      {"label": "1-Putt", "value": _fmt(one_putt_pct, "%", 0)},
+      {"label": "3-Putt", "value": _fmt(three_putt_pct, "%", 0)},
+    ]) }}
+  </div>
 </div>
+{{ Footnote(text="PPR = putts per round. Scratch = USGA 0.0-handicap baseline.") }}
 {% endblock %}

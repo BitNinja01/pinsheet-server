@@ -1,36 +1,43 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Momentum", accent="Bouncing back") }}
+{{ PageShell(title="Bounce-back ability is", accent="the mental edge.") }}
 {{ CatTabs(active="momentum") }}
-<div class="stats-page">
-  {{ HeroBand(value=after_bogey_avg, label="Next hole avg after bogey+", delta="", delta_dir="") }}
-  {{ StatStrip(items=[
-    {"label": "After Bogey+", "value": _fmt(after_bogey_avg, "", 2)},
-    {"label": "Recovery %", "value": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else "\u2014"},
-    {"label": "Bogey-Free Rds", "value": bogey_free|string if bogey_free is not none else "\u2014"},
-    {"label": "Opening 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else "\u2014"},
-    {"label": "Closing 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else "\u2014"},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Post-Bogey Response", bars=[
-        {"label": "Par+", "pct": recovery_rate or 0, "display": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else "\u2014"},
-        {"label": "Bogey", "pct": 0, "display": "\u2014"},
-        {"label": "Double+", "pct": 0, "display": "\u2014"},
-      ], footer_rows=[
-        {"label": "After Bogey", "value": _fmt(after_bogey_avg, "", 2)},
-        {"label": "Recovery %", "value": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else None},
-        {"label": "Bogey-Free Rds", "value": bogey_free|string if bogey_free is not none else None},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Stretch Performance", rows=[
-        {"label": "Opening 3 Avg", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else None},
-        {"label": "Closing 3 Avg", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else None},
-      ]) }}
-    </div>
+{{ HeroBand(value=after_bogey_avg, label="next hole avg after bogey+", context="lower is better", precision=2) }}
+{{ StatStrip(items=[
+  {"label": "After Bogey+", "value": _fmt(after_bogey_avg, "", 2)},
+  {"label": "Recovery %", "value": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else "\u2014"},
+  {"label": "Bogey-Free", "value": _fmt(bogey_free, "", 0) if bogey_free is not none else "\u2014"},
+  {"label": "Opening 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else "\u2014"},
+  {"label": "Closing 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else "\u2014"},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Post-Bogey Response", bars=[
+      {"label": "Par or Better", "pct": recovery_rate or 0, "display": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else "\u2014", "max": 60, "color": "var(--ps-accent)"},
+      {"label": "Bogey", "pct": 42, "display": "\u2014", "max": 60, "color": "var(--ps-ink-2)"},
+      {"label": "Double+", "pct": 24, "display": "\u2014", "max": 60, "color": "var(--ps-warn)"},
+    ], has_stacked_bar=True, stacked_max=60, footer_rows=[
+      {"label": "After Bogey", "value": _fmt(after_bogey_avg, "", 2)},
+      {"label": "Recovery", "value": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else None},
+      {"label": "Bogey-Free", "value": bogey_free|string if bogey_free is not none else None},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds. Recovery = par or better after double+.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Stretch Performance", rows=[
+      {"label": "Next Hole Avg (After Bogey+)", "value": _fmt(after_bogey_avg, "", 2), "warn": true},
+      {"label": "Recovery Rate (After Double+)", "value": _fmt(recovery_rate, "%", 1) if recovery_rate is not none else None},
+      {"label": "Bogey-Free Stretch Avg", "value": _fmt(bogey_free, "", 0) if bogey_free is not none else None},
+    ]) }}
+    {{ DRowSection(title="Front vs Back", rows=[
+      {"label": "Scoring on Opening 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else None},
+      {"label": "Scoring on Closing 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else None, "warn": True},
+    ]) }}
+    {{ DistSection(title="Closing Stretch", bars=None, footer_rows=[
+      {"label": "Open 3", "value": _fmt(opening_3_avg, "", 2) if opening_3_avg is not none else None},
+      {"label": "Close 3", "value": _fmt(closing_3_avg, "", 2) if closing_3_avg is not none else None},
+    ]) }}
+  </div>
 </div>
+{{ Footnote(text="Momentum metrics based on hole sequence analysis.") }}
 {% endblock %}

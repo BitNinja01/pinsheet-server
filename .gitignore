@@ -44,6 +44,10 @@ wireframes/
 image_examples/
 pinsheet_data.zip
 
+# Example / reference pages (design comps, not shipped)
+example_pages/
+stats_inventory.txt
+
 # ---> Python
 # Byte-compiled / optimized / DLL files
 __pycache__/

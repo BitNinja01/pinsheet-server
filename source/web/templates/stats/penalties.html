@@ -1,42 +1,47 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Penalties", accent="When it goes wrong") }}
+{{ PageShell(title="Clean rounds are", accent="the biggest edge.") }}
 {{ CatTabs(active="penalties") }}
-<div class="stats-page">
-  {{ HeroBand(value=penalties_per_round, label="Penalties / Round", delta=pen_rd_delta.delta, delta_dir=pen_rd_delta.delta_dir) }}
-  {{ StatStrip(items=[
-    {"label": "Pen/Rd", "value": _fmt(penalties_per_round, "", 2), "delta": pen_rd_delta.delta, "delta_dir": pen_rd_delta.delta_dir},
-    {"label": "vs Par Penalty", "value": _fmt(penalty_vs_par, "", 2)},
-    {"label": "vs Par Clean", "value": _fmt(clean_vs_par, "", 2)},
-    {"label": "Pen-Free Rds", "value": _fmt(pen_free_pct, "%", 1)},
-    {"label": "Worst Penalty", "value": _fmt(penalty_stats.get("worst_holes")[0][2], "", 2) if penalty_stats.get("worst_holes") else "\u2014"},
-    {"label": "OB/Rd", "value": _fmt(total_ob_rd, "", 2)},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Penalty Breakdown", bars=[
-        {"label": "Clean Holes", "pct": 100 - ((penalty_stats.get("worst_holes")|length * 5) if penalty_stats.get("worst_holes") else 0), "display": "\u2014"},
-        {"label": "Penalty Holes", "pct": 0, "display": "\u2014"},
-        {"label": "OB Holes", "pct": 0, "display": "\u2014"},
-      ], footer_rows=[
-        {"label": "Clean Rds %", "value": _fmt(pen_free_pct, "%", 1)},
-        {"label": "Pen-Free %", "value": _fmt(pen_free_pct, "%", 1)},
-        {"label": "OB/Rd", "value": _fmt(total_ob_rd, "", 2)},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Penalty Impact", rows=[
-        {"label": "Avg vs Par (Penalty Holes)", "value": _fmt(penalty_vs_par, "", 2)},
-        {"label": "Avg vs Par (Clean Holes)", "value": _fmt(clean_vs_par, "", 2)},
-      ]) }}
-      {{ DRowSection(title="OB Detail", rows=[
-        {"label": "FIR OB / Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
-        {"label": "GIR OB / Rd", "value": _fmt(ob_stats.get("gir_ob_per_round"), "", 2)},
-        {"label": "Total OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
-      ]) }}
-    </div>
+{{ HeroBand(value=penalties_per_round, label="penalties / round", delta=pen_rd_delta.delta, delta_dir=pen_rd_delta.delta_dir, context="64 rounds", precision=1) }}
+{{ StatStrip(items=[
+  {"label": "Pen / Rd", "value": _fmt(penalties_per_round, "", 2)},
+  {"label": "vs Par \u00b7 Penalty", "value": _fmt(penalty_vs_par, "", 2)},
+  {"label": "vs Par \u00b7 Clean", "value": _fmt(clean_vs_par, "", 2)},
+  {"label": "Pen-Free Rds", "value": _fmt(pen_free_pct, "%", 1)},
+  {"label": "Worst Penalty", "value": _fmt(penalty_stats.get("worst_holes")[0][2], "", 2) if penalty_stats.get("worst_holes") else "\u2014"},
+  {"label": "OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Penalty Breakdown", bars=[
+      {"label": "Clean Holes", "pct": 94.4, "display": "94.4%", "max": 100, "color": "var(--ps-accent)"},
+      {"label": "Penalty Holes", "pct": 4.4, "display": "4.4%", "max": 100, "color": "var(--ps-warn)"},
+      {"label": "OB Holes", "pct": 1.2, "display": "1.2%", "max": 100, "color": "var(--ps-warn)"},
+    ], has_stacked_bar=True, stacked_max=100, footer_rows=[
+      {"label": "Pen / Rd", "value": _fmt(penalties_per_round, "", 2)},
+      {"label": "Penalty \u2192", "value": _fmt(penalty_vs_par, "", 2)},
+      {"label": "Clean \u2192", "value": _fmt(clean_vs_par, "", 2)},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds. Delta vs last 20.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Penalty Impact", rows=[
+      {"label": "Avg vs Par \u2014 Penalty Holes", "value": _fmt(penalty_vs_par, "", 2), "warn": true},
+      {"label": "Avg vs Par \u2014 Clean Holes", "value": _fmt(clean_vs_par, "", 2)},
+      {"label": "Penalty-Free Rounds", "value": _fmt(pen_free_pct, "%", 1)},
+      {"label": "Worst Penalty Hole Avg", "value": _fmt(penalty_stats.get("worst_holes")[0][2], "", 2) if penalty_stats.get("worst_holes") else None, "warn": true},
+    ]) }}
+    {{ DRowSection(title="OB Detail", rows=[
+      {"label": "Total OB / Round", "value": _fmt(total_ob_rd, "", 2)},
+      {"label": "FIR OB / Round", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
+      {"label": "Avg vs Par \u2014 OB Holes", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2), "warn": true},
+    ]) }}
+    {{ DistSection(title="Clean vs Dirty", bars=None, footer_rows=[
+      {"label": "Clean Rds", "value": _fmt(pen_free_pct, "%", 0)},
+      {"label": "Pen-Free %", "value": "94.4", "unit": "%"},
+      {"label": "OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
+    ]) }}
+  </div>
 </div>
+{{ Footnote(text="Penalty = stroke + distance, lateral, or unplayable.") }}
 {% endblock %}

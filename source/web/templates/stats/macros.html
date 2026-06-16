@@ -11,20 +11,62 @@
 </div>
 {% endmacro %}
 
-{% macro HeroBand(value, label, delta=None, delta_dir=None, unit="", precision=1) %}
+{% macro HeroBand(value, label, delta=None, delta_dir=None, context=None, spark_data=None, trend_label=None, precision=1, decimal_only=False) %}
 <div class="ps-hero-band">
-  <div class="ps-hero-num">
-    {% if value is not none %}
-    <span class="ps-hero-val">{{ "{:.{p}f}".format(value, p=precision) }}</span>
-    {% if unit %}<span class="ps-hero-unit">{{ unit }}</span>{% endif %}
-    {% else %}
-    <span class="ps-hero-val">&mdash;</span>
+  <div class="ps-hero-left">
+    <div class="ps-hero-num">
+      {% if value is not none %}
+        {% set val_str = _fmt(value, "", precision) %}
+        {% if "." in val_str %}
+          {% set int_part = val_str.split(".")[0] %}
+          {% set dec_part = val_str.split(".")[1] %}
+          <span class="ps-hero-int">{{ int_part }}</span><span class="ps-hero-dot">.</span><span class="ps-hero-dec">{{ dec_part }}</span>
+        {% else %}
+          <span class="ps-hero-int">{{ val_str }}</span>
+        {% endif %}
+      {% else %}
+        <span class="ps-hero-int">&mdash;</span>
+      {% endif %}
+    </div>
+    <div class="ps-eyebrow">{{ label }}</div>
+    <div class="ps-hero-meta">
+      {% if delta is not none %}
+      <span class="ps-stat-delta{% if delta_dir == 'up' %} is-up{% elif delta_dir == 'down' %} is-down{% endif %}">{{ delta }}</span>
+      {% endif %}
+      {% if context %}
+      <span class="ps-hero-context">{{ context }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="ps-hero-right">
+    <div class="ps-eyebrow">{{ trend_label or "Trend" }}</div>
+    {% if spark_data %}
+    <div class="ps-hero-chart">
+      <svg class="ps-area-chart" viewBox="0 0 900 110" preserveAspectRatio="none">
+        {% if spark_data|length > 1 %}
+        {% set mn = spark_data|min %}
+        {% set mx = spark_data|max %}
+        {% set rng = (mx - mn) or 1 %}
+        {% set last_i = spark_data|length - 1 %}
+        {% set pts = [] %}
+        {% for v in spark_data %}
+          {% set x = 4 + (loop.index0 / last_i) * (900 - 8) %}
+          {% set y = 6 + (1 - (v - mn) / rng) * (110 - 12) %}
+          {% if loop.first %}{% set _d = pts.append("M" ~ x ~ "," ~ y) %}{% else %}{% set _d = pts.append("L" ~ x ~ "," ~ y) %}{% endif %}
+        {% endfor %}
+        {% set line_d = pts|join(" ") %}
+        {% set first_x = 4 %}
+        {% set last_x = 4 + (last_i / last_i) * (900 - 8) %}
+        {% set last_v = spark_data[-1] %}
+        {% set last_y = 6 + (1 - (last_v - mn) / rng) * (110 - 12) %}
+        <polygon points="{{ first_x }},110 {{ line_d[1:] }} {{ last_x }},110" fill="var(--ps-accent-dim)"/>
+        <path d="{{ line_d }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="{{ last_x }}" cy="{{ last_y }}" r="4" fill="var(--ps-accent)"/>
+        {% endif %}
+      </svg>
+    </div>
     {% endif %}
   </div>
-  <div class="ps-eyebrow">{{ label }}</div>
-  {% if delta is not none %}
-  <div class="ps-stat-delta{% if delta_dir == 'up' %} is-up{% elif delta_dir == 'down' %} is-down{% endif %}">{{ delta }}</div>
-  {% endif %}
 </div>
 {% endmacro %}
 
@@ -33,32 +75,30 @@
   {% for item in items %}
   <div class="ps-stat">
     <div class="ps-eyebrow">{{ item.label }}</div>
-    <div class="ps-stat-v">
-      {% if item.value is not none %}
-      {{ item.value }}{% if item.suffix %}<span class="ps-suffix">{{ item.suffix }}</span>{% endif %}
-      {% else %}
-      &mdash;
-      {% endif %}
-    </div>
-    {% if item.delta is not none %}
-    <div class="ps-stat-delta{% if item.delta_dir == 'up' %} is-up{% elif item.delta_dir == 'down' %} is-down{% endif %}">{{ item.delta }}</div>
-    {% endif %}
+    <div class="ps-stat-v{% if item.warn %} is-warn{% endif %}">{{ item.value }}</div>
   </div>
   {% endfor %}
 </div>
 {% endmacro %}
 
-{% macro DistSection(title, bars, footer_rows=None) %}
+{% macro DistSection(title, bars, has_stacked_bar=False, stacked_max=50, footer_rows=None) %}
 <div class="stats-section">
   <div class="ps-eyebrow">{{ title }}</div>
+  {% if has_stacked_bar and bars %}
+  <div class="ps-stacked-bar">
+    {% for bar in bars %}
+    <div class="ps-stacked-bar-seg" style="flex: {{ (bar.pct or 0) }}; background: {{ bar.color or 'var(--ps-accent)' }};{% if not loop.last %} margin-right: 2px;{% endif %}"></div>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% if bars %}
   <div class="stats-dist">
     {% for bar in bars %}
     <div class="stats-dist-row">
       <div class="stats-dist-label">{{ bar.label }}</div>
       <div class="stats-dist-bar-wrap">
-        <div class="ps-minibar">
-          <div class="ps-minibar-fill" style="width: {{ bar.pct }}%;"></div>
+        <div class="ps-minibar" style="background: var(--ps-rule-c);">
+          <div class="ps-minibar-fill" style="width: {{ ((bar.pct or 0) / (bar.max or 50)) * 100 if (bar.max or 0) > 0 else 0 }}%; background: {{ bar.color or 'var(--ps-accent)' }};"></div>
         </div>
       </div>
       <div class="stats-dist-value">{{ bar.display }}</div>
@@ -67,11 +107,23 @@
   </div>
   {% endif %}
   {% if footer_rows %}
-  <div class="stats-dist-footer">
+  <div class="ps-display-footer">
     {% for row in footer_rows %}
-    <div class="stats-dist-footer-row">
-      <span class="stats-dist-footer-label">{{ row.label }}</span>
-      <span class="stats-dist-footer-value">{{ row.value }}</span>
+    <div class="ps-display-footer-item">
+      <div class="ps-eyebrow">{{ row.label }}</div>
+      <div class="ps-display-footer-num">
+        {% if row.value is not none %}
+          {% set val_str = row.value %}
+          {% if "." in val_str %}
+            {% set int_part = val_str.split(".")[0] %}
+            {% set dec_part = val_str.split(".")[1] %}
+            <span class="ps-df-int">{{ int_part }}</span><span class="ps-df-dot">.</span><span class="ps-df-dec">{{ dec_part }}</span>
+          {% else %}
+            <span class="ps-df-int">{{ val_str }}</span>
+          {% endif %}
+          {% if row.unit %}<span class="ps-df-unit"> {{ row.unit }}</span>{% endif %}
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -82,32 +134,60 @@
 {% macro DRowSection(title, rows) %}
 <div class="stats-section">
   <div class="ps-eyebrow">{{ title }}</div>
-  {% if rows %}
   <div class="stats-drows">
     {% for row in rows %}
-    <div class="stats-drow">
+    <div class="stats-drow{% if row.warn %} is-warn{% endif %}">
       <span class="stats-drow-label">{{ row.label }}</span>
       {% if row.value is not none %}
-      <span class="stats-drow-value">{{ row.value }}{% if row.suffix %}<span class="ps-suffix"> {{ row.suffix }}</span>{% endif %}</span>
+      <span class="stats-drow-value">{{ row.value }}</span>
       {% else %}
       <span class="stats-drow-value">&mdash;</span>
       {% endif %}
     </div>
     {% endfor %}
   </div>
-  {% endif %}
 </div>
 {% endmacro %}
 
-{% macro PageShell(title, accent, back_link="/stats") %}
+{% macro PageShell(title, accent) %}
 <div class="ps-topbar">
   <div>
-    <div class="ps-eyebrow"><a href="{{ back_link }}" class="ps-back-link">&larr; Stats</a></div>
-    <h1 class="ps-h1">{{ title }} <span class="ps-h1-accent">{{ accent }}</span></h1>
+    <div class="ps-eyebrow" style="color: var(--ps-ink-3);">&larr; Stats</div>
+    <h1 class="ps-h1">{{ title }} <em style="font-style: italic; color: var(--ps-accent); font-weight: 400;" class="ps-h1">{{ accent }}</em></h1>
   </div>
 </div>
 {% endmacro %}
 
 {% macro Footnote(text) %}
 <div class="stats-footnote">{{ text }}</div>
+{% endmacro %}
+
+{% macro AreaChart(data, w=680, h=80, show_grid=True) %}
+{% if data and data|length > 1 %}
+{% set mn = data|min %}
+{% set mx = data|max %}
+{% set rng = (mx - mn) or 1 %}
+{% set last_i = data|length - 1 %}
+<svg class="ps-area-chart-sm" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
+  {% if show_grid %}
+  <line x1="0" y1="{{ h * 0.75 }}" x2="{{ w }}" y2="{{ h * 0.75 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ h * 0.5 }}" x2="{{ w }}" y2="{{ h * 0.5 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  <line x1="0" y1="{{ h * 0.25 }}" x2="{{ w }}" y2="{{ h * 0.25 }}" stroke="var(--ps-rule-c)" stroke-width="0.5"/>
+  {% endif %}
+  {% set pts = [] %}
+  {% for v in data %}
+    {% set x = 4 + (loop.index0 / last_i) * (w - 8) %}
+    {% set y = 6 + (1 - (v - mn) / rng) * (h - 12) %}
+    {% if loop.first %}{% set _d = pts.append("M" ~ x ~ "," ~ y) %}{% else %}{% set _d = pts.append("L" ~ x ~ "," ~ y) %}{% endif %}
+  {% endfor %}
+  {% set line_d = pts|join(" ") %}
+  {% set first_x = 4 %}
+  {% set last_x = 4 + (1) * (w - 8) %}
+  {% set last_v = data[-1] %}
+  {% set last_y = 6 + (1 - (last_v - mn) / rng) * (h - 12) %}
+  <polygon points="{{ first_x }},{{ h }} {{ line_d[1:] }} {{ last_x }},{{ h }}" fill="var(--ps-accent-dim)"/>
+  <path d="{{ line_d }}" fill="none" stroke="var(--ps-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="{{ last_x }}" cy="{{ last_y }}" r="3" fill="var(--ps-accent)"/>
+</svg>
+{% endif %}
 {% endmacro %}

@@ -1,48 +1,53 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Greens", accent="Approach accuracy") }}
+{{ PageShell(title="Par 5 greens are a strength,", accent="par 3s need work.") }}
 {{ CatTabs(active="greens") }}
-<div class="stats-page">
-  {{ HeroBand(value=gir_pct, label="Greens in Regulation", delta=gir_delta.delta, delta_dir=gir_delta.delta_dir, unit="%", precision=0) }}
-  {{ StatStrip(items=[
-    {"label": "GIR %", "value": _fmt(gir_pct, "%", 0), "delta": gir_delta.delta, "delta_dir": gir_delta.delta_dir},
-    {"label": "Par 3", "value": _fmt(gir_par_3, "%", 1) if gir_par_3 is not none else "\u2014"},
-    {"label": "Par 4", "value": _fmt(gir_par_4, "%", 1) if gir_par_4 is not none else "\u2014"},
-    {"label": "Par 5", "value": _fmt(gir_par_5, "%", 1) if gir_par_5 is not none else "\u2014"},
-    {"label": "From FW", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else "\u2014"},
-    {"label": "From Rough", "value": _fmt(gir_from_rough, "%", 1) if gir_from_rough is not none else "\u2014"},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Miss Direction", bars=[
-        {"label": "Left", "pct": gir_miss_direction.get("L") or 0, "display": _fmt(gir_miss_direction.get("L"), "%", 1)},
-        {"label": "Right", "pct": gir_miss_direction.get("R") or 0, "display": _fmt(gir_miss_direction.get("R"), "%", 1)},
-        {"label": "Short", "pct": gir_miss_direction.get("S") or 0, "display": _fmt(gir_miss_direction.get("S"), "%", 1)},
-        {"label": "Long", "pct": gir_miss_direction.get("LO") or 0, "display": _fmt(gir_miss_direction.get("LO"), "%", 1)},
-      ], footer_rows=[
-        {"label": "GIR %", "value": _fmt(gir_pct, "%", 0)},
-        {"label": "From FW %", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else None},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Source", rows=[
-        {"label": "From Fairway", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else None},
-        {"label": "From Rough", "value": _fmt(gir_from_rough, "%", 1) if gir_from_rough is not none else None},
-        {"label": "Miss L", "value": _fmt(gir_miss_direction.get("L"), "%", 1)},
-        {"label": "Miss R", "value": _fmt(gir_miss_direction.get("R"), "%", 1)},
-        {"label": "Short", "value": _fmt(gir_miss_direction.get("S"), "%", 1)},
-        {"label": "Long", "value": _fmt(gir_miss_direction.get("LO"), "%", 1)},
-      ]) }}
-      {{ DRowSection(title="Impact", rows=[
-        {"label": "GIR Hit \u2192 Par", "value": _fmt(gir_scoring_hit, "", 2)},
-        {"label": "GIR Miss \u2192 Par", "value": _fmt(gir_scoring_missed, "", 2)},
-        {"label": "GIR OB/Rd", "value": _fmt(ob_stats.get("gir_ob_per_round"), "", 2)},
-        {"label": "GIR OB \u2192 Par", "value": _fmt(ob_stats.get("gir_ob_avg_vs_par"), "", 2)},
-        {"label": "GIR Clean \u2192 Par", "value": _fmt(ob_stats.get("gir_clean_avg_vs_par"), "", 2)},
-      ]) }}
-    </div>
+{{ HeroBand(value=gir_pct, label="greens in reg %", delta=gir_delta.delta, delta_dir=gir_delta.delta_dir, context="64 rounds", precision=0) }}
+{{ StatStrip(items=[
+  {"label": "GIR %", "value": _fmt(gir_pct, "%", 0)},
+  {"label": "Par 3", "value": _fmt(gir_par_3, "%", 1) if gir_par_3 is not none else "\u2014"},
+  {"label": "Par 4", "value": _fmt(gir_par_4, "%", 1) if gir_par_4 is not none else "\u2014"},
+  {"label": "Par 5", "value": _fmt(gir_par_5, "%", 1) if gir_par_5 is not none else "\u2014"},
+  {"label": "From FW", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else "\u2014"},
+  {"label": "From Rough", "value": _fmt(gir_from_rough, "%", 1) if gir_from_rough is not none else "\u2014"},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Miss Direction", bars=[
+      {"label": "On Green", "pct": gir_pct or 0, "display": _fmt(gir_pct, "%", 0), "max": 100, "color": "var(--ps-accent)"},
+      {"label": "Short", "pct": gir_miss_direction.get("S") or 0, "display": _fmt(gir_miss_direction.get("S"), "%", 1), "max": 100, "color": "var(--ps-ink-2)"},
+      {"label": "Long", "pct": gir_miss_direction.get("LO") or 0, "display": _fmt(gir_miss_direction.get("LO"), "%", 1), "max": 100, "color": "var(--ps-ink-2)"},
+      {"label": "Left", "pct": gir_miss_direction.get("L") or 0, "display": _fmt(gir_miss_direction.get("L"), "%", 1), "max": 100, "color": "var(--ps-ink-2)"},
+      {"label": "Right", "pct": gir_miss_direction.get("R") or 0, "display": _fmt(gir_miss_direction.get("R"), "%", 1), "max": 100, "color": "var(--ps-ink-2)"},
+    ], has_stacked_bar=True, stacked_max=100, footer_rows=[
+      {"label": "Par 3", "value": _fmt(gir_par_3, "%", 1) if gir_par_3 is not none else None},
+      {"label": "Par 4", "value": _fmt(gir_par_4, "%", 1) if gir_par_4 is not none else None},
+      {"label": "Par 5", "value": _fmt(gir_par_5, "%", 1) if gir_par_5 is not none else None},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Source", rows=[
+      {"label": "GIR from Fairway", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else None},
+      {"label": "GIR from Rough / OB", "value": _fmt(gir_from_rough, "%", 1) if gir_from_rough is not none else None},
+      {"label": "Left GIR Miss %", "value": _fmt(gir_miss_direction.get("L"), "%", 1)},
+      {"label": "Right GIR Miss %", "value": _fmt(gir_miss_direction.get("R"), "%", 1)},
+      {"label": "Short GIR Miss %", "value": _fmt(gir_miss_direction.get("S"), "%", 1)},
+      {"label": "Long GIR Miss %", "value": _fmt(gir_miss_direction.get("LO"), "%", 1)},
+    ]) }}
+    {{ DRowSection(title="Impact", rows=[
+      {"label": "Avg vs Par \u2014 GIR Hit", "value": _fmt(gir_scoring_hit, "", 2)},
+      {"label": "Avg vs Par \u2014 GIR Missed", "value": _fmt(gir_scoring_missed, "", 2), "warn": true},
+      {"label": "GIR OB / Round", "value": _fmt(ob_stats.get("gir_ob_per_round"), "", 2)},
+      {"label": "Avg vs Par \u2014 GIR OB", "value": _fmt(ob_stats.get("gir_ob_avg_vs_par"), "", 2), "warn": true},
+      {"label": "Avg vs Par \u2014 GIR Clean", "value": _fmt(ob_stats.get("gir_clean_avg_vs_par"), "", 2)},
+    ]) }}
+    {{ DistSection(title="GIR Impact", bars=None, footer_rows=[
+      {"label": "GIR Hit \u2192", "value": _fmt(gir_scoring_hit, "", 2) if gir_scoring_hit is not none else None},
+      {"label": "GIR Miss \u2192", "value": _fmt(gir_scoring_missed, "", 2) if gir_scoring_missed is not none else None},
+      {"label": "From FW", "value": _fmt(gir_from_fairway, "%", 1) if gir_from_fairway is not none else None},
+    ]) }}
+  </div>
 </div>
+{{ Footnote(text="GIR = greens in regulation. Miss direction based on pin-relative.") }}
 {% endblock %}

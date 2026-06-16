@@ -1,46 +1,50 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Fairways", accent="Accuracy off the tee") }}
+{{ PageShell(title="Finding more fairways,", accent="cutting the cost of misses.") }}
 {{ CatTabs(active="fairways") }}
-<div class="stats-page">
-  {{ HeroBand(value=fir_pct, label="Fairways Hit %", delta=fir_delta.delta, delta_dir=fir_delta.delta_dir, unit="%", precision=0) }}
-  {{ StatStrip(items=[
-    {"label": "FIR %", "value": _fmt(fir_pct, "%", 0), "delta": fir_delta.delta, "delta_dir": fir_delta.delta_dir},
-    {"label": "Miss Left", "value": _fmt(miss_left, "%", 1) if miss_left is not none else "\u2014"},
-    {"label": "Miss Right", "value": _fmt(miss_right, "%", 1) if miss_right is not none else "\u2014"},
-    {"label": "FIR \u2192 Par", "value": _fmt(scoring_hit, "", 2)},
-    {"label": "Miss \u2192 Par", "value": _fmt(scoring_missed, "", 2)},
-    {"label": "OB/Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Miss Distribution", bars=[
-        {"label": "In Play", "pct": 100 - ((miss_left or 0) + (miss_right or 0)) if miss_left is not none else 0, "display": "\u2014"},
-        {"label": "Miss L", "pct": miss_left or 0, "display": _fmt(miss_left, "%", 1) if miss_left is not none else "\u2014"},
-        {"label": "Miss R", "pct": miss_right or 0, "display": _fmt(miss_right, "%", 1) if miss_right is not none else "\u2014"},
-      ], footer_rows=[
-        {"label": "OB/Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
-        {"label": "FIR OB \u2192 avg", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2)},
-        {"label": "FIR Clean \u2192 avg", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Scoring Impact", rows=[
-        {"label": "FIR Hit", "value": _fmt(scoring_hit, "", 2)},
-        {"label": "FIR Missed", "value": _fmt(scoring_missed, "", 2)},
-        {"label": "Missed L", "value": _fmt(scoring_miss_left, "", 2) if scoring_miss_left is not none else None},
-        {"label": "Missed R", "value": _fmt(scoring_miss_right, "", 2) if scoring_miss_right is not none else None},
-        {"label": "Fairway Miss Cost", "value": _fmt(scoring_missed - scoring_hit, "", 2) if scoring_hit is not none and scoring_missed is not none else None},
-      ]) }}
-      {{ DRowSection(title="OB Impact", rows=[
-        {"label": "FIR OB/Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
-        {"label": "Total OB/Rd", "value": _fmt(ob_stats.get("total_ob_per_round"), "", 2)},
-        {"label": "vs Par (OB)", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2)},
-        {"label": "vs Par (Clean)", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},
-      ]) }}
-    </div>
+{{ HeroBand(value=fir_pct, label="fairways hit %", delta=fir_delta.delta, delta_dir=fir_delta.delta_dir, context="64 rounds", precision=0) }}
+{{ StatStrip(items=[
+  {"label": "FIR %", "value": _fmt(fir_pct, "%", 0)},
+  {"label": "Miss Left", "value": _fmt(miss_left, "%", 1) if miss_left is not none else "\u2014"},
+  {"label": "Miss Right", "value": _fmt(miss_right, "%", 1) if miss_right is not none else "\u2014"},
+  {"label": "FIR \u2192 Par", "value": _fmt(scoring_hit, "", 2)},
+  {"label": "Miss \u2192 Par", "value": _fmt(scoring_missed, "", 2)},
+  {"label": "OB / Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Miss Distribution", bars=[
+      {"label": "In Play", "pct": fir_pct or 0, "display": _fmt(fir_pct, "%", 0), "max": 100, "color": "var(--ps-accent)"},
+      {"label": "Miss Left", "pct": miss_left or 0, "display": _fmt(miss_left, "%", 1) if miss_left is not none else "\u2014", "max": 100, "color": "var(--ps-ink-2)"},
+      {"label": "Miss Right", "pct": miss_right or 0, "display": _fmt(miss_right, "%", 1) if miss_right is not none else "\u2014", "max": 100, "color": "var(--ps-ink-2)"},
+      {"label": "OB / Penalty", "pct": ob_stats.get("fir_ob_per_round") or 0, "display": _fmt(ob_stats.get("fir_ob_per_round"), "", 2), "max": 100, "color": "var(--ps-warn)"},
+    ], has_stacked_bar=True, stacked_max=100, footer_rows=[
+      {"label": "FIR %", "value": _fmt(fir_pct, "%", 0)},
+      {"label": "Miss L", "value": _fmt(miss_left, "%", 1) if miss_left is not none else None},
+      {"label": "Miss R", "value": _fmt(miss_right, "%", 1) if miss_right is not none else None},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds. FIR excludes par 3s.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Scoring Impact", rows=[
+      {"label": "Avg vs Par \u2014 FIR Hit", "value": _fmt(scoring_hit, "", 2)},
+      {"label": "Avg vs Par \u2014 FIR Missed", "value": _fmt(scoring_missed, "", 2), "warn": true},
+      {"label": "Avg vs Par \u2014 Missed Left", "value": _fmt(scoring_miss_left, "", 2) if scoring_miss_left is not none else None, "warn": true},
+      {"label": "Avg vs Par \u2014 Missed Right", "value": _fmt(scoring_miss_right, "", 2) if scoring_miss_right is not none else None, "warn": true},
+      {"label": "Fairway Miss Cost", "value": _fmt(scoring_missed - scoring_hit, "", 2) if scoring_hit is not none and scoring_missed is not none else None, "warn": true},
+    ]) }}
+    {{ DRowSection(title="OB Impact", rows=[
+      {"label": "FIR OB / Round", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
+      {"label": "Total OB / Round", "value": _fmt(ob_stats.get("total_ob_per_round"), "", 2)},
+      {"label": "Avg vs Par \u2014 FIR OB", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2), "warn": true},
+      {"label": "Avg vs Par \u2014 FIR Clean", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},
+    ]) }}
+    {{ DistSection(title="OB Summary", bars=None, footer_rows=[
+      {"label": "OB / Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
+      {"label": "FIR OB \u2192", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2)},
+      {"label": "FIR Clean \u2192", "value": _fmt(ob_stats.get("fir_clean_avg_vs_par"), "", 2)},
+    ]) }}
+  </div>
 </div>
+{{ Footnote(text="FIR = fairways in regulation. OB = out of bounds.") }}
 {% endblock %}

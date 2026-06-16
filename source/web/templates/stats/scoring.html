@@ -1,47 +1,52 @@
 {% extends "base.html" %}
 {% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
 {% block content %}
-{{ PageShell(title="Scoring", accent="How you score") }}
+{{ PageShell(title="Trending in the", accent="right direction.") }}
 {{ CatTabs(active="scoring") }}
-<div class="stats-page">
-  {{ HeroBand(value=scoring_avg, label="Scoring Average", delta=scoring_avg_delta.delta, delta_dir=scoring_avg_delta.delta_dir) }}
-  {{ StatStrip(items=[
-    {"label": "To Par", "value": _fmt(to_par, "", 1), "delta": to_par_delta.delta, "delta_dir": to_par_delta.delta_dir},
-    {"label": "Par 3 Avg", "value": _fmt(par_3_avg, "", 2), "delta": par_3_avg_delta.delta, "delta_dir": par_3_avg_delta.delta_dir},
-    {"label": "Par 4 Avg", "value": _fmt(par_4_avg, "", 2), "delta": par_4_avg_delta.delta, "delta_dir": par_4_avg_delta.delta_dir},
-    {"label": "Par 5 Avg", "value": _fmt(par_5_avg, "", 2), "delta": par_5_avg_delta.delta, "delta_dir": par_5_avg_delta.delta_dir},
-    {"label": "Std Dev", "value": _fmt(std_dev, "", 2), "delta": std_dev_delta.delta, "delta_dir": std_dev_delta.delta_dir},
-    {"label": "Par or Better", "value": _fmt(par_or_better_pct, "%", 1), "delta": par_or_better_delta.delta, "delta_dir": par_or_better_delta.delta_dir},
-  ]) }}
-  <div class="stats-two-col">
-    <div class="stats-left">
-      {{ DistSection(title="Score Distribution", bars=[
-        {"label": "Eagle+", "pct": score_distribution.get("eagle") or 0, "display": _fmt(score_distribution.get("eagle"), "%", 1)},
-        {"label": "Birdie", "pct": score_distribution.get("birdie") or 0, "display": _fmt(score_distribution.get("birdie"), "%", 1)},
-        {"label": "Par", "pct": score_distribution.get("par") or 0, "display": _fmt(score_distribution.get("par"), "%", 1)},
-        {"label": "Bogey", "pct": score_distribution.get("bogey") or 0, "display": _fmt(score_distribution.get("bogey"), "%", 1)},
-        {"label": "Double", "pct": score_distribution.get("double") or 0, "display": _fmt(score_distribution.get("double"), "%", 1)},
-        {"label": "Triple+", "pct": score_distribution.get("triple_plus") or 0, "display": _fmt(score_distribution.get("triple_plus"), "%", 1)},
-      ], footer_rows=[
-        {"label": "Par or Better", "value": _fmt(par_or_better_pct, "%", 1)},
-        {"label": "Blow-up Rate", "value": _fmt(blow_up_rate, "%", 1)},
-        {"label": "Std Dev", "value": _fmt(std_dev, "", 2)},
-      ]) }}
-    </div>
-    <div class="stats-right">
-      {{ DRowSection(title="Approach Game", rows=[
-        {"label": "Approach", "value": _fmt(score_components.get("approach"), "", 2)},
-        {"label": "Scramble Game", "value": _fmt(score_components.get("scramble"), "", 2)},
-        {"label": "Fairway Miss Cost", "value": _fmt(fairway_miss_cost, "", 2) if fairway_miss_cost is not none else None},
-        {"label": "Avg Putts / Hole", "value": _fmt(score_components.get("putting"), "", 2)},
-      ]) }}
-      {{ DRowSection(title="Rates", rows=[
-        {"label": "Clean Card", "value": _fmt(clean_card_pct, "%", 1)},
-        {"label": "Blow-up Rate", "value": _fmt(blow_up_rate, "%", 1)},
-        {"label": "Std Dev", "value": _fmt(std_dev, "", 2)},
-      ]) }}
-    </div>
+{{ HeroBand(value=scoring_avg, label="scoring avg", delta=to_par_delta.delta, delta_dir=to_par_delta.delta_dir, context="64 rounds", precision=1) }}
+{{ StatStrip(items=[
+  {"label": "To Par", "value": _fmt(to_par, "", 1)},
+  {"label": "Par 3 Avg", "value": _fmt(par_3_avg, "", 2)},
+  {"label": "Par 4 Avg", "value": _fmt(par_4_avg, "", 2)},
+  {"label": "Par 5 Avg", "value": _fmt(par_5_avg, "", 2)},
+  {"label": "Std Dev", "value": _fmt(std_dev, "", 2)},
+  {"label": "Par or Better", "value": _fmt(par_or_better_pct, "%", 1)},
+]) }}
+<div class="stats-two-col">
+  <div class="stats-left">
+    {{ DistSection(title="Score Distribution", bars=[
+      {"label": "Eagle+", "pct": score_distribution.get("eagle") or 0, "display": _fmt(score_distribution.get("eagle"), "%", 1), "max": 50, "color": "var(--ps-accent)"},
+      {"label": "Birdie", "pct": score_distribution.get("birdie") or 0, "display": _fmt(score_distribution.get("birdie"), "%", 1), "max": 50, "color": "var(--ps-accent)"},
+      {"label": "Par", "pct": score_distribution.get("par") or 0, "display": _fmt(score_distribution.get("par"), "%", 1), "max": 50, "color": "var(--ps-accent)"},
+      {"label": "Bogey", "pct": score_distribution.get("bogey") or 0, "display": _fmt(score_distribution.get("bogey"), "%", 1), "max": 50, "color": "var(--ps-ink-2)"},
+      {"label": "Double", "pct": score_distribution.get("double") or 0, "display": _fmt(score_distribution.get("double"), "%", 1), "max": 50, "color": "var(--ps-warn)"},
+      {"label": "Triple+", "pct": score_distribution.get("triple_plus") or 0, "display": _fmt(score_distribution.get("triple_plus"), "%", 1), "max": 50, "color": "var(--ps-warn)"},
+    ], has_stacked_bar=True, stacked_max=50, footer_rows=[
+      {"label": "Par 3", "value": _fmt(par_3_avg, "", 2)},
+      {"label": "Par 4", "value": _fmt(par_4_avg, "", 2)},
+      {"label": "Par 5", "value": _fmt(par_5_avg, "", 2)},
+    ]) }}
   </div>
-  {{ Footnote(text="Based on best 8 of last 20 rounds. Delta vs last 20.") }}
+  <div class="stats-right">
+    {{ DRowSection(title="Context", rows=[
+      {"label": "Approach Game (FIR hit)", "value": _fmt(score_components.get("approach"), "", 2) if score_components.get("approach") is not none else None},
+      {"label": "Scramble Game (FIR miss)", "value": _fmt(score_components.get("scramble"), "", 2), "warn": true},
+      {"label": "Fairway Miss Cost", "value": _fmt(fairway_miss_cost, "", 2) if fairway_miss_cost is not none else None, "warn": true},
+      {"label": "Avg Putts / Hole", "value": _fmt(score_components.get("putting"), "", 2)},
+      {"label": "Clean Card %", "value": _fmt(clean_card_pct, "%", 1)},
+    ]) }}
+    {{ DRowSection(title="Rates", rows=[
+      {"label": "Par or Better %", "value": _fmt(par_or_better_pct, "%", 1)},
+      {"label": "Blow-up Rate (quad+)", "value": _fmt(blow_up_rate, "%", 1), "warn": true},
+      {"label": "Scoring Std Dev", "value": _fmt(std_dev, "", 2)},
+      {"label": "Eagle or Better %", "value": _fmt(score_distribution.get("eagle"), "%", 1)},
+    ]) }}
+    {% set ns = namespace(footer=[]) %}
+    {% if clean_card_pct is not none %}{% set _ = ns.footer.append({"label": "Clean Card", "value": clean_card_pct|round(1)|string, "unit": "%"}) %}{% endif %}
+    {% if blow_up_rate is not none %}{% set _ = ns.footer.append({"label": "Blow-up", "value": blow_up_rate|round(1)|string, "unit": "%"}) %}{% endif %}
+    {% if std_dev is not none %}{% set _ = ns.footer.append({"label": "Std Dev", "value": std_dev|round(1)|string}) %}{% endif %}
+    {{ DistSection(title="Key Rates", bars=None, footer_rows=ns.footer) }}
+  </div>
 </div>
+{{ Footnote(text="Best 8 of last 20 rounds. Delta vs last 20.") }}
 {% endblock %}
