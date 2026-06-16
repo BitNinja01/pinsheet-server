@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "stats/macros.html" import CatTabs, DRowSection, PageShell, Footnote %}
+{% block content %}
+{{ PageShell(title="Bests", accent="Personal records") }}
+{{ CatTabs(active="bests") }}
+<div class="stats-page">
+  <div class="stats-bests-grid">
+    <div class="stats-best-card">
+      <div class="stats-best-num">{{ best_gross if best_gross is not none else "\u2014" }}</div>
+      <div class="ps-eyebrow">Best Gross Score</div>
+      {% if best_gross_date %}<div class="stats-best-date">{{ best_gross_date }}</div>{% endif %}
+    </div>
+    <div class="stats-best-card">
+      <div class="stats-best-num">{{ best_diff if best_diff is not none else "\u2014" }}</div>
+      <div class="ps-eyebrow">Best Differential</div>
+      {% if best_diff_date %}<div class="stats-best-date">{{ best_diff_date }}</div>{% endif %}
+    </div>
+    <div class="stats-best-card">
+      <div class="stats-best-num">{{ most_fir if most_fir is not none else "\u2014" }}</div>
+      <div class="ps-eyebrow">Most Fairways</div>
+      {% if most_fir_date %}<div class="stats-best-date">{{ most_fir_date }}</div>{% endif %}
+    </div>
+    <div class="stats-best-card">
+      <div class="stats-best-num">{{ most_gir if most_gir is not none else "\u2014" }}</div>
+      <div class="ps-eyebrow">Most GIR</div>
+      {% if most_gir_date %}<div class="stats-best-date">{{ most_gir_date }}</div>{% endif %}
+    </div>
+    <div class="stats-best-card">
+      <div class="stats-best-num">{{ fewest_putts if fewest_putts is not none else "\u2014" }}</div>
+      <div class="ps-eyebrow">Fewest Putts</div>
+      {% if fewest_putts_date %}<div class="stats-best-date">{{ fewest_putts_date }}</div>{% endif %}
+    </div>
+  </div>
+  {{ Footnote(text="Personal bests across all rounds.") }}
+</div>
+{% endblock %}

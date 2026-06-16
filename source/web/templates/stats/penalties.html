@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "stats/macros.html" import CatTabs, HeroBand, StatStrip, DistSection, DRowSection, PageShell, Footnote %}
+{% block content %}
+{{ PageShell(title="Penalties", accent="When it goes wrong") }}
+{{ CatTabs(active="penalties") }}
+<div class="stats-page">
+  {{ HeroBand(value=penalties_per_round, label="Penalties / Round", delta=pen_rd_delta.delta, delta_dir=pen_rd_delta.delta_dir) }}
+  {{ StatStrip(items=[
+    {"label": "Pen/Rd", "value": _fmt(penalties_per_round, "", 2), "delta": pen_rd_delta.delta, "delta_dir": pen_rd_delta.delta_dir},
+    {"label": "vs Par Penalty", "value": _fmt(penalty_vs_par, "", 2)},
+    {"label": "vs Par Clean", "value": _fmt(clean_vs_par, "", 2)},
+    {"label": "Pen-Free Rds", "value": _fmt(pen_free_pct, "%", 1)},
+    {"label": "Worst Penalty", "value": _fmt(penalty_stats.get("worst_holes")[0][2], "", 2) if penalty_stats.get("worst_holes") else "\u2014"},
+    {"label": "OB/Rd", "value": _fmt(total_ob_rd, "", 2)},
+  ]) }}
+  <div class="stats-two-col">
+    <div class="stats-left">
+      {{ DistSection(title="Penalty Breakdown", bars=[
+        {"label": "Clean Holes", "pct": 100 - ((penalty_stats.get("worst_holes")|length * 5) if penalty_stats.get("worst_holes") else 0), "display": "\u2014"},
+        {"label": "Penalty Holes", "pct": 0, "display": "\u2014"},
+        {"label": "OB Holes", "pct": 0, "display": "\u2014"},
+      ], footer_rows=[
+        {"label": "Clean Rds %", "value": _fmt(pen_free_pct, "%", 1)},
+        {"label": "Pen-Free %", "value": _fmt(pen_free_pct, "%", 1)},
+        {"label": "OB/Rd", "value": _fmt(total_ob_rd, "", 2)},
+      ]) }}
+    </div>
+    <div class="stats-right">
+      {{ DRowSection(title="Penalty Impact", rows=[
+        {"label": "Avg vs Par (Penalty Holes)", "value": _fmt(penalty_vs_par, "", 2)},
+        {"label": "Avg vs Par (Clean Holes)", "value": _fmt(clean_vs_par, "", 2)},
+      ]) }}
+      {{ DRowSection(title="OB Detail", rows=[
+        {"label": "FIR OB / Rd", "value": _fmt(ob_stats.get("fir_ob_per_round"), "", 2)},
+        {"label": "GIR OB / Rd", "value": _fmt(ob_stats.get("gir_ob_per_round"), "", 2)},
+        {"label": "Total OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
+      ]) }}
+    </div>
+  </div>
+  {{ Footnote(text="Based on best 8 of last 20 rounds. Delta vs last 20.") }}
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import render_template, request, jsonify, g, current_app, url_for
+from flask import render_template, request, jsonify, g, current_app, url_for, redirect
 from flask_login import login_required, current_user
 
 from store import create_invite_code, get_invite_codes, get_plugin_states, generate_password_reset_token
@@ -17,6 +17,16 @@ from calc import (
     calc_penalty_free_rounds, calc_rounds_total, calc_season_rounds,
     calc_per_round_average, calc_hole_percentage,
     last_n_rounds, best_n_rounds,
+    calc_avg_vs_par, calc_score_distribution, calc_big_number_rate,
+    calc_clean_card_percent, calc_scoring_consistency, calc_score_components,
+    calc_four_plus_putt_percent, calc_putts_by_par_type,
+    calc_fir_miss_tendency, calc_scoring_by_fairway, calc_scoring_by_miss_side,
+    calc_gir_by_par_type, calc_gir_miss_direction, calc_gir_from_fairway_vs_rough,
+    calc_scoring_by_gir, calc_scramble_by_miss_direction, calc_scramble_by_par_type,
+    calc_ob_stats, calc_penalty_stats, calc_momentum_recovery,
+    calc_nemesis_best_holes, calc_scoring_trend, calc_fir_trend, calc_gir_trend,
+    calc_putts_trend, calc_scramble_trend, calc_handicap_trend,
+    calc_playing_to_handicap_rate,
 )
 from calc import stat_delta
 from source.models import dict_to_course
@@ -24,228 +34,307 @@ from source.request_data import get_settings, get_courses, get_all_rounds_for_us
 
 
 def register_stats_routes(app):
+    def _fmt(val, suffix="", precision=1):
+        if val is None:
+            return "\u2014"
+        if suffix == "%":
+            return f"{val:.{precision}f}%"
+        return f"{val:.{precision}f}{suffix}"
+
+    def _delta(val_b8, val_l20, higher_better, precision=1, suffix=""):
+        cls, text, _ = stat_delta(val_b8, val_l20, higher_better, precision, suffix)
+        return {"delta_dir": "up" if cls == "is-up" else ("down" if cls == "is-down" else ""), "delta": text}
+
+    def _load_rounds():
+        all_rounds = list(get_all_rounds_for_user())
+        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
+        b8 = best_n_rounds(all_rounds, 8)
+        l5 = last_n_rounds(all_rounds, 5)
+        l10 = last_n_rounds(all_rounds, 10)
+        l20 = last_n_rounds(all_rounds, 20)
+        return all_rounds, courses_dict, b8, l5, l10, l20
+
     @app.route("/stats")
     @login_required
-    def stats():
-        include_9hole = get_settings().get("include_9hole", True)
+    def stats_redirect():
+        return redirect("/stats/scoring")
 
-        all_rounds = get_all_rounds_for_user()
-        rounds = list(all_rounds)
-        courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
-
-        all_eligible = [r for r in rounds if not r.excluded]
-        b8 = best_n_rounds(rounds, 8)
-        l5 = last_n_rounds(rounds, 5)
-        l10 = last_n_rounds(rounds, 10)
-        l20 = last_n_rounds(rounds, 20)
-
-        now = datetime.now()
-        this_month_rounds = sum(1 for r in all_eligible if r.date.startswith(now.strftime("%Y-%m")))
-
-        def fmt_val(val, suffix="", precision=1):
-            if val is None:
-                return "\u2014"
-            if suffix == "%":
-                return f"{val:.{precision}f}%"
-            return f"{val:.{precision}f}{suffix}"
-
-        def _cell(label, b8v, l5v, l10v, l20v, suffix="", precision=1, higher_better=False):
-            def _fmt(v):
-                if v is None:
-                    return "\u2014"
-                if suffix == "%":
-                    return f"{v:.{precision}f}%"
-                return f"{v:.{precision}f}{suffix}"
-            windows = [
-                {"label": "B8", "value": _fmt(b8v)},
-                {"label": "L5", "value": _fmt(l5v)},
-                {"label": "L10", "value": _fmt(l10v)},
-                {"label": "L20", "value": _fmt(l20v)},
-            ]
-            value = _fmt(b8v)
-            delta_class, delta_text, cell_class = stat_delta(b8v, l20v, higher_better, precision, suffix)
-            return {
-                "label": label, "value": value,
-                "delta": delta_text, "delta_class": delta_class,
-                "cell_class": cell_class,
-                "windows": windows,
-            }
-
-        def _placeholder_cell(label):
-            d = "\u2014"
-            return {
-                "label": label, "value": d, "delta": d,
-                "delta_class": "", "cell_class": "",
-                "windows": [{"label": "B8", "value": d}, {"label": "L5", "value": d}, {"label": "L10", "value": d}, {"label": "L20", "value": d}],
-            }
-
-        # ── Stat Strip ──────────────────────────────────────────────────
-        _sa_b8 = calc_scoring_average(b8)
-        _sa_l20 = calc_scoring_average(l20)
-        _fir_b8 = calc_fir_percent(b8, courses_dict)
-        _fir_l20 = calc_fir_percent(l20, courses_dict)
-        _gir_b8 = calc_gir_percent(b8)
-        _gir_l20 = calc_gir_percent(l20)
-        _pt_b8 = calc_putts_per_round(b8)
-        _pt_l20 = calc_putts_per_round(l20)
-        _sc_b8 = calc_scramble_percent(b8, courses_dict)
-        _sc_l20 = calc_scramble_percent(l20, courses_dict)
-
-        _sd_sa_cls, _sd_sa_txt, _ = stat_delta(_sa_b8, _sa_l20, False, 1, "")
-        _sd_fir_cls, _sd_fir_txt, _ = stat_delta(_fir_b8, _fir_l20, True, 1, "%")
-        _sd_gir_cls, _sd_gir_txt, _ = stat_delta(_gir_b8, _gir_l20, True, 1, "%")
-        _sd_pt_cls, _sd_pt_txt, _ = stat_delta(_pt_b8, _pt_l20, False, 1, "")
-        _sd_sc_cls, _sd_sc_txt, _ = stat_delta(_sc_b8, _sc_l20, True, 1, "%")
-
-        strip_data = [
-            {"label": "Rounds", "value": str(len(all_eligible)), "is_pct": False,
-             "delta_class": "is-up" if this_month_rounds > 0 else "",
-             "delta_text": f"+{this_month_rounds} this month"},
-            {"label": "Avg Score", "value": fmt_val(_sa_b8, "", 1), "is_pct": False,
-             "delta_class": _sd_sa_cls, "delta_text": _sd_sa_txt},
-            {"label": "FIR%", "value": fmt_val(_fir_b8, "", 0), "is_pct": True,
-             "delta_class": _sd_fir_cls, "delta_text": _sd_fir_txt},
-            {"label": "GIR%", "value": fmt_val(_gir_b8, "", 0), "is_pct": True,
-             "delta_class": _sd_gir_cls, "delta_text": _sd_gir_txt},
-            {"label": "Putts/Rd", "value": fmt_val(_pt_b8, "", 1), "is_pct": False,
-             "delta_class": _sd_pt_cls, "delta_text": _sd_pt_txt},
-            {"label": "Scramble%", "value": fmt_val(_sc_b8, "", 0), "is_pct": True,
-             "delta_class": _sd_sc_cls, "delta_text": _sd_sc_txt},
-        ]
-
-        # ── Section 1: Scoring Statistics ───────────────────────────────
-        _birdie = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g < p)
-        _bogey = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g == p + 1)
-        _dbl = lambda r: calc_per_round_average(r, courses_dict, lambda g, p: g >= p + 2)
-        _pb = lambda r: calc_hole_percentage(r, courses_dict, lambda g, p: g < p)
+    @app.route("/stats/scoring")
+    @login_required
+    def stats_scoring():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
         sa_b8 = calc_scoring_average(b8)
-        sa_l5_ = calc_scoring_average(l5)
-        sa_l10 = calc_scoring_average(l10)
-        sa_l20_ = calc_scoring_average(l20)
+        sa_l20 = calc_scoring_average(l20)
+        to_par_b8 = calc_avg_vs_par(b8, courses_dict)
+        to_par_l20 = calc_avg_vs_par(l20, courses_dict)
+        par3_b8 = calc_scoring_avg_by_par_type(b8, courses_dict).get(3)
+        par3_l20 = calc_scoring_avg_by_par_type(l20, courses_dict).get(3)
+        par4_b8 = calc_scoring_avg_by_par_type(b8, courses_dict).get(4)
+        par4_l20 = calc_scoring_avg_by_par_type(l20, courses_dict).get(4)
+        par5_b8 = calc_scoring_avg_by_par_type(b8, courses_dict).get(5)
+        par5_l20 = calc_scoring_avg_by_par_type(l20, courses_dict).get(5)
+        stddev_b8 = calc_scoring_consistency(b8, courses_dict)
+        stddev_l20 = calc_scoring_consistency(l20, courses_dict)
+        pob_b8 = calc_par_or_better_percent(b8, courses_dict)
+        pob_l20 = calc_par_or_better_percent(l20, courses_dict)
+        score_dist_b8 = calc_score_distribution(b8, courses_dict)
+        score_dist_l20 = calc_score_distribution(l20, courses_dict)
+        blowup_b8 = calc_big_number_rate(b8, courses_dict)
+        blowup_l20 = calc_big_number_rate(l20, courses_dict)
+        clean_card_b8 = calc_clean_card_percent(b8, courses_dict)
+        clean_card_l20 = calc_clean_card_percent(l20, courses_dict)
+        components = calc_score_components(b8, courses_dict)
 
-        section1 = {
-            "label": "Scoring",
-            "cells": [
-                _cell("Score Avg", sa_b8, sa_l5_, sa_l10, sa_l20_, "", 1, False),
-                _placeholder_cell("Strokes Gained"),
-                _cell("Birdies / Rd", _birdie(b8), _birdie(l5), _birdie(l10), _birdie(l20), "", 1, True),
-                _cell("Bogeys / Rd", _bogey(b8), _bogey(l5), _bogey(l10), _bogey(l20), "", 1, False),
-                _cell("Doubles+ / Rd", _dbl(b8), _dbl(l5), _dbl(l10), _dbl(l20), "", 1, False),
-                _cell("Par Breakers", _pb(b8), _pb(l5), _pb(l10), _pb(l20), "%", 1, True),
-            ],
-        }
+        scoring_by_fw = calc_scoring_by_fairway(b8, courses_dict)
+        miss_cost = (scoring_by_fw.get("missed") - scoring_by_fw.get("hit")) if scoring_by_fw.get("hit") is not None and scoring_by_fw.get("missed") is not None else None
 
-        # ── Section 2: Putting Statistics ───────────────────────────────
-        _pt_b8 = calc_putts_per_round(b8)
-        _pt_l5_ = calc_putts_per_round(l5)
-        _pt_l10 = calc_putts_per_round(l10)
-        _pt_l20_ = calc_putts_per_round(l20)
-
-        _o1_b8 = calc_one_putt_percent(b8)
-        _o1_l5 = calc_one_putt_percent(l5)
-        _o1_l10 = calc_one_putt_percent(l10)
-        _o1_l20 = calc_one_putt_percent(l20)
-
-        _o3_b8 = calc_three_putt_percent(b8)
-        _o3_l5 = calc_three_putt_percent(l5)
-        _o3_l10 = calc_three_putt_percent(l10)
-        _o3_l20 = calc_three_putt_percent(l20)
-
-        _pg_b8 = calc_putts_per_gir(b8)
-        _pg_l5 = calc_putts_per_gir(l5)
-        _pg_l10 = calc_putts_per_gir(l10)
-        _pg_l20 = calc_putts_per_gir(l20)
-
-        _o2_b8 = calc_two_putt_percent(b8)
-        _o2_l5 = calc_two_putt_percent(l5)
-        _o2_l10 = calc_two_putt_percent(l10)
-        _o2_l20 = calc_two_putt_percent(l20)
-
-        section2 = {
-            "label": "Putting",
-            "cells": [
-                _cell("Putts / Round", _pt_b8, _pt_l5_, _pt_l10, _pt_l20_, "", 1, False),
-                _cell("1-Putt %", _o1_b8, _o1_l5, _o1_l10, _o1_l20, "%", 1, True),
-                _cell("2-Putt %", _o2_b8, _o2_l5, _o2_l10, _o2_l20, "%", 1, True),
-                _cell("3-Putt %", _o3_b8, _o3_l5, _o3_l10, _o3_l20, "%", 1, False),
-                _cell("Putts / GIR", _pg_b8, _pg_l5, _pg_l10, _pg_l20, "", 2, False),
-                _placeholder_cell("Longest Made"),
-            ],
-        }
-
-        # ── Section 3: Short Game Statistics ────────────────────────────
-        _sc_b8 = calc_scramble_percent(b8, courses_dict)
-        _sc_l5_ = calc_scramble_percent(l5, courses_dict)
-        _sc_l10 = calc_scramble_percent(l10, courses_dict)
-        _sc_l20_ = calc_scramble_percent(l20, courses_dict)
-
-        _px_b8 = calc_penalties_per_round(b8)
-        _px_l5 = calc_penalties_per_round(l5)
-        _px_l10 = calc_penalties_per_round(l10)
-        _px_l20 = calc_penalties_per_round(l20)
-
-        section3 = {
-            "label": "Short Game",
-            "cells": [
-                _cell("Scramble %", _sc_b8, _sc_l5_, _sc_l10, _sc_l20_, "%", 1, True),
-                _placeholder_cell("Sand Save %"),
-                _placeholder_cell("Up & Down %"),
-                _placeholder_cell("Prox to Hole"),
-                _placeholder_cell("Chip-Ins"),
-                _cell("Penalties / Rd", _px_b8, _px_l5, _px_l10, _px_l20, "", 2, False),
-            ],
-        }
-
-        # ── Section 4: Tee to Green Statistics ─────────────────────────
-        _fir_b8 = calc_fir_percent(b8, courses_dict)
-        _fir_l5_ = calc_fir_percent(l5, courses_dict)
-        _fir_l10 = calc_fir_percent(l10, courses_dict)
-        _fir_l20_ = calc_fir_percent(l20, courses_dict)
-
-        _gir_b8 = calc_gir_percent(b8)
-        _gir_l5_ = calc_gir_percent(l5)
-        _gir_l10 = calc_gir_percent(l10)
-        _gir_l20_ = calc_gir_percent(l20)
-
-        _p3_b8 = calc_scoring_avg_by_par_type(b8, courses_dict).get(3)
-        _p3_l5 = calc_scoring_avg_by_par_type(l5, courses_dict).get(3)
-        _p3_l10 = calc_scoring_avg_by_par_type(l10, courses_dict).get(3)
-        _p3_l20 = calc_scoring_avg_by_par_type(l20, courses_dict).get(3)
-
-        section4 = {
-            "label": "Tee to Green",
-            "cells": [
-                _cell("FIR %", _fir_b8, _fir_l5_, _fir_l10, _fir_l20_, "%", 1, True),
-                _cell("GIR %", _gir_b8, _gir_l5_, _gir_l10, _gir_l20_, "%", 1, True),
-                _placeholder_cell("Driving Dist"),
-                _placeholder_cell("Approach Prox"),
-                _placeholder_cell("SG: T2G"),
-                _cell("Par 3 Avg", _p3_b8, _p3_l5, _p3_l10, _p3_l20, "", 2, False),
-            ],
-        }
-
-        sections_data = [section1, section2, section3, section4]
-
-        # ── Bests ───────────────────────────────────────────────────────
-        bests = calc_personal_bests(rounds, courses_dict)
-        bests_data = {
-            "label": "Bests",
-            "headline": "Your personal best performances.",
-            "bests": [
-                ("Lowest Gross", bests.get("best_gross"), bests.get("best_gross_date")),
-                ("Lowest Diff", bests.get("best_diff"), bests.get("best_diff_date")),
-                ("Most FIR", bests.get("most_fir"), bests.get("most_fir_date")),
-                ("Most GIR", bests.get("most_gir"), bests.get("most_gir_date")),
-                ("Fewest Putts", bests.get("fewest_putts"), bests.get("fewest_putts_date")),
-            ],
-        }
-
-        return render_template("stats.html", **base_context(
+        return render_template("stats/scoring.html", **base_context(
             current_page="stats",
-            strip=strip_data,
-            sections=sections_data,
-            bests_section=bests_data,
+            scoring_avg=sa_b8, scoring_avg_delta=_delta(sa_b8, sa_l20, False),
+            to_par=to_par_b8, to_par_delta=_delta(to_par_b8, to_par_l20, False),
+            par_3_avg=par3_b8, par_3_avg_delta=_delta(par3_b8, par3_l20, False),
+            par_4_avg=par4_b8, par_4_avg_delta=_delta(par4_b8, par4_l20, False),
+            par_5_avg=par5_b8, par_5_avg_delta=_delta(par5_b8, par5_l20, False),
+            std_dev=stddev_b8, std_dev_delta=_delta(stddev_b8, stddev_l20, False),
+            par_or_better_pct=pob_b8, par_or_better_delta=_delta(pob_b8, pob_l20, True, 1, "%"),
+            blow_up_rate=blowup_b8, blow_up_delta=_delta(blowup_b8, blowup_l20, False, 1, "%"),
+            clean_card_pct=clean_card_b8, clean_card_delta=_delta(clean_card_b8, clean_card_l20, True, 1, "%"),
+            score_distribution=score_dist_b8,
+            score_components=components,
+            fairway_miss_cost=miss_cost,
+        ))
+
+    @app.route("/stats/penalties")
+    @login_required
+    def stats_penalties():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        pen_rd_b8 = calc_penalties_per_round(b8)
+        pen_rd_l20 = calc_penalties_per_round(l20)
+        pen_stats = calc_penalty_stats(b8, courses_dict)
+        ob_stats = calc_ob_stats(b8, courses_dict)
+        total_ob_rd = ob_stats.get("total_ob_per_round")
+
+        pen_free = sum(1 for r in b8 if r.holes and sum(h.penalties for h in r.holes.values()) == 0)
+        pen_free_pct = (pen_free / len(b8) * 100) if b8 else None
+
+        return render_template("stats/penalties.html", **base_context(
+            current_page="stats",
+            penalties_per_round=pen_rd_b8, pen_rd_delta=_delta(pen_rd_b8, pen_rd_l20, False),
+            penalty_vs_par=pen_stats.get("penalty_avg_vs_par"),
+            clean_vs_par=pen_stats.get("clean_avg_vs_par"),
+            pen_free_pct=pen_free_pct,
+            total_ob_rd=total_ob_rd,
+            ob_stats=ob_stats,
+            penalty_stats=pen_stats,
+        ))
+
+    @app.route("/stats/fairways")
+    @login_required
+    def stats_fairways():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        fir_b8 = calc_fir_percent(b8, courses_dict)
+        fir_l20 = calc_fir_percent(l20, courses_dict)
+        miss_tend = calc_fir_miss_tendency(b8, courses_dict)
+        scoring_fw = calc_scoring_by_fairway(b8, courses_dict)
+        scoring_miss_side = calc_scoring_by_miss_side(b8, courses_dict)
+        ob_stats = calc_ob_stats(b8, courses_dict)
+
+        return render_template("stats/fairways.html", **base_context(
+            current_page="stats",
+            fir_pct=fir_b8, fir_delta=_delta(fir_b8, fir_l20, True, 1, "%"),
+            miss_left=miss_tend.get("left"),
+            miss_right=miss_tend.get("right"),
+            scoring_hit=scoring_fw.get("hit"),
+            scoring_missed=scoring_fw.get("missed"),
+            scoring_miss_left=scoring_miss_side.get("left"),
+            scoring_miss_right=scoring_miss_side.get("right"),
+            ob_stats=ob_stats,
+        ))
+
+    @app.route("/stats/greens")
+    @login_required
+    def stats_greens():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        gir_b8 = calc_gir_percent(b8)
+        gir_l20 = calc_gir_percent(l20)
+        gir_by_par = calc_gir_by_par_type(b8, courses_dict)
+        gir_miss_dir = calc_gir_miss_direction(b8)
+        gir_from = calc_gir_from_fairway_vs_rough(b8, courses_dict)
+        scoring_gir = calc_scoring_by_gir(b8, courses_dict)
+        ob_stats = calc_ob_stats(b8, courses_dict)
+
+        return render_template("stats/greens.html", **base_context(
+            current_page="stats",
+            gir_pct=gir_b8, gir_delta=_delta(gir_b8, gir_l20, True, 1, "%"),
+            gir_par_3=gir_by_par.get(3),
+            gir_par_4=gir_by_par.get(4),
+            gir_par_5=gir_by_par.get(5),
+            gir_from_fairway=gir_from.get("fairway"),
+            gir_from_rough=gir_from.get("rough"),
+            gir_miss_direction=gir_miss_dir,
+            gir_scoring_hit=scoring_gir.get("hit"),
+            gir_scoring_missed=scoring_gir.get("missed"),
+            ob_stats=ob_stats,
+        ))
+
+    @app.route("/stats/putting")
+    @login_required
+    def stats_putting():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        pt_rd_b8 = calc_putts_per_round(b8)
+        pt_rd_l20 = calc_putts_per_round(l20)
+        pt_gir_b8 = calc_putts_per_gir(b8)
+        pt_gir_l20 = calc_putts_per_gir(l20)
+        o1_b8 = calc_one_putt_percent(b8)
+        o1_l20 = calc_one_putt_percent(l20)
+        o2_b8 = calc_two_putt_percent(b8)
+        o2_l20 = calc_two_putt_percent(l20)
+        o3_b8 = calc_three_putt_percent(b8)
+        o3_l20 = calc_three_putt_percent(l20)
+        o4p_b8 = calc_four_plus_putt_percent(b8)
+        o4p_l20 = calc_four_plus_putt_percent(l20)
+        pt_by_par = calc_putts_by_par_type(b8, courses_dict)
+
+        return render_template("stats/putting.html", **base_context(
+            current_page="stats",
+            putts_per_round=pt_rd_b8, pt_rd_delta=_delta(pt_rd_b8, pt_rd_l20, False),
+            putts_per_gir=pt_gir_b8, pt_gir_delta=_delta(pt_gir_b8, pt_gir_l20, False),
+            one_putt_pct=o1_b8, o1_delta=_delta(o1_b8, o1_l20, True, 1, "%"),
+            two_putt_pct=o2_b8, o2_delta=_delta(o2_b8, o2_l20, True, 1, "%"),
+            three_putt_pct=o3_b8, o3_delta=_delta(o3_b8, o3_l20, False, 1, "%"),
+            four_plus_putt_pct=o4p_b8, o4p_delta=_delta(o4p_b8, o4p_l20, False, 1, "%"),
+            putts_by_par=pt_by_par,
+        ))
+
+    @app.route("/stats/short-game")
+    @login_required
+    def stats_short_game():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        sc_b8 = calc_scramble_percent(b8, courses_dict)
+        sc_l20 = calc_scramble_percent(l20, courses_dict)
+        sc_by_dir = calc_scramble_by_miss_direction(b8, courses_dict)
+        sc_by_par = calc_scramble_by_par_type(b8, courses_dict)
+
+        return render_template("stats/short-game.html", **base_context(
+            current_page="stats",
+            scramble_pct=sc_b8, sc_delta=_delta(sc_b8, sc_l20, True, 1, "%"),
+            scramble_left=sc_by_dir.get("L"),
+            scramble_right=sc_by_dir.get("R"),
+            scramble_short=sc_by_dir.get("S"),
+            scramble_long=sc_by_dir.get("LO"),
+            scramble_par_3=sc_by_par.get(3),
+            scramble_par_4=sc_by_par.get(4),
+            scramble_par_5=sc_by_par.get(5),
+        ))
+
+    @app.route("/stats/momentum")
+    @login_required
+    def stats_momentum():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        momentum = calc_momentum_recovery(b8, courses_dict)
+        after_bogey_avg = momentum.get("after_bogey_avg")
+        recovery_rate = momentum.get("recovery_rate")
+
+        bogey_free = 0
+        for r in b8:
+            if not r.holes:
+                continue
+            course = courses_dict.get(r.course)
+            ch = course.holes if course else {}
+            has_bogey = False
+            for n, h in r.holes.items():
+                par = ch.get(str(n), type("obj", (), {"par": None})()).par
+                if h.gross and par and h.gross - par >= 1:
+                    has_bogey = True
+                    break
+            if not has_bogey:
+                bogey_free += 1
+
+        opening_3 = []
+        closing_3 = []
+        for r in b8:
+            if r.holes:
+                course = courses_dict.get(r.course)
+                ch = course.holes if course else {}
+                sorted_nums = sorted(r.holes.keys(), key=int)
+                for group, indices in [("opening", sorted_nums[:3]), ("closing", sorted_nums[-3:])]:
+                    scores = []
+                    for n in indices:
+                        h = r.holes[n]
+                        par = ch.get(str(n), type("obj", (), {"par": None})()).par
+                        if h.gross and par:
+                            scores.append(h.gross - par)
+                    if scores:
+                        avg = sum(scores) / len(scores)
+                        if group == "opening":
+                            opening_3.append(avg)
+                        else:
+                            closing_3.append(avg)
+
+        opening_3_avg = sum(opening_3) / len(opening_3) if opening_3 else None
+        closing_3_avg = sum(closing_3) / len(closing_3) if closing_3 else None
+
+        return render_template("stats/momentum.html", **base_context(
+            current_page="stats",
+            after_bogey_avg=after_bogey_avg,
+            recovery_rate=recovery_rate,
+            bogey_free=bogey_free,
+            opening_3_avg=opening_3_avg,
+            closing_3_avg=closing_3_avg,
+        ))
+
+    @app.route("/stats/trends")
+    @login_required
+    def stats_trends():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+        settings = get_settings()
+        include_9hole = settings.get("include_9hole", True)
+
+        scoring_t = calc_scoring_trend(all_rounds)
+        fir_t = calc_fir_trend(all_rounds, courses_dict)
+        gir_t = calc_gir_trend(all_rounds)
+        putts_t = calc_putts_trend(all_rounds)
+        scramble_t = calc_scramble_trend(all_rounds, courses_dict)
+        hi_t = calc_handicap_trend(all_rounds, include_9hole)
+        pth = calc_playing_to_handicap_rate(all_rounds)
+
+        return render_template("stats/trends.html", **base_context(
+            current_page="stats",
+            scoring_trend=scoring_t,
+            fir_trend=fir_t,
+            gir_trend=gir_t,
+            putts_trend=putts_t,
+            scramble_trend=scramble_t,
+            handicap_trend=hi_t,
+            playing_to_handicap_rate=pth,
+        ))
+
+    @app.route("/stats/bests")
+    @login_required
+    def stats_bests():
+        all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
+
+        bests = calc_personal_bests(all_rounds, courses_dict)
+
+        return render_template("stats/bests.html", **base_context(
+            current_page="stats",
+            best_gross=bests.get("best_gross"),
+            best_gross_date=bests.get("best_gross_date"),
+            best_diff=bests.get("best_diff"),
+            best_diff_date=bests.get("best_diff_date"),
+            most_fir=bests.get("most_fir"),
+            most_fir_date=bests.get("most_fir_date"),
+            most_gir=bests.get("most_gir"),
+            most_gir_date=bests.get("most_gir_date"),
+            fewest_putts=bests.get("fewest_putts"),
+            fewest_putts_date=bests.get("fewest_putts_date"),
         ))
 
     @app.route("/season")

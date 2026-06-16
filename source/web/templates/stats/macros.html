@@ -1,0 +1,113 @@
+{% macro CatTabs(active) %}
+<div class="ps-chip-group">
+  {% set tabs = [
+    ("scoring", "Scoring"), ("penalties", "Penalties"), ("fairways", "Fairways"),
+    ("greens", "Greens"), ("putting", "Putting"), ("short-game", "Short Game"),
+    ("momentum", "Momentum"), ("trends", "Trends"), ("bests", "Bests"),
+  ] %}
+  {% for slug, label in tabs %}
+  <a href="/stats/{{ slug }}" class="ps-chip{% if slug == active %} is-active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro HeroBand(value, label, delta=None, delta_dir=None, unit="", precision=1) %}
+<div class="ps-hero-band">
+  <div class="ps-hero-num">
+    {% if value is not none %}
+    <span class="ps-hero-val">{{ "{:.{p}f}".format(value, p=precision) }}</span>
+    {% if unit %}<span class="ps-hero-unit">{{ unit }}</span>{% endif %}
+    {% else %}
+    <span class="ps-hero-val">&mdash;</span>
+    {% endif %}
+  </div>
+  <div class="ps-eyebrow">{{ label }}</div>
+  {% if delta is not none %}
+  <div class="ps-stat-delta{% if delta_dir == 'up' %} is-up{% elif delta_dir == 'down' %} is-down{% endif %}">{{ delta }}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro StatStrip(items) %}
+<div class="ps-stat-strip">
+  {% for item in items %}
+  <div class="ps-stat">
+    <div class="ps-eyebrow">{{ item.label }}</div>
+    <div class="ps-stat-v">
+      {% if item.value is not none %}
+      {{ item.value }}{% if item.suffix %}<span class="ps-suffix">{{ item.suffix }}</span>{% endif %}
+      {% else %}
+      &mdash;
+      {% endif %}
+    </div>
+    {% if item.delta is not none %}
+    <div class="ps-stat-delta{% if item.delta_dir == 'up' %} is-up{% elif item.delta_dir == 'down' %} is-down{% endif %}">{{ item.delta }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro DistSection(title, bars, footer_rows=None) %}
+<div class="stats-section">
+  <div class="ps-eyebrow">{{ title }}</div>
+  {% if bars %}
+  <div class="stats-dist">
+    {% for bar in bars %}
+    <div class="stats-dist-row">
+      <div class="stats-dist-label">{{ bar.label }}</div>
+      <div class="stats-dist-bar-wrap">
+        <div class="ps-minibar">
+          <div class="ps-minibar-fill" style="width: {{ bar.pct }}%;"></div>
+        </div>
+      </div>
+      <div class="stats-dist-value">{{ bar.display }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if footer_rows %}
+  <div class="stats-dist-footer">
+    {% for row in footer_rows %}
+    <div class="stats-dist-footer-row">
+      <span class="stats-dist-footer-label">{{ row.label }}</span>
+      <span class="stats-dist-footer-value">{{ row.value }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro DRowSection(title, rows) %}
+<div class="stats-section">
+  <div class="ps-eyebrow">{{ title }}</div>
+  {% if rows %}
+  <div class="stats-drows">
+    {% for row in rows %}
+    <div class="stats-drow">
+      <span class="stats-drow-label">{{ row.label }}</span>
+      {% if row.value is not none %}
+      <span class="stats-drow-value">{{ row.value }}{% if row.suffix %}<span class="ps-suffix"> {{ row.suffix }}</span>{% endif %}</span>
+      {% else %}
+      <span class="stats-drow-value">&mdash;</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro PageShell(title, accent, back_link="/stats") %}
+<div class="ps-topbar">
+  <div>
+    <div class="ps-eyebrow"><a href="{{ back_link }}" class="ps-back-link">&larr; Stats</a></div>
+    <h1 class="ps-h1">{{ title }} <span class="ps-h1-accent">{{ accent }}</span></h1>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro Footnote(text) %}
+<div class="stats-footnote">{{ text }}</div>
+{% endmacro %}
