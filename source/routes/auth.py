@@ -8,7 +8,7 @@ from store import verify_user, get_user, real_user_count, create_user, is_invite
 
 def register_auth_routes(app, limiter, User):
     @app.route("/login", methods=["GET", "POST"])
-    @limiter.limit("5 per minute")
+    @limiter.limit("15 per minute")
     def login_page():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
@@ -32,7 +32,7 @@ def register_auth_routes(app, limiter, User):
         return render_template("login.html", error=None)
 
     @app.route("/register", methods=["GET", "POST"])
-    @limiter.limit("5 per minute")
+    @limiter.limit("15 per minute")
     def register_page():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
@@ -82,7 +82,7 @@ def register_auth_routes(app, limiter, User):
         return redirect(url_for("login_page"))
 
     @app.route("/reset-password", methods=["GET", "POST"])
-    @limiter.limit("5 per minute")
+    @limiter.limit("15 per minute")
     def reset_password():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
