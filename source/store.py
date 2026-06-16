@@ -227,6 +227,16 @@ def update_round_handicap(date: str, index: int, handicap: float, user_id: int) 
     db.close()
 
 
+def update_round_differential(date: str, index: int, differential: float, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+        (str(differential), user_id, date, index),
+    )
+    db.commit()
+    db.close()
+
+
 def recompute_all_handicaps() -> None:
     users = get_users()
     if not users:
@@ -239,6 +249,8 @@ def recompute_all_handicaps() -> None:
     t0 = time.time()
     total_rounds = 0
     total_updated = 0
+
+    courses_data = get_courses()
 
     for u in users:
         uid = u["id"]
@@ -253,15 +265,37 @@ def recompute_all_handicaps() -> None:
 
             chronological = list(reversed(all_rounds))
             user_updated = 0
+            db = get_db()
 
             for i, r in enumerate(chronological):
+                if not r.differential or r.differential == "0":
+                    course_data = courses_data.get(r.course)
+                    if course_data:
+                        tee_data = course_data.get("tees", {}).get(r.tees)
+                        if tee_data and r.total_gross and r.total_gross != "0":
+                            slope, rating = get_slope_rating(tee_data, r.holes_selection)
+                            diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                            str_diff = str(diff)
+                            if r.differential != str_diff:
+                                db.execute(
+                                    "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+                                    (str_diff, uid, r.date, r.index),
+                                )
+                                user_updated += 1
+
                 window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:
                     new_val = str(hi)
                     if r.computed_handicap != new_val:
-                        update_round_handicap(r.date, r.index, hi, uid)
+                        db.execute(
+                            "UPDATE rounds SET computed_handicap = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+                            (str(hi), uid, r.date, r.index),
+                        )
                         user_updated += 1
+
+            db.commit()
+            db.close()
 
             total_rounds += len(chronological)
             total_updated += user_updated
