@@ -18,11 +18,12 @@ _repo_root = str(Path(__file__).resolve().parent.parent)
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-from flask import Flask, request, g
+from flask import Flask, request, g, jsonify, redirect, url_for
 
 from database import set_db_path, init_db
 from store import (
     get_user_by_id,
+    get_user_by_api_key,
 )
 
 from source.plugin import _plugins
@@ -75,6 +76,42 @@ class User:
 def _load_user(user_id):
     user_dict = get_user_by_id(int(user_id))
     return User(user_dict) if user_dict else None
+
+
+@login_manager.request_loader
+def _load_user_from_request(req):
+    """Resolve `Authorization: Bearer psk_...` to a User (UC-APIKEY-001).
+
+    Additive: returns None on any missing/invalid key so Flask-Login falls
+    through to the session user_loader. Session cookies always take precedence
+    (Flask-Login only calls this when no session user is present), so existing
+    web-UI auth is unchanged. The key-derived identity is forced non-admin so a
+    key — even an admin user's key — can never reach an admin route.
+    """
+    auth_header = req.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    key = auth_header[len("Bearer "):].strip()
+    if not key.startswith("psk_"):
+        return None
+    user_dict = get_user_by_api_key(key)
+    if not user_dict:
+        return None
+    user = User(user_dict)
+    user.is_admin = False              # keys are never admin (admin stays session-only)
+    user.via_api_key = True
+    user.api_permissions = user_dict.get("permissions", [])
+    return user
+
+
+@login_manager.unauthorized_handler
+def _unauthorized():
+    """Return a true 401 for bearer (API) callers; preserve the 302 -> login
+    redirect for the web UI. Without this, a revoked/expired key would receive
+    the HTML login redirect instead of a 401."""
+    if request.headers.get("Authorization", "").startswith("Bearer psk_"):
+        return jsonify({"error": "unauthorized"}), 401
+    return redirect(url_for("login_page", next=request.path))
 
 
 from source.extensions import init_app

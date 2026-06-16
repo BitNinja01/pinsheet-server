@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import logging
 import secrets
@@ -930,3 +931,147 @@ def get_distinct_club_field_values(field: str) -> list[str]:
     ).fetchall()
     db.close()
     return [r[field] for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# API keys (UC-APIKEY-001 / GAP-024) — hand-rolled, stdlib only.
+# Store ONLY the sha256 hash + a short non-secret prefix; the plaintext key
+# (psk_<token_urlsafe>) is shown exactly once at creation and never persisted
+# or logged. Lookup is constant-time via hmac.compare_digest.
+# ---------------------------------------------------------------------------
+
+API_KEY_PERMISSIONS = ("rounds:read", "rounds:write", "stats:read", "courses:write")
+
+# Fixed-length dummy hash compared on the "key not found" path so an unknown key
+# runs the same constant-time comparison as a known one (no existence timing oracle).
+_SENTINEL_KEY_HASH = hashlib.sha256(b"pinsheet-api-key-sentinel").hexdigest()
+
+
+def _hash_api_key(plaintext: str) -> str:
+    return hashlib.sha256(plaintext.encode()).hexdigest()
+
+
+def _split_permissions(raw: str) -> list[str]:
+    return [p for p in (raw or "").split(",") if p]
+
+
+def _api_key_expired(expires_at: str | None) -> bool:
+    """Tolerant expiry check that fails closed. Accepts ISO-8601 strings whether
+    stored with a 'T' or space separator (SQLite datetime('now')) or a 'Z' suffix."""
+    if not expires_at:
+        return False
+    raw = expires_at.strip().replace(" ", "T").rstrip("Z")
+    try:
+        return datetime.fromisoformat(raw) <= datetime.utcnow()
+    except ValueError:
+        return True  # malformed expiry — treat as expired
+
+
+def create_api_key(user_id: int, label: str, permissions, expires_at: str | None = None) -> tuple[str, dict]:
+    """Mint a new key. Returns (plaintext, metadata). The plaintext is returned
+    exactly once here and is never stored or logged — only its sha256 hash and a
+    short non-secret prefix are persisted."""
+    plaintext = "psk_" + secrets.token_urlsafe(32)
+    key_hash = _hash_api_key(plaintext)
+    prefix = plaintext[:12]  # non-secret display fragment (e.g. "psk_Abc12Xy")
+    if isinstance(permissions, (list, tuple)):
+        perms = [p for p in permissions if p in API_KEY_PERMISSIONS]
+        permissions = ",".join(perms)
+    else:
+        permissions = permissions or ""
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO api_keys (user_id, label, key_hash, prefix, permissions, expires_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, label, key_hash, prefix, permissions, expires_at),
+    )
+    db.commit()
+    key_id = cur.lastrowid
+    db.close()
+    _log.info("api_key created: id=%s user_id=%s prefix=%s", key_id, user_id, prefix)
+    meta = {
+        "id": key_id,
+        "user_id": user_id,
+        "label": label,
+        "prefix": prefix,
+        "permissions": _split_permissions(permissions),
+        "expires_at": expires_at,
+    }
+    return plaintext, meta
+
+
+def list_api_keys(user_id: int) -> list[dict]:
+    """Return metadata for a user's keys. Never returns key_hash or plaintext."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, label, prefix, permissions, created_at, last_used_at, expires_at, revoked_at "
+        "FROM api_keys WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,),
+    ).fetchall()
+    db.close()
+    return [
+        {
+            "id": r["id"],
+            "label": r["label"],
+            "prefix": r["prefix"],
+            "permissions": _split_permissions(r["permissions"]),
+            "created_at": r["created_at"],
+            "last_used_at": r["last_used_at"],
+            "expires_at": r["expires_at"],
+            "revoked_at": r["revoked_at"],
+        }
+        for r in rows
+    ]
+
+
+def revoke_api_key(key_id: int, user_id: int) -> bool:
+    """Owner-scoped revocation. Returns True iff a live key owned by user_id was revoked."""
+    db = get_db()
+    cur = db.execute(
+        "UPDATE api_keys SET revoked_at = datetime('now') "
+        "WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+        (key_id, user_id),
+    )
+    db.commit()
+    changed = cur.rowcount
+    db.close()
+    return changed > 0
+
+
+def get_user_by_api_key(plaintext: str) -> dict | None:
+    """Resolve a bearer key to its owning user dict (+ granted permissions), or None.
+    Rejects unknown, revoked, and expired keys. Constant-time hash comparison."""
+    if not plaintext or not plaintext.startswith("psk_"):
+        return None
+    key_hash = _hash_api_key(plaintext)
+    db = get_db()
+    row = db.execute(
+        "SELECT id, user_id, key_hash, permissions, expires_at, revoked_at "
+        "FROM api_keys WHERE key_hash = ?",
+        (key_hash,),
+    ).fetchone()
+    # Constant-time compare on BOTH paths: an unknown key is compared against a
+    # fixed sentinel so it cannot be distinguished from a known key by timing.
+    stored_hash = row["key_hash"] if row is not None else _SENTINEL_KEY_HASH
+    matches = hmac.compare_digest(stored_hash.encode(), key_hash.encode())
+    if row is None or not matches:
+        db.close()
+        return None
+    if row["revoked_at"]:
+        db.close()
+        return None
+    if _api_key_expired(row["expires_at"]):
+        db.close()
+        return None
+    db.execute("UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ?", (row["id"],))
+    db.commit()
+    user_id = row["user_id"]
+    permissions = row["permissions"]
+    db.close()
+    user = get_user_by_id(user_id)
+    if not user:
+        _log.warning("api_key id=%s: key_hash matched but user_id=%s not found", row["id"], user_id)
+        return None
+    user["is_admin"] = False  # keys are never admin — enforced at the store layer too
+    user["permissions"] = _split_permissions(permissions)
+    return user
