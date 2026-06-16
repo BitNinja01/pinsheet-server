@@ -177,6 +177,17 @@ def test_score_components_excludes_n_fairway(make_course):
     assert result["scramble"] is None
 
 
+def test_score_components_blank_fairway_counts_as_approach(make_course):
+    from source.models import dict_to_round
+    holes = {"1": {"gross": "4", "putts": "2", "fairway": "", "gir": "H", "penalties": "0"}}
+    rounds = [dict_to_round({"date": "2026-01-01", "course": "Test GC", "tees": "White",
+                             "holes_selection": "all", "total_gross": "4", "holes": holes})]
+    courses = make_course()
+    result = calc_score_components(rounds, courses)
+    assert result["approach"] == 0.0
+    assert result["scramble"] is None
+
+
 def test_penalty_stats_empty():
     result = calc_penalty_stats([], {})
     assert result["rate_per_round"] is None
