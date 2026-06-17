@@ -6,6 +6,7 @@
     <title>PinSheet</title>
     <link rel="stylesheet" href="/static/app.css">
     {% if plugin_blocks.get("head") %}{{ plugin_blocks["head"]|safe }}{% endif %}
+    {% block extra_head %}{% endblock %}
 </head>
 <body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
     <div class="ps-layout">

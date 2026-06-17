@@ -1154,7 +1154,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // --- Date step ---
-    document.getElementById('round-date').addEventListener('blur', function () {
+    var dateInput = document.getElementById('round-date');
+    if (typeof flatpickr !== 'undefined') {
+        flatpickr(dateInput, {
+            dateFormat: 'Y-m-d',
+            allowInput: true,
+            onChange: function (selectedDates, dateStr) {
+                if (dateStr) showStep('course');
+            },
+        });
+    }
+    dateInput.addEventListener('blur', function () {
         if (this.value) showStep('course');
     });
 

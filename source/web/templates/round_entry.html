@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/flatpickr.min.css">
+{% endblock %}
 {% block content %}
 <script>
 window._courses = {{ courses|tojson }};
@@ -107,4 +110,5 @@ window._courses = {{ courses|tojson }};
         <button class="btn btn-accent" id="submit-round" style="margin-top:0.75rem">Save Round</button>
     </div>
 </div>
+<script src="/static/flatpickr.min.js"></script>
 {% endblock %}
