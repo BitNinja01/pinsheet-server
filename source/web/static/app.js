@@ -425,7 +425,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!course) return;
         var teeSelect = document.getElementById('round-tee');
         teeSelect.innerHTML = '<option value="">Select tees...</option>';
-        (Object.keys(course.tees || {})).forEach(function (name) {
+        var names = Object.keys(course.tees || {});
+        names.sort(function (a, b) {
+            return (parseInt(course.tees[b].yardage) || 0) - (parseInt(course.tees[a].yardage) || 0);
+        });
+        names.forEach(function (name) {
             var opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;

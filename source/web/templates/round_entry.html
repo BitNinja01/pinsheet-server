@@ -21,8 +21,8 @@ window._courses = {{ courses|tojson }};
 
     <div class="wizard-step" data-step="date">
         <label class="step-label">Date</label>
-        <input type="date" class="step-input" id="round-date"
-               value="{{ today }}">
+        <input type="text" class="step-input" id="round-date"
+               placeholder="YYYY-MM-DD" value="{{ today }}">
     </div>
 
     <div class="wizard-step" data-step="course">
