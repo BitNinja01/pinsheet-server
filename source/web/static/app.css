@@ -659,7 +659,7 @@ a:hover { color: var(--ps-accent); }
     border-color: var(--ps-accent);
 }
 textarea.step-input { resize: vertical; }
-#round-date { accent-color: var(--ps-accent); }
+#round-date { accent-color: var(--ps-accent); color-scheme: light; }
 .radio-group { display: flex; gap: 1.5rem; }
 .radio-group label {
     font-family: var(--ps-font-body);
