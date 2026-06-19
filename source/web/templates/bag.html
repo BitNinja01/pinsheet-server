@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+.bag-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: var(--ps-sp-3); border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+}
+.bag-title { font-family: var(--ps-font-mono); font-size: var(--ps-fs-h1); font-weight: var(--ps-fw-body); line-height: var(--ps-lh-heading); letter-spacing: var(--ps-tracking-display); }
+.bag-right { display: flex; align-items: center; gap: var(--ps-sp-6); }
+.bag-stat { display: flex; flex-direction: column; gap: 2px; }
+.bag-stat-l { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: var(--ps-tracking-eyebrow); text-transform: uppercase; color: var(--ps-ink-3); }
+.bag-stat-v { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-bold); color: var(--ps-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bag-tabs { display: flex; gap: 0; border-bottom: var(--ps-rule) solid var(--ps-rule-c); }
+.bag-tab { font-family: var(--ps-font-mono); font-size: var(--ps-fs-eyebrow); font-weight: var(--ps-fw-label); letter-spacing: var(--ps-tracking-eyebrow); text-transform: uppercase; color: var(--ps-ink-3); text-decoration: none; padding: var(--ps-sp-3) var(--ps-sp-5); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.bag-tab:hover { color: var(--ps-ink); }
+.bag-tab.is-active { color: var(--ps-ink); border-bottom-color: var(--ps-accent); }
+.bag-body { display: flex; flex-direction: column; gap: var(--ps-sp-6); flex: 1; min-height: 0; }
+.bag-section { display: flex; flex-direction: column; gap: var(--ps-sp-3); }
+.bag-section + .bag-section { border-top: var(--ps-rule) solid var(--ps-rule-c); padding-top: var(--ps-sp-6); }
+.btile-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: var(--ps-rule) solid var(--ps-rule-c); border-left: var(--ps-rule) solid var(--ps-rule-c); }
+.btile { border-right: var(--ps-rule) solid var(--ps-rule-c); border-bottom: var(--ps-rule) solid var(--ps-rule-c); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 196px; text-align: left; }
+.btile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ps-sp-2); }
+.btile-club { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-bold); letter-spacing: 0.01em; white-space: nowrap; }
+.btile-loft { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-3); margin-left: 6px; }
+.btile-tr { display: flex; align-items: center; gap: var(--ps-sp-2); flex: 0 0 auto; }
+.btile-sw { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); font-weight: var(--ps-fw-label); letter-spacing: var(--ps-tracking-chip); color: var(--ps-ink-2); border: var(--ps-rule) solid var(--ps-rule-c); padding: 2px 6px; }
+.btile-x { appearance: none; background: none; border: 0; color: var(--ps-ink-3); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.btile-x:hover { color: var(--ps-warn); }
+.btile-carry { font-family: var(--ps-font-display); font-weight: var(--ps-fw-thin); font-size: 50px; line-height: 0.95; letter-spacing: var(--ps-tracking-tight); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 5px; }
+.btile-cyd { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); font-weight: var(--ps-fw-body); color: var(--ps-ink-3); letter-spacing: 0; }
+.btile-gap { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-meta); font-weight: var(--ps-fw-strong); color: var(--ps-accent); margin-left: auto; align-self: flex-start; }
+.btile-spec { display: flex; flex-direction: column; gap: 4px; margin-top: auto; border-top: var(--ps-rule) solid var(--ps-rule-c); padding-top: 9px; }
+.brow { display: flex; align-items: baseline; gap: 6px; }
+.brow-l { font-family: var(--ps-font-mono); font-size: 9px; letter-spacing: var(--ps-tracking-chip); text-transform: uppercase; color: var(--ps-ink-3); width: 34px; flex: 0 0 auto; }
+.brow-v { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-2); letter-spacing: 0.01em; white-space: nowrap; }
+.btile.empty { appearance: none; background: none; cursor: pointer; align-items: center; justify-content: center; gap: 6px; outline: 1px dashed var(--ps-rule-c); outline-offset: -10px; border-top: 0; border-left: 0; }
+.btile.empty:hover { outline-color: var(--ps-accent); }
+.empty-eyebrow { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: var(--ps-tracking-eyebrow); text-transform: uppercase; color: var(--ps-ink-3); }
+.empty-add { font-family: var(--ps-font-mono); font-size: var(--ps-fs-eyebrow); color: var(--ps-ink); white-space: nowrap; }
+.btile.empty:hover .empty-add { color: var(--ps-accent); }
+.picker-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.picker { width: 560px; max-height: 720px; background: var(--ps-paper-2); border: var(--ps-rule) solid var(--ps-ink); display: flex; flex-direction: column; }
+.picker-head { display: flex; justify-content: space-between; align-items: center; padding: var(--ps-sp-4) var(--ps-sp-5); border-bottom: var(--ps-rule) solid var(--ps-rule-c); }
+.picker-list { overflow-y: auto; }
+.picker-row { appearance: none; width: 100%; background: none; border: 0; border-bottom: var(--ps-rule) solid var(--ps-rule-c); display: grid; grid-template-columns: 1fr 1fr auto; align-items: baseline; gap: var(--ps-sp-4); padding: var(--ps-sp-3) var(--ps-sp-5); cursor: pointer; text-align: left; }
+.picker-row:hover { background: var(--ps-accent-dim); }
+.picker-club { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-bold); color: var(--ps-ink); }
+.picker-loft { font-size: var(--ps-fs-micro); color: var(--ps-ink-3); margin-left: var(--ps-sp-2); }
+.picker-spec { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-3); letter-spacing: 0.02em; }
+.picker-carry { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-meta); color: var(--ps-ink); font-variant-numeric: tabular-nums; text-align: right; }
+.picker-empty { padding: var(--ps-sp-7) var(--ps-sp-5); font-size: var(--ps-fs-eyebrow); color: var(--ps-ink-3); line-height: 1.5; }
+.gapband-head { display: flex; align-items: baseline; gap: var(--ps-sp-4); margin-bottom: var(--ps-sp-1); }
+.gapband-note { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-3); letter-spacing: 0.03em; }
+.gapband-note .mint { color: var(--ps-accent); font-weight: var(--ps-fw-strong); }
+.eqcards { display: flex; flex-direction: column; gap: var(--ps-sp-5); }
+.eqcat { display: flex; flex-direction: column; gap: 10px; }
+.eqcat-header { display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px; border-bottom: var(--ps-rule) solid var(--ps-ink); }
+.eqcat-count { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-3); }
+.eqcat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; padding: 1px 0 0 1px; }
+.ecard { border: var(--ps-rule) solid var(--ps-rule-c); margin: -1px 0 0 -1px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 228px; }
+.ecard-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ps-sp-2); }
+.ecard-club { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-bold); letter-spacing: 0.01em; white-space: nowrap; }
+.ecard-loft { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); color: var(--ps-ink-3); margin-left: 6px; }
+.ecard-carry { font-family: var(--ps-font-display); font-weight: var(--ps-fw-thin); font-size: 50px; line-height: 0.95; letter-spacing: var(--ps-tracking-tight); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 5px; }
+.ecard-cyd { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); font-weight: var(--ps-fw-body); color: var(--ps-ink-3); letter-spacing: 0; }
+.ecard-spec { display: flex; flex-direction: column; gap: 4px; margin-top: auto; border-top: var(--ps-rule) solid var(--ps-rule-c); padding-top: 9px; }
+.ecard-foot { margin-top: 0; display: flex; gap: var(--ps-sp-2); align-items: center; }
+.ebtn { appearance: none; font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: var(--ps-tracking-chip); text-transform: uppercase; padding: 5px 10px; border: var(--ps-rule) solid var(--ps-rule-c); background: none; color: var(--ps-ink-2); cursor: pointer; white-space: nowrap; }
+.ebtn:hover:not(:disabled) { border-color: var(--ps-ink); color: var(--ps-ink); }
+.ebtn:disabled { opacity: 0.4; cursor: default; }
+.ebtn.in { color: var(--ps-accent); border-color: color-mix(in oklab, var(--ps-accent) 50%, transparent); }
+.ebtn.in:hover { color: var(--ps-warn); border-color: var(--ps-warn); }
+.edit { outline: none; cursor: text; border-bottom: 1px solid transparent; padding: 0 1px; transition: background var(--ps-dur-quick) var(--ps-ease), border-color var(--ps-dur-quick) var(--ps-ease); }
+.edit:hover { border-bottom-color: var(--ps-rule-c); }
+.edit:focus { border-bottom-color: var(--ps-accent); background: var(--ps-accent-dim); }
+@media (max-width: 768px) {
+    .btile-grid { grid-template-columns: repeat(2, 1fr); }
+    .eqcat-grid { grid-template-columns: repeat(2, 1fr); }
+    .bag-right { flex-wrap: wrap; gap: var(--ps-sp-3); }
+    .bag-stat-v { font-size: var(--ps-fs-micro); }
+    .picker { width: 90vw; max-height: 80vh; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="bag-topbar">
+    <div class="bag-title">Your bag</div>
+    <div class="bag-right" id="bag-stats">
+        <div class="bag-stat"><span class="bag-stat-l">in bag</span><span class="bag-stat-v" id="bag-count">{{ slots|length }} / {{ bag_size }}</span></div>
+        <div class="bag-stat"><span class="bag-stat-l">owned</span><span class="bag-stat-v">{{ clubs|length }}</span></div>
+        <a class="ps-btn ps-btn--ghost" href="#" id="bag-toggle-view" data-view="sheet">Equipment</a>
+        <button class="ps-btn" id="bag-add-club">+ Add club</button>
+    </div>
+</div>
+<div class="bag-tabs">
+    <span class="bag-tab is-active" data-view="sheet">Bag Sheet</span>
+    <span class="bag-tab" data-view="equip">Equipment</span>
+</div>
+<div class="bag-body" id="bag-body">
+    <div id="bag-sheet-view">
+        <div class="bag-section">
+            <div class="gapband-head">
+                <span class="ps-eyebrow">Clubs</span>
+                <span class="gapband-note">{{ slots|length }} of {{ bag_size }} slots filled</span>
+            </div>
+            <div class="btile-grid" id="bag-grid">
+                {% for i in range(bag_size) %}
+                {% set sid = slots[i] if i < slots|length else none %}
+                {% set c = clubs_by_id.get(sid) if sid else none %}
+                {% if c %}
+                <div class="btile" data-slot="{{ i }}" data-club-id="{{ c.id }}">
+                    <div class="btile-top">
+                        <div class="btile-name">
+                            <span class="btile-club">{{ c.club }}</span>
+                            <span class="btile-loft">{{ c.loft }}</span>
+                        </div>
+                        <div class="btile-tr">
+                            <span class="btile-sw">{{ c.sw }}</span>
+                            <button class="btile-x" type="button" title="remove from bag" data-action="clear-slot" data-slot="{{ i }}">×</button>
+                        </div>
+                    </div>
+                    <div class="btile-carry">
+                        {% if c.category == 'Putter' %}<span class="btile-cyd">—</span>
+                        {% else %}<span class="edit btile-carry-num" data-field="carry" data-club-id="{{ c.id }}">{{ c.carry if c.carry else '' }}</span>{% endif %}
+                        <span class="btile-cyd">{{ 'putter' if c.category == 'Putter' else 'yd' }}</span>
+                        <span class="btile-gap" data-gap-for="{{ c.id }}"></span>
+                    </div>
+                    <div class="btile-spec">
+                        {% for label, field in [('grip', 'grip'), ('shaft', 'shaft'), ('head', 'head')] %}
+                        <div class="brow"><span class="brow-l">{{ label }}</span><span class="brow-v">{{ c[field] if c[field] else '—' }}</span></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="btile empty" data-slot="{{ i }}">
+                    <span class="empty-eyebrow">empty slot</span>
+                    <span class="empty-add">+ assign club</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="bag-section">
+            <div class="gapband-head">
+                <span class="ps-eyebrow">Gapping</span>
+                <span class="gapband-note" id="gapping-note"></span>
+            </div>
+            <svg id="gapping-svg" viewBox="0 0 1600 310" width="100%" style="display:block" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+    </div>
+    <div id="bag-equip-view" style="display:none">
+        <div class="eqcards">
+            {% for cat in cat_order %}
+            {% set cat_clubs = clubs|selectattr('category', 'equalto', cat)|list %}
+            {% if cat_clubs %}
+            <div class="eqcat">
+                <div class="eqcat-header"><span class="ps-eyebrow">{{ cat }}</span><span class="eqcat-count">{{ cat_clubs|length }}</span></div>
+                <div class="eqcat-grid">
+                    {% for c in cat_clubs %}
+                    <div class="ecard" data-club-id="{{ c.id }}">
+                        <div class="ecard-top">
+                            <div class="btile-name">
+                                <span class="edit ecard-club" data-field="club" data-club-id="{{ c.id }}">{{ c.club }}</span>
+                                <span class="edit ecard-loft" data-field="loft" data-club-id="{{ c.id }}">{{ c.loft }}</span>
+                            </div>
+                            <span class="edit btile-sw" data-field="sw" data-club-id="{{ c.id }}">{{ c.sw }}</span>
+                        </div>
+                        <div class="ecard-carry">
+                            {% if c.category == 'Putter' %}<span class="ecard-cyd">—</span>
+                            {% else %}<span class="edit ecard-carry-num" data-field="carry" data-club-id="{{ c.id }}">{{ c.carry if c.carry else '' }}</span>{% endif %}
+                            <span class="ecard-cyd">{{ 'putter' if c.category == 'Putter' else 'yd' }}</span>
+                        </div>
+                        <div class="ecard-spec">
+                            {% for label, field in [('head', 'head'), ('shaft', 'shaft'), ('grip', 'grip')] %}
+                            <div class="brow"><span class="brow-l">{{ label }}</span><span class="edit brow-v" data-field="{{ field }}" data-club-id="{{ c.id }}">{{ c[field] if c[field] else '—' }}</span></div>
+                            {% endfor %}
+                        </div>
+                        <div class="ecard-foot">
+                            <button class="ebtn bag-status-btn" data-club-id="{{ c.id }}">add to bag</button>
+                            <button class="ebtn" data-action="delete-club" data-club-id="{{ c.id }}">Delete</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<div id="picker-overlay" style="display:none">
+    <div class="picker-scrim">
+        <div class="picker">
+            <div class="picker-head">
+                <span class="ps-eyebrow">Assign club</span>
+                <button class="btile-x" type="button" id="picker-close">×</button>
+            </div>
+            <div class="picker-list" id="picker-list"></div>
+        </div>
+    </div>
+</div>
+<script>
+var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
+function saveAllSlots() {
+    fetch('/bag/slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: BAG.slots }) });
+}
+function saveClub(id, field, value) {
+    var c = BAG.clubs[id];
+    if (!c) { c = { id: id, category: 'Irons' }; BAG.clubs[id] = c; }
+    c[field] = value;
+    fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
+}
+function addClub() {
+    fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.ok) location.reload(); });
+}
+function assignClub(slot, clubId) {
+    while (BAG.slots.length <= slot) BAG.slots.push(null);
+    BAG.slots[slot] = clubId;
+    saveAllSlots(); renderGrid();
+}
+function clearSlot(slot) {
+    BAG.slots[slot] = null;
+    saveAllSlots(); renderGrid();
+}
+function addToBag(clubId) {
+    var idx = -1;
+    for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) { idx = i; break; } }
+    if (idx < 0 && BAG.slots.length < BAG.bagSize) idx = BAG.slots.length;
+    if (idx >= 0) { BAG.slots[idx] = clubId; saveAllSlots(); renderGrid(); }
+}
+function removeFromBag(clubId) {
+    for (var i = 0; i < BAG.slots.length; i++) { if (BAG.slots[i] === clubId) BAG.slots[i] = null; }
+    saveAllSlots(); renderGrid(); renderEquipButtons();
+}
+function inBag(clubId) { for (var i = 0; i < BAG.slots.length; i++) { if (BAG.slots[i] === clubId) return true; } return false; }
+function hasEmpty() { if (BAG.slots.length < BAG.bagSize) return true; for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) return true; } return false; }
+function renderGrid() {
+    var grid = document.getElementById('bag-grid');
+    var html = '';
+    for (var i = 0; i < BAG.bagSize; i++) {
+        var sid = i < BAG.slots.length ? BAG.slots[i] : null;
+        var c = sid && BAG.clubs[sid] ? BAG.clubs[sid] : null;
+        if (c) {
+            var isP = c.category === 'Putter';
+            html += '<div class="btile" data-slot="' + i + '" data-club-id="' + c.id + '">' +
+                '<div class="btile-top"><div class="btile-name"><span class="btile-club">' + esc(c.club) + '</span><span class="btile-loft">' + esc(c.loft) + '</span></div>' +
+                '<div class="btile-tr"><span class="btile-sw">' + esc(c.sw) + '</span><button class="btile-x" type="button" title="remove from bag" data-action="clear-slot" data-slot="' + i + '">×</button></div></div>' +
+                '<div class="btile-carry">' +
+                (isP ? '<span class="btile-cyd">—</span>' : '<span class="edit btile-carry-num" data-field="carry" data-club-id="' + c.id + '">' + (c.carry || '') + '</span>') +
+                ' <span class="btile-cyd">' + (isP ? 'putter' : 'yd') + '</span>' +
+                '<span class="btile-gap" data-gap-for="' + c.id + '"></span></div>' +
+                '<div class="btile-spec">' +
+                ['grip','shaft','head'].map(function(f){return '<div class=\"brow\"><span class=\"brow-l\">'+f+'</span><span class=\"brow-v\">'+esc(c[f]||'—')+'</span></div>';}).join('') +
+                '</div></div>';
+        } else {
+            html += '<div class="btile empty" data-slot="' + i + '"><span class="empty-eyebrow">empty slot</span><span class="empty-add">+ assign club</span></div>';
+        }
+    }
+    grid.innerHTML = html;
+    bindTileEvents(); updateGaps();
+}
+function renderEquipButtons() {
+    document.querySelectorAll('.bag-status-btn').forEach(function(btn) {
+        var id = btn.dataset.clubId;
+        if (inBag(id)) { btn.textContent = '● in bag'; btn.classList.add('in'); btn.onclick = function(e) { e.preventDefault(); removeFromBag(id); }; }
+        else { btn.textContent = 'add to bag'; btn.classList.remove('in'); btn.disabled = !hasEmpty(); btn.onclick = function(e) { e.preventDefault(); addToBag(id); }; }
+    });
+}
+function updateGaps() {
+    var play = [];
+    for (var i = 0; i < BAG.slots.length; i++) {
+        var sid = BAG.slots[i];
+        var c = sid && BAG.clubs[sid] ? BAG.clubs[sid] : null;
+        if (c && c.carry != null && c.carry > 0) play.push(c);
+    }
+    play.sort(function(a, b) { return b.carry - a.carry; });
+    var gaps = [];
+    for (var i = 0; i < play.length - 1; i++) gaps.push(play[i].carry - play[i + 1].carry);
+    var maxGap = gaps.length ? Math.max.apply(null, gaps) : 0;
+    document.querySelectorAll('[data-gap-for]').forEach(function(el) {
+        var id = el.dataset.gapFor, idx = -1;
+        for (var i = 0; i < play.length - 1; i++) { if (play[i].id === id) { idx = i; break; } }
+        if (idx >= 0) { el.textContent = '+' + gaps[idx]; el.style.color = gaps[idx] === maxGap ? 'var(--ps-accent)' : ''; }
+        else el.textContent = '';
+    });
+    document.getElementById('bag-count').textContent = BAG.slots.filter(Boolean).length + ' / ' + BAG.bagSize;
+    renderGapSVG(play, gaps, maxGap);
+    var note = document.getElementById('gapping-note');
+    note.innerHTML = 'widest <span class="mint">' + maxGap + ' yd</span>';
+    if (play.length > 1 && maxGap > 0) {
+        var wi = gaps.indexOf(maxGap);
+        note.innerHTML += ' · ' + play[wi].club.toLowerCase() + ' → ' + play[wi + 1].club.toLowerCase();
+    }
+    note.innerHTML += ' · putter not plotted';
+}
+function renderGapSVG(play, gaps, maxGap) {
+    var svg = document.getElementById('gapping-svg');
+    var W = 1600, H = 310, pl = 56, pr = W - 56, topY = 78, stemTop = 98, baseY = 240;
+    var carries = play.map(function(c){return c.carry;});
+    var lo = carries.length ? Math.min.apply(null, carries) : 70;
+    var hi = carries.length ? Math.max.apply(null, carries) : 305;
+    var pad = Math.max(16, (hi - lo) * 0.06);
+    var dmin = lo - pad, dmax = hi + pad;
+    function x(v){return pl+((v-dmin)/(dmax-dmin))*(pr-pl);}
+    var lines = [];
+    play.forEach(function(c){lines.push('<line x1="'+x(c.carry)+'" x2="'+x(c.carry)+'" y1="'+stemTop+'" y2="'+baseY+'" stroke="var(--ps-rule-c)" stroke-width="0.75"/>');});
+    play.slice(0,-1).forEach(function(c,i){var a=x(c.carry),b=x(play[i+1].carry),big=gaps[i]===maxGap;lines.push('<line x1="'+a+'" x2="'+b+'" y1="'+baseY+'" y2="'+baseY+'" stroke="'+(big?'var(--ps-accent)':'var(--ps-ink-3)')+'" stroke-width="'+(big?3:1.4)+'"/>');});
+    play.forEach(function(c){lines.push('<text x="'+x(c.carry)+'" y="'+topY+'" text-anchor="middle" font-family="var(--ps-font-display)" font-weight="200" font-size="40" letter-spacing="-0.03em" fill="var(--ps-ink)">'+c.carry+'</text>');});
+    play.forEach(function(c){lines.push('<text x="'+x(c.carry)+'" y="'+(topY+20)+'" text-anchor="middle" font-family="var(--ps-font-mono)" font-size="11" letter-spacing="0.04em" fill="var(--ps-ink-2)">'+c.club.toLowerCase()+'</text>');});
+    play.forEach(function(c){lines.push('<circle cx="'+x(c.carry)+'" cy="'+baseY+'" r="4" fill="var(--ps-paper)" stroke="var(--ps-accent)" stroke-width="1.5"/>');});
+    play.slice(0,-1).forEach(function(c,i){var mid=(x(c.carry)+x(play[i+1].carry))/2,gap=gaps[i],big=gap===maxGap;lines.push('<line x1="'+mid+'" x2="'+mid+'" y1="'+(baseY+6)+'" y2="'+(baseY+13)+'" stroke="var(--ps-rule-c)" stroke-width="0.75"/>');lines.push('<text x="'+mid+'" y="'+(baseY+32)+'" text-anchor="middle" font-family="var(--ps-font-mono)" font-size="13" font-weight="'+(big?600:400)+'" letter-spacing="0.02em" fill="'+(big?'var(--ps-accent)':'var(--ps-ink-3)')+'">'+gap+'</text>');lines.push('<text x="'+mid+'" y="'+(baseY+47)+'" text-anchor="middle" font-family="var(--ps-font-mono)" font-size="8" letter-spacing="0.16em" fill="var(--ps-ink-3)">YD</text>');});
+    svg.innerHTML = lines.join('\n');
+}
+function esc(s){if(!s)return'—';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function bindTileEvents() {
+    document.querySelectorAll('.btile.empty').forEach(function(el){el.onclick=function(){openPicker(parseInt(el.dataset.slot));};});
+    document.querySelectorAll('[data-action="clear-slot"]').forEach(function(el){el.onclick=function(e){e.stopPropagation();clearSlot(parseInt(el.dataset.slot));};});
+    bindEditFields();
+}
+function bindEditFields() {
+    document.querySelectorAll('.edit[data-field][data-club-id]').forEach(function(el) {
+        el.addEventListener('blur', function() {
+            var val = el.textContent.trim();
+            var field = el.dataset.field;
+            if (field === 'carry') { val = val.replace(/[^0-9]/g, ''); el.textContent = val; }
+            saveClub(el.dataset.clubId, field, val);
+            if (field === 'carry') updateGaps();
+        });
+        el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+    });
+}
+function openPicker(slot) {
+    var overlay = document.getElementById('picker-overlay');
+    var list = document.getElementById('picker-list');
+    var avail = [];
+    for (var id in BAG.clubs) {
+        if (BAG.clubs.hasOwnProperty(id) && !inBag(id)) avail.push(BAG.clubs[id]);
+    }
+    if (avail.length) {
+        list.innerHTML = avail.map(function(c) {
+            return '<button class="picker-row" type="button" data-club-id="'+c.id+'">' +
+                '<span class="picker-club">'+esc(c.club)+'<span class="picker-loft">'+esc(c.loft)+'</span></span>' +
+                '<span class="picker-spec">'+esc(c.head)+' · '+esc(c.shaft)+'</span>' +
+                '<span class="picker-carry">'+(c.carry!=null?c.carry+' yd':'—')+'</span></button>';
+        }).join('');
+        list.querySelectorAll('.picker-row').forEach(function(row){row.onclick=function(){assignClub(slot,row.dataset.clubId);closePicker();};});
+    } else {
+        list.innerHTML = '<div class="picker-empty">Every club you own is already in the bag. Add more in Equipment.</div>';
+    }
+    overlay.style.display='block';
+}
+function closePicker(){document.getElementById('picker-overlay').style.display='none';}
+function deleteClub(clubId) {
+    if (!confirm('Delete this club?')) return;
+    fetch('/bag/club/'+clubId+'/delete',{method:'POST'}).then(function(){location.reload();});
+}
+document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.bag-tab').forEach(function(tab){
+        tab.addEventListener('click',function(){
+            document.querySelectorAll('.bag-tab').forEach(function(t){t.classList.remove('is-active');});
+            tab.classList.add('is-active');
+            document.getElementById('bag-sheet-view').style.display=tab.dataset.view==='sheet'?'block':'none';
+            document.getElementById('bag-equip-view').style.display=tab.dataset.view==='equip'?'block':'none';
+        });
+    });
+    document.getElementById('picker-close').onclick=closePicker;
+    document.getElementById('picker-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closePicker();};
+    document.getElementById('bag-add-club').onclick=addClub;
+    document.querySelectorAll('[data-action="delete-club"]').forEach(function(el){el.onclick=function(){deleteClub(el.dataset.clubId);};});
+    bindEditFields(); renderEquipButtons();
+});
+</script>
+{% endblock %}

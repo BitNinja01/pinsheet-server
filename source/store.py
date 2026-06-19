@@ -805,3 +805,72 @@ def complete_challenge(challenge_id: int) -> None:
     db.commit()
     db.close()
     _log.info("challenge completed: id=%s", challenge_id)
+
+
+def get_clubs(user_id: int) -> list[dict]:
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, category, club, loft, head, shaft, grip, sw, carry FROM clubs WHERE user_id = ? ORDER BY category, club",
+        (user_id,),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def save_club(club_data: dict, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        """INSERT OR REPLACE INTO clubs (id, user_id, category, club, loft, head, shaft, grip, sw, carry)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            club_data["id"],
+            user_id,
+            club_data.get("category", "Irons"),
+            club_data.get("club", ""),
+            club_data.get("loft", ""),
+            club_data.get("head", ""),
+            club_data.get("shaft", ""),
+            club_data.get("grip", ""),
+            club_data.get("sw", ""),
+            club_data.get("carry"),
+        ),
+    )
+    db.commit()
+    db.close()
+    _log.info("club saved: %s", club_data["id"])
+
+
+def delete_club(club_id: str, user_id: int) -> None:
+    db = get_db()
+    db.execute("DELETE FROM clubs WHERE id = ? AND user_id = ?", (club_id, user_id))
+    row = db.execute("SELECT slot_ids FROM bag_slots WHERE user_id = ?", (user_id,)).fetchone()
+    if row:
+        slots = json.loads(row["slot_ids"])
+        slots = [s for s in slots if s != club_id]
+        db.execute(
+            "UPDATE bag_slots SET slot_ids = ? WHERE user_id = ?",
+            (json.dumps(slots), user_id),
+        )
+    db.commit()
+    db.close()
+    _log.info("club deleted: %s", club_id)
+
+
+def get_bag_slots(user_id: int) -> list[str]:
+    db = get_db()
+    row = db.execute("SELECT slot_ids FROM bag_slots WHERE user_id = ?", (user_id,)).fetchone()
+    db.close()
+    if row:
+        return json.loads(row["slot_ids"])
+    return []
+
+
+def save_bag_slots(slot_ids: list, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "INSERT OR REPLACE INTO bag_slots (user_id, slot_ids) VALUES (?, ?)",
+        (user_id, json.dumps(slot_ids)),
+    )
+    db.commit()
+    db.close()
+    _log.info("bag slots saved for user_id=%s", user_id)
