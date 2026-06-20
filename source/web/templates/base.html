@@ -43,6 +43,7 @@
                 </nav>
                 {% if plugin_nav %}
                 <nav class="ps-nav ps-nav-plugins">
+                    <span class="ps-nav-label">Plugins</span>
                     {% for item in plugin_nav %}
                     <a href="{{ item.url }}" class="{% if current_page == item.page_id %}is-active{% endif %}">
                         {{ item.label }}
