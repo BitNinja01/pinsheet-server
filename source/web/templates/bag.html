@@ -251,8 +251,8 @@
                     </div>
                 </div>
                 <label class="acf-field"><span class="acf-label">number</span><input class="acf-input" type="text" id="acf-number" placeholder="e.g. 4" autofocus></label>
-                <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" placeholder="e.g. titleist"></label>
-                <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" placeholder="e.g. t100"></label>
+                <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" list="dl-brand" placeholder="e.g. titleist"></label>
+                <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" list="dl-model" placeholder="e.g. t100"></label>
                 <label class="acf-field"><span class="acf-label">loft</span><input class="acf-input" type="text" id="acf-loft" placeholder="e.g. 23°"></label>
                 <div class="acf-field">
                     <span class="acf-label">lie</span>
@@ -270,9 +270,9 @@
                 </div>
                 <label class="acf-field"><span class="acf-label">length</span><input class="acf-input" type="text" id="acf-length" placeholder="e.g. 38.5"></label>
                 <label class="acf-field"><span class="acf-label">shaft flex</span><input class="acf-input" type="text" id="acf-shaft_flex" placeholder="e.g. stiff"></label>
-                <label class="acf-field"><span class="acf-label">shaft brand</span><input class="acf-input" type="text" id="acf-shaft_brand" placeholder="e.g. project x"></label>
-                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. 6.5"></label>
-                <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" placeholder="e.g. tour velvet"></label>
+                <label class="acf-field"><span class="acf-label">shaft brand</span><input class="acf-input" type="text" id="acf-shaft_brand" list="dl-shaft_brand" placeholder="e.g. project x"></label>
+                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" list="dl-shaft" placeholder="e.g. 6.5"></label>
+                <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" list="dl-grip" placeholder="e.g. tour velvet"></label>
                 <label class="acf-field"><span class="acf-label">swing wt</span><input class="acf-input" type="text" id="acf-sw" placeholder="e.g. D2"></label>
                 <label class="acf-field"><span class="acf-label">carry · yd</span><input class="acf-input" type="text" id="acf-carry" placeholder="e.g. 205"></label>
             </div>
@@ -283,6 +283,11 @@
         </div>
     </div>
 </div>
+<datalist id="dl-brand">{% for v in autocomplete_data.brand %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="dl-model">{% for v in autocomplete_data.model %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="dl-shaft_brand">{% for v in autocomplete_data.shaft_brand %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="dl-shaft">{% for v in autocomplete_data.shaft %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="dl-grip">{% for v in autocomplete_data.grip %}<option value="{{ v }}">{% endfor %}</datalist>
 <script>
 var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
 var _editingClubId = null;

@@ -880,3 +880,15 @@ def save_bag_slots(slot_ids: list, user_id: int) -> None:
     db.commit()
     db.close()
     _log.info("bag slots saved for user_id=%s", user_id)
+
+
+def get_distinct_club_field_values(field: str) -> list[str]:
+    SAFE = {"brand", "model", "shaft_brand", "shaft", "grip"}
+    if field not in SAFE:
+        return []
+    db = get_db()
+    rows = db.execute(
+        f"SELECT DISTINCT {field} FROM clubs WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}"
+    ).fetchall()
+    db.close()
+    return [r[field] for r in rows]

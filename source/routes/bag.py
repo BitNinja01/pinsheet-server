@@ -6,7 +6,7 @@ import string
 from flask import render_template, request, jsonify
 from flask_login import login_required, current_user
 
-from store import get_clubs, save_club, delete_club, get_bag_slots, save_bag_slots
+from store import get_clubs, save_club, delete_club, get_bag_slots, save_bag_slots, get_distinct_club_field_values
 from source.request_data import base_context
 
 _log = logging.getLogger("pinsheet")
@@ -27,6 +27,8 @@ def register_bag_routes(app, csrf):
         clubs = get_clubs(user_id)
         slots = get_bag_slots(user_id)
         clubs_by_id = {c["id"]: c for c in clubs}
+        ac_fields = ["brand", "model", "shaft_brand", "shaft", "grip"]
+        autocomplete_data = {f: get_distinct_club_field_values(f) for f in ac_fields}
         return render_template("bag.html", **base_context(
             current_page="bag",
             clubs=clubs,
@@ -36,6 +38,7 @@ def register_bag_routes(app, csrf):
             slots_json=json.dumps(slots),
             bag_size=BAG_SIZE,
             cat_order=CAT_ORDER,
+            autocomplete_data=autocomplete_data,
         ))
 
     @app.route("/bag/club", methods=["POST"])
