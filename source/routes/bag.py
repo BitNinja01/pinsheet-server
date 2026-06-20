@@ -55,6 +55,7 @@ def register_bag_routes(app, csrf):
             "lie": data.get("lie", ""),
             "length": data.get("length", ""),
             "shaft_flex": data.get("shaft_flex", ""),
+            "shaft_brand": data.get("shaft_brand", ""),
             "shaft": data.get("shaft", ""),
             "grip": data.get("grip", ""),
             "sw": data.get("sw", ""),

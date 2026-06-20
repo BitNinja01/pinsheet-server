@@ -165,6 +165,7 @@ def init_db() -> None:
             lie        TEXT DEFAULT '',
             length     TEXT DEFAULT '',
             shaft_flex TEXT DEFAULT '',
+            shaft_brand TEXT DEFAULT '',
             shaft      TEXT DEFAULT '',
             grip       TEXT DEFAULT '',
             sw         TEXT DEFAULT '',
@@ -178,7 +179,7 @@ def init_db() -> None:
         );
 
     """)
-    for col in ("number", "brand", "model", "lie", "length", "shaft_flex"):
+    for col in ("number", "brand", "model", "lie", "length", "shaft_flex", "shaft_brand"):
         try:
             db.execute(f"ALTER TABLE clubs ADD COLUMN {col} TEXT DEFAULT ''")
         except Exception:

@@ -201,12 +201,13 @@
                             <span class="ecard-cyd">{{ 'putter' if c.category == 'Putters' else 'yd' }}</span>
                         </div>
                         <div class="ecard-spec">
-                            {% for label, field in [('brand', 'brand'), ('model', 'model'), ('shaft', 'shaft'), ('grip', 'grip'), ('lie', 'lie'), ('length', 'length'), ('flex', 'shaft_flex')] %}
+                            {% for label, field in [('brand', 'brand'), ('model', 'model'), ('shaft brand', 'shaft_brand'), ('shaft', 'shaft'), ('grip', 'grip'), ('lie', 'lie'), ('length', 'length'), ('flex', 'shaft_flex')] %}
                             <div class="brow"><span class="brow-l">{{ label }}</span><span class="edit brow-v" data-field="{{ field }}" data-club-id="{{ c.id }}">{{ c[field] if c[field] else '—' }}</span></div>
                             {% endfor %}
                         </div>
                         <div class="ecard-foot">
                             <button class="ebtn bag-status-btn" data-club-id="{{ c.id }}">add to bag</button>
+                            <button class="ebtn" data-action="edit-club" data-club-id="{{ c.id }}">Edit</button>
                             <button class="ebtn" data-action="delete-club" data-club-id="{{ c.id }}">Delete</button>
                         </div>
                     </div>
@@ -234,7 +235,7 @@
     <div class="picker-scrim">
         <div class="picker acf">
             <div class="picker-head">
-                <span class="ps-eyebrow">Add a club</span>
+                <span class="ps-eyebrow" id="add-club-title">Add a club</span>
                 <button class="btile-x" type="button" id="add-club-close">×</button>
             </div>
             <div class="acf-body">
@@ -269,7 +270,8 @@
                 </div>
                 <label class="acf-field"><span class="acf-label">length</span><input class="acf-input" type="text" id="acf-length" placeholder="e.g. 38.5"></label>
                 <label class="acf-field"><span class="acf-label">shaft flex</span><input class="acf-input" type="text" id="acf-shaft_flex" placeholder="e.g. stiff"></label>
-                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. project x 6.5"></label>
+                <label class="acf-field"><span class="acf-label">shaft brand</span><input class="acf-input" type="text" id="acf-shaft_brand" placeholder="e.g. project x"></label>
+                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. 6.5"></label>
                 <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" placeholder="e.g. tour velvet"></label>
                 <label class="acf-field"><span class="acf-label">swing wt</span><input class="acf-input" type="text" id="acf-sw" placeholder="e.g. D2"></label>
                 <label class="acf-field"><span class="acf-label">carry · yd</span><input class="acf-input" type="text" id="acf-carry" placeholder="e.g. 205"></label>
@@ -283,6 +285,7 @@
 </div>
 <script>
 var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
+var _editingClubId = null;
 
 function sortSlots() {
     var clubs = [];
@@ -326,11 +329,38 @@ function autoClubName() {
 
 var addClubCat = 'Drivers';
 function openAddDialog() {
+    _editingClubId = null;
     addClubCat = 'Drivers';
     document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Drivers');});
-    ['number','brand','model','loft','length','shaft_flex','shaft','grip','sw','carry'].forEach(function(f){var el=document.getElementById('acf-'+f);if(el)el.value='';});
+    ['number','brand','model','loft','length','shaft_flex','shaft_brand','shaft','grip','sw','carry'].forEach(function(f){var el=document.getElementById('acf-'+f);if(el)el.value='';});
     document.querySelectorAll('#acf-lie-options .chip').forEach(function(c){c.classList.toggle('on',c.dataset.lie==='Std');});
     document.getElementById('acf-carry').placeholder = 'e.g. 205';
+    document.getElementById('add-club-title').textContent = 'Add a club';
+    document.getElementById('add-club-submit').textContent = 'Add club';
+    document.getElementById('add-club-overlay').style.display='block';
+    setTimeout(function(){document.getElementById('acf-number').focus();},100);
+}
+function openEditDialog(clubId) {
+    var c = BAG.clubs[clubId];
+    if (!c) return;
+    _editingClubId = clubId;
+    addClubCat = c.category || 'Irons';
+    document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.toggle('on',x.dataset.cat===addClubCat);});
+    document.getElementById('acf-number').value = c.number || '';
+    document.getElementById('acf-brand').value = c.brand || '';
+    document.getElementById('acf-model').value = c.model || '';
+    document.getElementById('acf-loft').value = c.loft || '';
+    document.querySelectorAll('#acf-lie-options .chip').forEach(function(x){x.classList.toggle('on',x.dataset.lie===(c.lie||'Std'));});
+    document.getElementById('acf-length').value = c.length || '';
+    document.getElementById('acf-shaft_flex').value = c.shaft_flex || '';
+    document.getElementById('acf-shaft_brand').value = c.shaft_brand || '';
+    document.getElementById('acf-shaft').value = c.shaft || '';
+    document.getElementById('acf-grip').value = c.grip || '';
+    document.getElementById('acf-sw').value = c.sw || '';
+    document.getElementById('acf-carry').value = c.carry != null ? c.carry : '';
+    document.getElementById('acf-carry').placeholder = c.category === 'Putters' ? '\u2014 (putter)' : 'e.g. 205';
+    document.getElementById('add-club-title').textContent = 'Edit club';
+    document.getElementById('add-club-submit').textContent = 'Save';
     document.getElementById('add-club-overlay').style.display='block';
     setTimeout(function(){document.getElementById('acf-number').focus();},100);
 }
@@ -340,6 +370,7 @@ function closeAddDialog() {
 function submitAddClub() {
     var n = document.getElementById('acf-number').value.trim();
     var data = {
+        id: _editingClubId || undefined,
         category: addClubCat,
         club: autoClubName(),
         number: n,
@@ -349,6 +380,7 @@ function submitAddClub() {
         lie: (document.querySelector('#acf-lie-options .chip.on') || {}).dataset.lie || 'Std',
         length: document.getElementById('acf-length').value.trim(),
         shaft_flex: document.getElementById('acf-shaft_flex').value.trim(),
+        shaft_brand: document.getElementById('acf-shaft_brand').value.trim(),
         shaft: document.getElementById('acf-shaft').value.trim(),
         grip: document.getElementById('acf-grip').value.trim(),
         sw: document.getElementById('acf-sw').value.trim(),
@@ -536,6 +568,7 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('picker-close').onclick=closePicker;
     document.getElementById('picker-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closePicker();};
     document.querySelectorAll('[data-action="delete-club"]').forEach(function(el){el.onclick=function(){deleteClub(el.dataset.clubId);};});
+    document.querySelectorAll('[data-action="edit-club"]').forEach(function(el){el.onclick=function(e){e.preventDefault();openEditDialog(el.dataset.clubId);};});
     document.getElementById('bag-eq-add-btn').onclick=openAddDialog;
     document.getElementById('add-club-close').onclick=closeAddDialog;
     document.getElementById('add-club-cancel').onclick=closeAddDialog;
@@ -543,10 +576,18 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('add-club-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closeAddDialog();};
     document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putters';document.getElementById('acf-carry').placeholder=isP?'\u2014 (putter)':'e.g. 205';};});
     document.querySelectorAll('#acf-lie-options .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-lie-options .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');};});
-    document.querySelectorAll('.bag-tab').forEach(function(t){t.onclick=function(){document.querySelectorAll('.bag-tab').forEach(function(x){x.classList.remove('on');});t.classList.add('on');var v=t.dataset.view;document.getElementById('bag-sheet-view').style.display=v==='sheet'?'block':'none';document.getElementById('bag-equip-view').style.display=v==='equip'?'block':'none';if(v==='sheet')updateGaps();};});
+    function switchTab(view) {
+        document.querySelectorAll('.bag-tab').forEach(function(x){x.classList.toggle('on',x.dataset.view===view);});
+        document.getElementById('bag-sheet-view').style.display=view==='sheet'?'block':'none';
+        document.getElementById('bag-equip-view').style.display=view==='equip'?'block':'none';
+        if (view==='sheet') updateGaps();
+    }
+    document.querySelectorAll('.bag-tab').forEach(function(t){t.onclick=function(){var v=t.dataset.view;location.hash=v;switchTab(v);};});
     sortSlots();
     while (BAG.slots.length < BAG.bagSize) BAG.slots.push(null);
-    bindTileEvents(); bindEditFields(); renderEquipButtons(); updateGaps();
+    bindTileEvents(); bindEditFields(); renderEquipButtons();
+    var tab = location.hash.replace('#','') || 'sheet';
+    if (tab === 'equip' || tab === 'sheet') switchTab(tab); else switchTab('sheet');
 });
 </script>
 {% endblock %}
