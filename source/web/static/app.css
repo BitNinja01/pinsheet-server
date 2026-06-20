@@ -247,7 +247,8 @@ body {
     text-transform: uppercase;
     color: var(--ps-ink-3);
     padding-left: 14px;
-    margin-bottom: -4px;
+    padding-bottom: 6px;
+    border-bottom: var(--ps-rule) solid var(--ps-rule-c);
 }
 
 /* ── User switcher ──────────────────────────────────────────────────── */
