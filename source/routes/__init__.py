@@ -17,4 +17,4 @@ def register_routes(app, limiter, csrf, User):
     register_stats_routes(app)
     register_admin_routes(app, csrf)
     register_matches_routes(app)
-    register_bag_routes(app)
+    register_bag_routes(app, csrf)

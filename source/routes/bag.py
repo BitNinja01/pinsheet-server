@@ -19,7 +19,7 @@ def _club_id() -> str:
     return "c" + secrets.token_hex(4)
 
 
-def register_bag_routes(app):
+def register_bag_routes(app, csrf):
     @app.route("/bag")
     @login_required
     def bag_page():
@@ -39,6 +39,7 @@ def register_bag_routes(app):
         ))
 
     @app.route("/bag/club", methods=["POST"])
+    @csrf.exempt
     @login_required
     def bag_save_club():
         data = request.get_json(force=True)
@@ -58,12 +59,14 @@ def register_bag_routes(app):
         return jsonify({"ok": True, "id": club_id})
 
     @app.route("/bag/club/<club_id>/delete", methods=["POST"])
+    @csrf.exempt
     @login_required
     def bag_delete_club(club_id):
         delete_club(club_id, current_user.id)
         return jsonify({"ok": True})
 
     @app.route("/bag/slots", methods=["POST"])
+    @csrf.exempt
     @login_required
     def bag_save_slots():
         data = request.get_json(force=True)
