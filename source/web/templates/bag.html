@@ -253,7 +253,20 @@
                 <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" placeholder="e.g. titleist"></label>
                 <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" placeholder="e.g. t100"></label>
                 <label class="acf-field"><span class="acf-label">loft</span><input class="acf-input" type="text" id="acf-loft" placeholder="e.g. 23°"></label>
-                <label class="acf-field"><span class="acf-label">lie</span><input class="acf-input" type="text" id="acf-lie" placeholder="e.g. 63°"></label>
+                <div class="acf-field">
+                    <span class="acf-label">lie</span>
+                    <div class="acf-cats" id="acf-lie-options">
+                        <button type="button" class="chip" data-lie="-4">-4°</button>
+                        <button type="button" class="chip" data-lie="-3">-3°</button>
+                        <button type="button" class="chip" data-lie="-2">-2°</button>
+                        <button type="button" class="chip" data-lie="-1">-1°</button>
+                        <button type="button" class="chip on" data-lie="Std">Std</button>
+                        <button type="button" class="chip" data-lie="+1">+1°</button>
+                        <button type="button" class="chip" data-lie="+2">+2°</button>
+                        <button type="button" class="chip" data-lie="+3">+3°</button>
+                        <button type="button" class="chip" data-lie="+4">+4°</button>
+                    </div>
+                </div>
                 <label class="acf-field"><span class="acf-label">length</span><input class="acf-input" type="text" id="acf-length" placeholder="e.g. 38.5"></label>
                 <label class="acf-field"><span class="acf-label">shaft flex</span><input class="acf-input" type="text" id="acf-shaft_flex" placeholder="e.g. stiff"></label>
                 <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. project x 6.5"></label>
@@ -315,7 +328,8 @@ var addClubCat = 'Drivers';
 function openAddDialog() {
     addClubCat = 'Drivers';
     document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Drivers');});
-    ['number','brand','model','loft','lie','length','shaft_flex','shaft','grip','sw','carry'].forEach(function(f){document.getElementById('acf-'+f).value='';});
+    ['number','brand','model','loft','length','shaft_flex','shaft','grip','sw','carry'].forEach(function(f){var el=document.getElementById('acf-'+f);if(el)el.value='';});
+    document.querySelectorAll('#acf-lie-options .chip').forEach(function(c){c.classList.toggle('on',c.dataset.lie==='Std');});
     document.getElementById('acf-carry').placeholder = 'e.g. 205';
     document.getElementById('add-club-overlay').style.display='block';
     setTimeout(function(){document.getElementById('acf-number').focus();},100);
@@ -332,7 +346,7 @@ function submitAddClub() {
         brand: document.getElementById('acf-brand').value.trim(),
         model: document.getElementById('acf-model').value.trim(),
         loft: document.getElementById('acf-loft').value.trim(),
-        lie: document.getElementById('acf-lie').value.trim(),
+        lie: (document.querySelector('#acf-lie-options .chip.on') || {}).dataset.lie || 'Std',
         length: document.getElementById('acf-length').value.trim(),
         shaft_flex: document.getElementById('acf-shaft_flex').value.trim(),
         shaft: document.getElementById('acf-shaft').value.trim(),
@@ -528,6 +542,7 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('add-club-submit').onclick=submitAddClub;
     document.getElementById('add-club-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closeAddDialog();};
     document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putters';document.getElementById('acf-carry').placeholder=isP?'\u2014 (putter)':'e.g. 205';};});
+    document.querySelectorAll('#acf-lie-options .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-lie-options .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');};});
     document.querySelectorAll('.bag-tab').forEach(function(t){t.onclick=function(){document.querySelectorAll('.bag-tab').forEach(function(x){x.classList.remove('on');});t.classList.add('on');var v=t.dataset.view;document.getElementById('bag-sheet-view').style.display=v==='sheet'?'block':'none';document.getElementById('bag-equip-view').style.display=v==='equip'?'block':'none';if(v==='sheet')updateGaps();};});
     sortSlots();
     while (BAG.slots.length < BAG.bagSize) BAG.slots.push(null);
