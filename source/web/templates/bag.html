@@ -133,9 +133,9 @@
                         </div>
                     </div>
                     <div class="btile-carry">
-                        {% if c.category == 'Putter' %}<span class="btile-cyd">—</span>
+                        {% if c.category == 'Putters' %}<span class="btile-cyd">—</span>
                         {% else %}<span class="edit btile-carry-num" data-field="carry" data-club-id="{{ c.id }}">{{ c.carry if c.carry else '' }}</span>{% endif %}
-                        <span class="btile-cyd">{{ 'putter' if c.category == 'Putter' else 'yd' }}</span>
+                        <span class="btile-cyd">{{ 'putter' if c.category == 'Putters' else 'yd' }}</span>
                         <span class="btile-gap" data-gap-for="{{ c.id }}"></span>
                     </div>
                     <div class="btile-spec">
@@ -191,9 +191,9 @@
                             <span class="edit btile-sw" data-field="sw" data-club-id="{{ c.id }}">{{ c.sw }}</span>
                         </div>
                         <div class="ecard-carry">
-                            {% if c.category == 'Putter' %}<span class="ecard-cyd">—</span>
+                            {% if c.category == 'Putters' %}<span class="ecard-cyd">—</span>
                             {% else %}<span class="edit ecard-carry-num" data-field="carry" data-club-id="{{ c.id }}">{{ c.carry if c.carry else '' }}</span>{% endif %}
-                            <span class="ecard-cyd">{{ 'putter' if c.category == 'Putter' else 'yd' }}</span>
+                            <span class="ecard-cyd">{{ 'putter' if c.category == 'Putters' else 'yd' }}</span>
                         </div>
                         <div class="ecard-spec">
                             {% for label, field in [('head', 'head'), ('shaft', 'shaft'), ('grip', 'grip')] %}
@@ -240,7 +240,7 @@
                         <button type="button" class="chip" data-cat="Hybrids">Hybrids</button>
                         <button type="button" class="chip" data-cat="Irons">Irons</button>
                         <button type="button" class="chip" data-cat="Wedges">Wedges</button>
-                        <button type="button" class="chip" data-cat="Putter">Putter</button>
+                        <button type="button" class="chip" data-cat="Putters">Putters</button>
                     </div>
                 </div>
                 <label class="acf-field"><span class="acf-label">club</span><input class="acf-input" type="text" id="acf-club" placeholder="e.g. 4-iron" autofocus></label>
@@ -269,10 +269,10 @@ function saveClub(id, field, value) {
     c[field] = value;
     fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 }
-var addClubCat = 'Irons';
+var addClubCat = 'Drivers';
 function openAddDialog() {
-    addClubCat = 'Irons';
-    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Irons');});
+    addClubCat = 'Drivers';
+    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Drivers');});
     ['club','loft','head','shaft','grip','sw','carry'].forEach(function(f){document.getElementById('acf-'+f).value='';});
     document.getElementById('acf-carry').placeholder = 'e.g. 205';
     document.getElementById('add-club-overlay').style.display='block';
@@ -324,7 +324,7 @@ function renderGrid() {
         var sid = i < BAG.slots.length ? BAG.slots[i] : null;
         var c = sid && BAG.clubs[sid] ? BAG.clubs[sid] : null;
         if (c) {
-            var isP = c.category === 'Putter';
+            var isP = c.category === 'Putters';
             html += '<div class="btile" data-slot="' + i + '" data-club-id="' + c.id + '">' +
                 '<div class="btile-top"><div class="btile-name"><span class="btile-club">' + esc(c.club) + '</span><span class="btile-loft">' + esc(c.loft) + '</span></div>' +
                 '<div class="btile-tr"><span class="btile-sw">' + esc(c.sw) + '</span><button class="btile-x" type="button" title="remove from bag" data-action="clear-slot" data-slot="' + i + '">×</button></div></div>' +
@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('add-club-cancel').onclick=closeAddDialog;
     document.getElementById('add-club-submit').onclick=submitAddClub;
     document.getElementById('add-club-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closeAddDialog();};
-    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putter';document.getElementById('acf-carry').placeholder=isP?'— (putter)':'e.g. 205';};});
+    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putters';document.getElementById('acf-carry').placeholder=isP?'— (putter)':'e.g. 205';};});
     function showSheet(){document.getElementById('bag-sheet-view').style.display='block';document.getElementById('bag-equip-view').style.display='none';}
     function showEquip(){document.getElementById('bag-sheet-view').style.display='none';document.getElementById('bag-equip-view').style.display='block';}
     document.getElementById('bag-to-equip').onclick=function(e){e.preventDefault();showEquip();};

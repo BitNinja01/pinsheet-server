@@ -12,7 +12,7 @@ from source.request_data import base_context
 _log = logging.getLogger("pinsheet")
 
 BAG_SIZE = 14
-CAT_ORDER = ["Woods", "Hybrids", "Irons", "Wedges", "Putter"]
+CAT_ORDER = ["Drivers", "Woods", "Hybrids", "Irons", "Wedges", "Putters"]
 
 
 def _club_id() -> str:
