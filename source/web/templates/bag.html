@@ -299,17 +299,17 @@ function submitAddClub() {
 function assignClub(slot, clubId) {
     while (BAG.slots.length <= slot) BAG.slots.push(null);
     BAG.slots[slot] = clubId;
-    saveAllSlots(); renderGrid();
+    saveAllSlots(); renderGrid(); renderEquipButtons();
 }
 function clearSlot(slot) {
     BAG.slots[slot] = null;
-    saveAllSlots(); renderGrid();
+    saveAllSlots(); renderGrid(); renderEquipButtons();
 }
 function addToBag(clubId) {
     var idx = -1;
     for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) { idx = i; break; } }
     if (idx < 0 && BAG.slots.length < BAG.bagSize) idx = BAG.slots.length;
-    if (idx >= 0) { BAG.slots[idx] = clubId; saveAllSlots(); renderGrid(); }
+    if (idx >= 0) { BAG.slots[idx] = clubId; saveAllSlots(); renderGrid(); renderEquipButtons(); }
 }
 function removeFromBag(clubId) {
     for (var i = 0; i < BAG.slots.length; i++) { if (BAG.slots[i] === clubId) BAG.slots[i] = null; }
@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded',function(){
     function showEquip(){document.getElementById('bag-sheet-view').style.display='none';document.getElementById('bag-equip-view').style.display='block';}
     document.getElementById('bag-to-equip').onclick=function(e){e.preventDefault();showEquip();};
     document.getElementById('bag-to-sheet').onclick=function(e){e.preventDefault();showSheet();};
-    bindEditFields(); renderEquipButtons();
+    bindTileEvents(); bindEditFields(); renderEquipButtons();
 });
 </script>
 {% endblock %}
