@@ -154,16 +154,21 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS clubs (
-            id        TEXT PRIMARY KEY,
-            user_id   INTEGER NOT NULL REFERENCES users(id),
-            category  TEXT NOT NULL,
-            club      TEXT NOT NULL,
-            loft      TEXT DEFAULT '',
-            head      TEXT DEFAULT '',
-            shaft     TEXT DEFAULT '',
-            grip      TEXT DEFAULT '',
-            sw        TEXT DEFAULT '',
-            carry     INTEGER,
+            id         TEXT PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            category   TEXT NOT NULL,
+            club       TEXT NOT NULL,
+            number     TEXT DEFAULT '',
+            brand      TEXT DEFAULT '',
+            model      TEXT DEFAULT '',
+            loft       TEXT DEFAULT '',
+            lie        TEXT DEFAULT '',
+            length     TEXT DEFAULT '',
+            shaft_flex TEXT DEFAULT '',
+            shaft      TEXT DEFAULT '',
+            grip       TEXT DEFAULT '',
+            sw         TEXT DEFAULT '',
+            carry      INTEGER,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -173,5 +178,14 @@ def init_db() -> None:
         );
 
     """)
+    for col in ("number", "brand", "model", "lie", "length", "shaft_flex"):
+        try:
+            db.execute(f"ALTER TABLE clubs ADD COLUMN {col} TEXT DEFAULT ''")
+        except Exception:
+            pass
+    try:
+        db.execute("ALTER TABLE clubs DROP COLUMN head")
+    except Exception:
+        pass
     db.commit()
     db.close()

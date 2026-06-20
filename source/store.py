@@ -810,7 +810,7 @@ def complete_challenge(challenge_id: int) -> None:
 def get_clubs(user_id: int) -> list[dict]:
     db = get_db()
     rows = db.execute(
-        "SELECT id, category, club, loft, head, shaft, grip, sw, carry FROM clubs WHERE user_id = ? ORDER BY category, club",
+        "SELECT id, category, club, number, brand, model, loft, lie, length, shaft_flex, shaft, grip, sw, carry FROM clubs WHERE user_id = ? ORDER BY category, club",
         (user_id,),
     ).fetchall()
     db.close()
@@ -820,15 +820,20 @@ def get_clubs(user_id: int) -> list[dict]:
 def save_club(club_data: dict, user_id: int) -> None:
     db = get_db()
     db.execute(
-        """INSERT OR REPLACE INTO clubs (id, user_id, category, club, loft, head, shaft, grip, sw, carry)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT OR REPLACE INTO clubs (id, user_id, category, club, number, brand, model, loft, lie, length, shaft_flex, shaft, grip, sw, carry)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             club_data["id"],
             user_id,
             club_data.get("category", "Irons"),
             club_data.get("club", ""),
+            club_data.get("number", ""),
+            club_data.get("brand", ""),
+            club_data.get("model", ""),
             club_data.get("loft", ""),
-            club_data.get("head", ""),
+            club_data.get("lie", ""),
+            club_data.get("length", ""),
+            club_data.get("shaft_flex", ""),
             club_data.get("shaft", ""),
             club_data.get("grip", ""),
             club_data.get("sw", ""),

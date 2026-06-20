@@ -12,9 +12,11 @@
 .bag-stat { display: flex; flex-direction: column; gap: 2px; }
 .bag-stat-l { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: var(--ps-tracking-eyebrow); text-transform: uppercase; color: var(--ps-ink-3); }
 .bag-stat-v { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-meta); color: var(--ps-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.page-link { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-meta); letter-spacing: var(--ps-tracking-label); text-transform: uppercase; color: var(--ps-ink-2); text-decoration: none; border: var(--ps-rule) solid var(--ps-rule-c); padding: 8px 14px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; cursor: pointer; }
-.page-link:hover { color: var(--ps-ink); border-color: var(--ps-ink); }
-.page-link .arr { color: var(--ps-accent); font-weight: var(--ps-fw-strong); }
+.bag-tabs { display: flex; gap: 0; border: var(--ps-rule) solid var(--ps-rule-c); }
+.bag-tab { font-family: var(--ps-font-mono); font-size: var(--ps-fs-round-meta); letter-spacing: var(--ps-tracking-label); text-transform: uppercase; color: var(--ps-ink-3); padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.bag-tab + .bag-tab { border-left: var(--ps-rule) solid var(--ps-rule-c); }
+.bag-tab.on { color: var(--ps-ink); background: var(--ps-accent-dim); }
+.bag-tab:hover { color: var(--ps-ink); }
 .bag-body { display: flex; flex-direction: column; gap: var(--ps-sp-6); flex: 1; min-height: 0; }
 .bag-section { display: flex; flex-direction: column; gap: var(--ps-sp-3); }
 .bag-section + .bag-section { border-top: var(--ps-rule) solid var(--ps-rule-c); padding-top: var(--ps-sp-6); }
@@ -96,7 +98,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="bag-topbar lean" id="bag-topbar">
+<div class="bag-topbar" id="bag-topbar">
     <div class="lean-left">
         <span class="ps-eyebrow">What's in the bag</span>
         <span class="lean-title">Your bag</span>
@@ -106,7 +108,10 @@
         <div class="bag-stat"><span class="bag-stat-l">carry</span><span class="bag-stat-v" id="bag-carry-range">—</span></div>
         <div class="bag-stat"><span class="bag-stat-l">avg gap</span><span class="bag-stat-v" id="bag-avg-gap">—</span></div>
         <div class="bag-stat"><span class="bag-stat-l">swing wt</span><span class="bag-stat-v" id="bag-swing-wt">—</span></div>
-        <a class="page-link" href="#" id="bag-to-equip">Equipment <span class="arr">→</span></a>
+        <div class="bag-tabs" id="bag-tabs">
+            <span class="bag-tab on" data-view="sheet">Bag</span>
+            <span class="bag-tab" data-view="equip">Equipment</span>
+        </div>
     </div>
 </div>
 <div class="bag-body" id="bag-body">
@@ -139,7 +144,7 @@
                         <span class="btile-gap" data-gap-for="{{ c.id }}"></span>
                     </div>
                     <div class="btile-spec">
-                        {% for label, field in [('grip', 'grip'), ('shaft', 'shaft'), ('head', 'head')] %}
+                        {% for label, field in [('grip', 'grip'), ('shaft', 'shaft'), ('model', 'model')] %}
                         <div class="brow"><span class="brow-l">{{ label }}</span><span class="brow-v">{{ c[field] if c[field] else '—' }}</span></div>
                         {% endfor %}
                     </div>
@@ -196,7 +201,7 @@
                             <span class="ecard-cyd">{{ 'putter' if c.category == 'Putters' else 'yd' }}</span>
                         </div>
                         <div class="ecard-spec">
-                            {% for label, field in [('head', 'head'), ('shaft', 'shaft'), ('grip', 'grip')] %}
+                            {% for label, field in [('brand', 'brand'), ('model', 'model'), ('shaft', 'shaft'), ('grip', 'grip'), ('lie', 'lie'), ('length', 'length'), ('flex', 'shaft_flex')] %}
                             <div class="brow"><span class="brow-l">{{ label }}</span><span class="edit brow-v" data-field="{{ field }}" data-club-id="{{ c.id }}">{{ c[field] if c[field] else '—' }}</span></div>
                             {% endfor %}
                         </div>
@@ -236,16 +241,21 @@
                 <div class="acf-field wide">
                     <span class="acf-label">category</span>
                     <div class="acf-cats" id="acf-cats">
-                        <button type="button" class="chip on" data-cat="Woods">Woods</button>
+                        <button type="button" class="chip on" data-cat="Drivers">Drivers</button>
+                        <button type="button" class="chip" data-cat="Woods">Woods</button>
                         <button type="button" class="chip" data-cat="Hybrids">Hybrids</button>
                         <button type="button" class="chip" data-cat="Irons">Irons</button>
                         <button type="button" class="chip" data-cat="Wedges">Wedges</button>
                         <button type="button" class="chip" data-cat="Putters">Putters</button>
                     </div>
                 </div>
-                <label class="acf-field"><span class="acf-label">club</span><input class="acf-input" type="text" id="acf-club" placeholder="e.g. 4-iron" autofocus></label>
+                <label class="acf-field"><span class="acf-label">number</span><input class="acf-input" type="text" id="acf-number" placeholder="e.g. 4" autofocus></label>
+                <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" placeholder="e.g. titleist"></label>
+                <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" placeholder="e.g. t100"></label>
                 <label class="acf-field"><span class="acf-label">loft</span><input class="acf-input" type="text" id="acf-loft" placeholder="e.g. 23°"></label>
-                <label class="acf-field"><span class="acf-label">head</span><input class="acf-input" type="text" id="acf-head" placeholder="e.g. t100"></label>
+                <label class="acf-field"><span class="acf-label">lie</span><input class="acf-input" type="text" id="acf-lie" placeholder="e.g. 63°"></label>
+                <label class="acf-field"><span class="acf-label">length</span><input class="acf-input" type="text" id="acf-length" placeholder="e.g. 38.5"></label>
+                <label class="acf-field"><span class="acf-label">shaft flex</span><input class="acf-input" type="text" id="acf-shaft_flex" placeholder="e.g. stiff"></label>
                 <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. project x 6.5"></label>
                 <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" placeholder="e.g. tour velvet"></label>
                 <label class="acf-field"><span class="acf-label">swing wt</span><input class="acf-input" type="text" id="acf-sw" placeholder="e.g. D2"></label>
@@ -260,33 +270,71 @@
 </div>
 <script>
 var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
-function saveAllSlots() {
-    fetch('/bag/slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: BAG.slots }) });
+
+function sortSlots() {
+    var clubs = [];
+    var nulls = [];
+    for (var i = 0; i < BAG.slots.length; i++) {
+        var sid = BAG.slots[i];
+        if (sid && BAG.clubs[sid]) {
+            clubs.push({ slot: sid, carry: BAG.clubs[sid].carry || 0 });
+        } else {
+            nulls.push(null);
+        }
+    }
+    clubs.sort(function(a, b) { return b.carry - a.carry; });
+    BAG.slots = clubs.map(function(c) { return c.slot; }).concat(nulls).slice(0, BAG.bagSize);
 }
+
+function saveAllSlots() {
+    sortSlots();
+    var clean = BAG.slots.slice();
+    while (clean.length > 0 && clean[clean.length - 1] === null) clean.pop();
+    fetch('/bag/slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: clean }) });
+}
+
 function saveClub(id, field, value) {
     var c = BAG.clubs[id];
     if (!c) { c = { id: id, category: 'Irons' }; BAG.clubs[id] = c; }
     c[field] = value;
     fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 }
+
+function autoClubName() {
+    var num = document.getElementById('acf-number').value.trim();
+    if (addClubCat === 'Putters') return 'Putter';
+    if (addClubCat === 'Drivers') return num || 'Driver';
+    if (addClubCat === 'Woods') return (num || '?') + '-wood';
+    if (addClubCat === 'Hybrids') return (num || '?') + '-hybrid';
+    if (addClubCat === 'Irons') return (num || '?') + '-iron';
+    if (addClubCat === 'Wedges') return (num || '?') + '\u00b0';
+    return num || 'New club';
+}
+
 var addClubCat = 'Drivers';
 function openAddDialog() {
     addClubCat = 'Drivers';
     document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Drivers');});
-    ['club','loft','head','shaft','grip','sw','carry'].forEach(function(f){document.getElementById('acf-'+f).value='';});
+    ['number','brand','model','loft','lie','length','shaft_flex','shaft','grip','sw','carry'].forEach(function(f){document.getElementById('acf-'+f).value='';});
     document.getElementById('acf-carry').placeholder = 'e.g. 205';
     document.getElementById('add-club-overlay').style.display='block';
-    setTimeout(function(){document.getElementById('acf-club').focus();},100);
+    setTimeout(function(){document.getElementById('acf-number').focus();},100);
 }
 function closeAddDialog() {
     document.getElementById('add-club-overlay').style.display='none';
 }
 function submitAddClub() {
+    var n = document.getElementById('acf-number').value.trim();
     var data = {
         category: addClubCat,
-        club: document.getElementById('acf-club').value.trim() || 'New club',
+        club: autoClubName(),
+        number: n,
+        brand: document.getElementById('acf-brand').value.trim(),
+        model: document.getElementById('acf-model').value.trim(),
         loft: document.getElementById('acf-loft').value.trim(),
-        head: document.getElementById('acf-head').value.trim(),
+        lie: document.getElementById('acf-lie').value.trim(),
+        length: document.getElementById('acf-length').value.trim(),
+        shaft_flex: document.getElementById('acf-shaft_flex').value.trim(),
         shaft: document.getElementById('acf-shaft').value.trim(),
         grip: document.getElementById('acf-grip').value.trim(),
         sw: document.getElementById('acf-sw').value.trim(),
@@ -296,28 +344,33 @@ function submitAddClub() {
         .then(function(r) { return r.json(); })
         .then(function(d) { if (d.ok) location.reload(); });
 }
+
 function assignClub(slot, clubId) {
     while (BAG.slots.length <= slot) BAG.slots.push(null);
     BAG.slots[slot] = clubId;
-    saveAllSlots(); renderGrid(); renderEquipButtons();
+    sortSlots(); saveAllSlots(); renderGrid(); renderEquipButtons();
 }
 function clearSlot(slot) {
     BAG.slots[slot] = null;
-    saveAllSlots(); renderGrid(); renderEquipButtons();
+    sortSlots(); saveAllSlots(); renderGrid(); renderEquipButtons();
 }
 function addToBag(clubId) {
+    sortSlots();
     var idx = -1;
     for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) { idx = i; break; } }
     if (idx < 0 && BAG.slots.length < BAG.bagSize) idx = BAG.slots.length;
-    if (idx >= 0) { BAG.slots[idx] = clubId; saveAllSlots(); renderGrid(); renderEquipButtons(); }
+    if (idx >= 0) { BAG.slots[idx] = clubId; sortSlots(); saveAllSlots(); renderGrid(); renderEquipButtons(); }
 }
 function removeFromBag(clubId) {
     for (var i = 0; i < BAG.slots.length; i++) { if (BAG.slots[i] === clubId) BAG.slots[i] = null; }
-    saveAllSlots(); renderGrid(); renderEquipButtons();
+    sortSlots(); saveAllSlots(); renderGrid(); renderEquipButtons();
 }
 function inBag(clubId) { for (var i = 0; i < BAG.slots.length; i++) { if (BAG.slots[i] === clubId) return true; } return false; }
-function hasEmpty() { if (BAG.slots.length < BAG.bagSize) return true; for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) return true; } return false; }
+function hasEmpty() { sortSlots(); if (BAG.slots.length < BAG.bagSize) return true; for (var i = 0; i < BAG.slots.length; i++) { if (!BAG.slots[i]) return true; } return false; }
+
 function renderGrid() {
+    sortSlots();
+    while (BAG.slots.length < BAG.bagSize) BAG.slots.push(null);
     var grid = document.getElementById('bag-grid');
     var html = '';
     for (var i = 0; i < BAG.bagSize; i++) {
@@ -333,7 +386,7 @@ function renderGrid() {
                 ' <span class="btile-cyd">' + (isP ? 'putter' : 'yd') + '</span>' +
                 '<span class="btile-gap" data-gap-for="' + c.id + '"></span></div>' +
                 '<div class="btile-spec">' +
-                ['grip','shaft','head'].map(function(f){return '<div class=\"brow\"><span class=\"brow-l\">'+f+'</span><span class=\"brow-v\">'+esc(c[f]||'—')+'</span></div>';}).join('') +
+                ['grip','shaft','model'].map(function(f){return '<div class=\"brow\"><span class=\"brow-l\">'+f+'</span><span class=\"brow-v\">'+esc(c[f]||'—')+'</span></div>';}).join('') +
                 '</div></div>';
         } else {
             html += '<div class="btile empty" data-slot="' + i + '"><span class="empty-eyebrow">empty slot</span><span class="empty-add">+ assign club</span></div>';
@@ -342,6 +395,7 @@ function renderGrid() {
     grid.innerHTML = html;
     bindTileEvents(); updateGaps();
 }
+
 function renderEquipButtons() {
     document.querySelectorAll('.bag-status-btn').forEach(function(btn) {
         var id = btn.dataset.clubId;
@@ -349,6 +403,7 @@ function renderEquipButtons() {
         else { btn.textContent = 'add to bag'; btn.classList.remove('in'); btn.disabled = !hasEmpty(); btn.onclick = function(e) { e.preventDefault(); addToBag(id); }; }
     });
 }
+
 function updateGaps() {
     var play = [];
     for (var i = 0; i < BAG.slots.length; i++) {
@@ -370,13 +425,18 @@ function updateGaps() {
     renderGapSVG(play, gaps, maxGap);
     updateHeaderStats(play, gaps, maxGap);
     var note = document.getElementById('gapping-note');
-    note.innerHTML = 'widest <span class="mint">' + maxGap + ' yd</span>';
-    if (play.length > 1 && maxGap > 0) {
-        var wi = gaps.indexOf(maxGap);
-        note.innerHTML += ' \u00b7 ' + play[wi].club.toLowerCase() + ' \u2192 ' + play[wi + 1].club.toLowerCase();
+    if (play.length > 0) {
+        note.innerHTML = 'widest <span class="mint">' + maxGap + ' yd</span>';
+        if (play.length > 1 && maxGap > 0) {
+            var wi = gaps.indexOf(maxGap);
+            note.innerHTML += ' \u00b7 ' + play[wi].club.toLowerCase() + ' \u2192 ' + play[wi + 1].club.toLowerCase();
+        }
+        note.innerHTML += ' \u00b7 putter not plotted';
+    } else {
+        note.innerHTML = 'add clubs with carry distance to see gapping';
     }
-    note.innerHTML += ' \u00b7 putter not plotted';
 }
+
 function updateHeaderStats(play, gaps, maxGap) {
     var carries = play.map(function(c){return c.carry;});
     var minC = carries.length ? Math.min.apply(null, carries) : null;
@@ -388,12 +448,14 @@ function updateHeaderStats(play, gaps, maxGap) {
     document.getElementById('bag-avg-gap').textContent = avgGap ? avgGap+' yd' : '\u2014';
     document.getElementById('bag-swing-wt').textContent = swRange;
 }
+
 function renderGapSVG(play, gaps, maxGap) {
     var svg = document.getElementById('gapping-svg');
+    if (!play.length) { svg.innerHTML = ''; return; }
     var W = 1600, H = 310, pl = 56, pr = W - 56, topY = 78, stemTop = 98, baseY = 240;
     var carries = play.map(function(c){return c.carry;});
-    var lo = carries.length ? Math.min.apply(null, carries) : 70;
-    var hi = carries.length ? Math.max.apply(null, carries) : 305;
+    var lo = Math.min.apply(null, carries);
+    var hi = Math.max.apply(null, carries);
     var pad = Math.max(16, (hi - lo) * 0.06);
     var dmin = lo - pad, dmax = hi + pad;
     function x(v){return pl+((v-dmin)/(dmax-dmin))*(pr-pl);}
@@ -406,12 +468,15 @@ function renderGapSVG(play, gaps, maxGap) {
     play.slice(0,-1).forEach(function(c,i){var mid=(x(c.carry)+x(play[i+1].carry))/2,gap=gaps[i],big=gap===maxGap;lines.push('<line x1="'+mid+'" x2="'+mid+'" y1="'+(baseY+6)+'" y2="'+(baseY+13)+'" stroke="var(--ps-rule-c)" stroke-width="0.75"/>');lines.push('<text x="'+mid+'" y="'+(baseY+32)+'" text-anchor="middle" font-family="var(--ps-font-mono)" font-size="13" font-weight="'+(big?600:400)+'" letter-spacing="0.02em" fill="'+(big?'var(--ps-accent)':'var(--ps-ink-3)')+'">'+gap+'</text>');lines.push('<text x="'+mid+'" y="'+(baseY+47)+'" text-anchor="middle" font-family="var(--ps-font-mono)" font-size="8" letter-spacing="0.16em" fill="var(--ps-ink-3)">YD</text>');});
     svg.innerHTML = lines.join('\n');
 }
+
 function esc(s){if(!s)return'\u2014';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
 function bindTileEvents() {
     document.querySelectorAll('.btile.empty').forEach(function(el){el.onclick=function(){openPicker(parseInt(el.dataset.slot));};});
     document.querySelectorAll('[data-action="clear-slot"]').forEach(function(el){el.onclick=function(e){e.stopPropagation();clearSlot(parseInt(el.dataset.slot));};});
     bindEditFields();
 }
+
 function bindEditFields() {
     document.querySelectorAll('.edit[data-field][data-club-id]').forEach(function(el) {
         el.addEventListener('blur', function() {
@@ -424,6 +489,7 @@ function bindEditFields() {
         el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
     });
 }
+
 function openPicker(slot) {
     var overlay = document.getElementById('picker-overlay');
     var list = document.getElementById('picker-list');
@@ -435,7 +501,7 @@ function openPicker(slot) {
         list.innerHTML = avail.map(function(c) {
             return '<button class="picker-row" type="button" data-club-id="'+c.id+'">' +
                 '<span class="picker-club">'+esc(c.club)+'<span class="picker-loft">'+esc(c.loft)+'</span></span>' +
-                '<span class="picker-spec">'+esc(c.head)+' \u00b7 '+esc(c.shaft)+'</span>' +
+                '<span class="picker-spec">'+esc(c.model||'')+' \u00b7 '+esc(c.shaft||'')+'</span>' +
                 '<span class="picker-carry">'+(c.carry!=null?c.carry+' yd':'\u2014')+'</span></button>';
         }).join('');
         list.querySelectorAll('.picker-row').forEach(function(row){row.onclick=function(){assignClub(slot,row.dataset.clubId);closePicker();};});
@@ -444,11 +510,14 @@ function openPicker(slot) {
     }
     overlay.style.display='block';
 }
+
 function closePicker(){document.getElementById('picker-overlay').style.display='none';}
+
 function deleteClub(clubId) {
     if (!confirm('Delete this club?')) return;
     fetch('/bag/club/'+clubId+'/delete',{method:'POST'}).then(function(){location.reload();});
 }
+
 document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('picker-close').onclick=closePicker;
     document.getElementById('picker-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closePicker();};
@@ -458,12 +527,11 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('add-club-cancel').onclick=closeAddDialog;
     document.getElementById('add-club-submit').onclick=submitAddClub;
     document.getElementById('add-club-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closeAddDialog();};
-    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putters';document.getElementById('acf-carry').placeholder=isP?'— (putter)':'e.g. 205';};});
-    function showSheet(){document.getElementById('bag-sheet-view').style.display='block';document.getElementById('bag-equip-view').style.display='none';}
-    function showEquip(){document.getElementById('bag-sheet-view').style.display='none';document.getElementById('bag-equip-view').style.display='block';}
-    document.getElementById('bag-to-equip').onclick=function(e){e.preventDefault();showEquip();};
-    document.getElementById('bag-to-sheet').onclick=function(e){e.preventDefault();showSheet();};
-    bindTileEvents(); bindEditFields(); renderEquipButtons();
+    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putters';document.getElementById('acf-carry').placeholder=isP?'\u2014 (putter)':'e.g. 205';};});
+    document.querySelectorAll('.bag-tab').forEach(function(t){t.onclick=function(){document.querySelectorAll('.bag-tab').forEach(function(x){x.classList.remove('on');});t.classList.add('on');var v=t.dataset.view;document.getElementById('bag-sheet-view').style.display=v==='sheet'?'block':'none';document.getElementById('bag-equip-view').style.display=v==='equip'?'block':'none';if(v==='sheet')updateGaps();};});
+    sortSlots();
+    while (BAG.slots.length < BAG.bagSize) BAG.slots.push(null);
+    bindTileEvents(); bindEditFields(); renderEquipButtons(); updateGaps();
 });
 </script>
 {% endblock %}
