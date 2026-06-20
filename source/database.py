@@ -153,6 +153,40 @@ def init_db() -> None:
             UNIQUE(challenge_id, user_id)
         );
 
+        CREATE TABLE IF NOT EXISTS clubs (
+            id         TEXT PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            category   TEXT NOT NULL,
+            club       TEXT NOT NULL,
+            number     TEXT DEFAULT '',
+            brand      TEXT DEFAULT '',
+            model      TEXT DEFAULT '',
+            loft       TEXT DEFAULT '',
+            lie        TEXT DEFAULT '',
+            length     TEXT DEFAULT '',
+            shaft_flex TEXT DEFAULT '',
+            shaft_brand TEXT DEFAULT '',
+            shaft      TEXT DEFAULT '',
+            grip       TEXT DEFAULT '',
+            sw         TEXT DEFAULT '',
+            carry      INTEGER,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS bag_slots (
+            user_id  INTEGER PRIMARY KEY REFERENCES users(id),
+            slot_ids TEXT NOT NULL DEFAULT '[]'
+        );
+
     """)
+    for col in ("number", "brand", "model", "lie", "length", "shaft_flex", "shaft_brand"):
+        try:
+            db.execute(f"ALTER TABLE clubs ADD COLUMN {col} TEXT DEFAULT ''")
+        except Exception:
+            pass
+    try:
+        db.execute("ALTER TABLE clubs DROP COLUMN head")
+    except Exception:
+        pass
     db.commit()
     db.close()

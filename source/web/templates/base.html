@@ -6,6 +6,7 @@
     <title>PinSheet</title>
     <link rel="stylesheet" href="/static/app.css">
     {% if plugin_blocks.get("head") %}{{ plugin_blocks["head"]|safe }}{% endif %}
+    {% block extra_head %}{% endblock %}
 </head>
 <body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
     <div class="ps-layout">
@@ -23,18 +24,26 @@
                 <div class="ps-logo">PinSheet</div>
 
                 <nav class="ps-nav">
+                    <span class="ps-nav-label">Hub</span>
                     <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Home</a>
+                </nav>
+                <nav class="ps-nav">
+                    <span class="ps-nav-label">Golf</span>
                     <a href="/profile" class="{% if current_page == 'profile' %}is-active{% endif %}">Profile</a>
                     <a href="/rounds" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
                     <a href="/stats" class="{% if current_page == 'stats' %}is-active{% endif %}">Stats</a>
                     <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
-                    <a href="/season" class="{% if current_page == 'season' %}is-active{% endif %}">Season</a>
+                    <a href="/bag" class="{% if current_page == 'bag' %}is-active{% endif %}">Bag</a>
+                </nav>
+                <nav class="ps-nav">
+                    <span class="ps-nav-label">Account</span>
                     <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
                     {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
                     <a href="/logout">Logout</a>
                 </nav>
                 {% if plugin_nav %}
                 <nav class="ps-nav ps-nav-plugins">
+                    <span class="ps-nav-label">Plugins</span>
                     {% for item in plugin_nav %}
                     <a href="{{ item.url }}" class="{% if current_page == item.page_id %}is-active{% endif %}">
                         {{ item.label }}

@@ -1,4 +1,115 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/flatpickr.min.css">
+<style>
+.flatpickr-calendar {
+    background: var(--ps-paper);
+    border: var(--ps-rule) solid var(--ps-rule-c);
+    border-radius: 0;
+    box-shadow: none;
+    margin-top: 4px;
+    font-family: var(--ps-font-mono);
+}
+.flatpickr-months {
+    background: var(--ps-paper-2);
+    border-radius: 0;
+}
+.flatpickr-months .flatpickr-month {
+    color: var(--ps-ink);
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+    color: var(--ps-ink);
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: var(--ps-paper-2);
+    color: var(--ps-ink);
+    border: none;
+    padding: 0;
+}
+.flatpickr-current-month input.cur-year {
+    background: var(--ps-paper-2);
+    color: var(--ps-ink);
+    padding: 0;
+}
+.flatpickr-current-month .numInputWrapper span.arrowUp,
+.flatpickr-current-month .numInputWrapper span.arrowDown {
+    border-color: var(--ps-rule-c);
+}
+span.flatpickr-weekday {
+    color: var(--ps-ink-3);
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-caption);
+    font-weight: var(--ps-fw-label);
+}
+.flatpickr-day {
+    color: var(--ps-ink);
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-caption);
+    border-radius: 0;
+}
+.flatpickr-day.weekend {
+    color: var(--ps-ink);
+    background: transparent;
+}
+.flatpickr-day.today {
+    border-color: var(--ps-accent);
+    background: var(--ps-accent-dim);
+}
+.flatpickr-day:hover,
+.flatpickr-day:focus {
+    background: var(--ps-accent-dim);
+    border-color: var(--ps-accent);
+}
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected.inRange,
+.flatpickr-day.startRange.inRange,
+.flatpickr-day.endRange.inRange,
+.flatpickr-day.selected:focus,
+.flatpickr-day.startRange:focus,
+.flatpickr-day.endRange:focus,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover,
+.flatpickr-day.selected.prevMonthDay,
+.flatpickr-day.startRange.prevMonthDay,
+.flatpickr-day.endRange.prevMonthDay,
+.flatpickr-day.selected.nextMonthDay,
+.flatpickr-day.startRange.nextMonthDay,
+.flatpickr-day.endRange.nextMonthDay {
+    background: var(--ps-accent);
+    border-color: var(--ps-accent);
+    color: var(--ps-accent-fg);
+}
+.flatpickr-day.inRange {
+    background: var(--ps-accent-dim);
+    border-color: transparent;
+    color: var(--ps-ink);
+}
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+    color: var(--ps-ink-3);
+}
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: var(--ps-ink-3);
+}
+.flatpickr-day.prevMonthDay.weekend,
+.flatpickr-day.nextMonthDay.weekend {
+    color: var(--ps-ink-3);
+}
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+    fill: var(--ps-ink-2);
+}
+.flatpickr-prev-month:hover svg,
+.flatpickr-next-month:hover svg {
+    fill: var(--ps-accent);
+}
+</style>
+{% endblock %}
 {% block content %}
 <script>
 window._courses = {{ courses|tojson }};
@@ -21,8 +132,8 @@ window._courses = {{ courses|tojson }};
 
     <div class="wizard-step" data-step="date">
         <label class="step-label">Date</label>
-        <input type="date" class="step-input" id="round-date"
-               value="{{ today }}">
+        <input type="text" class="step-input" id="round-date"
+               placeholder="YYYY-MM-DD" value="{{ today }}">
     </div>
 
     <div class="wizard-step" data-step="course">
@@ -107,4 +218,5 @@ window._courses = {{ courses|tojson }};
         <button class="btn btn-accent" id="submit-round" style="margin-top:0.75rem">Save Round</button>
     </div>
 </div>
+<script src="/static/flatpickr.min.js"></script>
 {% endblock %}

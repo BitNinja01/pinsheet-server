@@ -239,6 +239,17 @@ body {
     border-left-color: var(--ps-accent);
     font-weight: var(--ps-fw-label);
 }
+.ps-nav-label {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-eyebrow);
+    font-weight: var(--ps-fw-label);
+    letter-spacing: var(--ps-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ps-ink-3);
+    padding-left: 14px;
+    padding-bottom: 6px;
+    border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+}
 
 /* ── User switcher ──────────────────────────────────────────────────── */
 .ps-user-switch {
