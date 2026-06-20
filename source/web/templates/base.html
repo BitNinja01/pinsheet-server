@@ -23,9 +23,11 @@
             <div class="ps-sidebar-inner">
                 <div class="ps-logo">PinSheet</div>
 
+                <span class="ps-nav-label">Hub</span>
                 <nav class="ps-nav">
                     <a href="/" class="{% if current_page == 'dashboard' %}is-active{% endif %}">Home</a>
                 </nav>
+                <span class="ps-nav-label">Golf</span>
                 <nav class="ps-nav">
                     <a href="/profile" class="{% if current_page == 'profile' %}is-active{% endif %}">Profile</a>
                     <a href="/rounds" class="{% if current_page in ('round_entry', 'rounds_list') %}is-active{% endif %}">Rounds</a>
@@ -33,6 +35,7 @@
                     <a href="/courses" class="{% if current_page == 'courses' %}is-active{% endif %}">Courses</a>
                     <a href="/bag" class="{% if current_page == 'bag' %}is-active{% endif %}">Bag</a>
                 </nav>
+                <span class="ps-nav-label">Account</span>
                 <nav class="ps-nav">
                     <a href="/settings" class="{% if current_page == 'settings' %}is-active{% endif %}">Settings</a>
                     {% if current_user.is_admin %}<a href="/admin/invites">Admin</a>{% endif %}
