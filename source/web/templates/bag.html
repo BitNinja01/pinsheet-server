@@ -89,6 +89,9 @@
 .edit { outline: none; cursor: text; border-bottom: 1px solid transparent; padding: 0 1px; transition: background var(--ps-dur-quick) var(--ps-ease), border-color var(--ps-dur-quick) var(--ps-ease); }
 .edit:hover { border-bottom-color: var(--ps-rule-c); }
 .edit:focus { border-bottom-color: var(--ps-accent); background: var(--ps-accent-dim); }
+.ac-dd { position: absolute; top: 100%; left: 0; right: 0; z-index: 15; background: var(--ps-paper-2); border: var(--ps-rule) solid var(--ps-ink); max-height: 192px; overflow-y: auto; display: none; }
+.ac-dd .ac-o { font-family: var(--ps-font-mono); font-size: var(--ps-fs-body-lg); color: var(--ps-ink); padding: 7px 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-dd .ac-o:hover { background: var(--ps-accent-dim); }
 @media (max-width: 768px) {
     .btile-grid { grid-template-columns: repeat(2, 1fr); }
     .eqcat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -251,8 +254,8 @@
                     </div>
                 </div>
                 <label class="acf-field"><span class="acf-label">number</span><input class="acf-input" type="text" id="acf-number" placeholder="e.g. 4" autofocus></label>
-                <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" list="dl-brand" placeholder="e.g. titleist"></label>
-                <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" list="dl-model" placeholder="e.g. t100"></label>
+                <label class="acf-field"><span class="acf-label">brand</span><input class="acf-input" type="text" id="acf-brand" placeholder="e.g. titleist"></label>
+                <label class="acf-field"><span class="acf-label">model</span><input class="acf-input" type="text" id="acf-model" placeholder="e.g. t100"></label>
                 <label class="acf-field"><span class="acf-label">loft</span><input class="acf-input" type="text" id="acf-loft" placeholder="e.g. 23°"></label>
                 <div class="acf-field">
                     <span class="acf-label">lie</span>
@@ -270,9 +273,9 @@
                 </div>
                 <label class="acf-field"><span class="acf-label">length</span><input class="acf-input" type="text" id="acf-length" placeholder="e.g. 38.5"></label>
                 <label class="acf-field"><span class="acf-label">shaft flex</span><input class="acf-input" type="text" id="acf-shaft_flex" placeholder="e.g. stiff"></label>
-                <label class="acf-field"><span class="acf-label">shaft brand</span><input class="acf-input" type="text" id="acf-shaft_brand" list="dl-shaft_brand" placeholder="e.g. project x"></label>
-                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" list="dl-shaft" placeholder="e.g. 6.5"></label>
-                <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" list="dl-grip" placeholder="e.g. tour velvet"></label>
+                <label class="acf-field"><span class="acf-label">shaft brand</span><input class="acf-input" type="text" id="acf-shaft_brand" placeholder="e.g. project x"></label>
+                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. 6.5"></label>
+                <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" placeholder="e.g. tour velvet"></label>
                 <label class="acf-field"><span class="acf-label">swing wt</span><input class="acf-input" type="text" id="acf-sw" placeholder="e.g. D2"></label>
                 <label class="acf-field"><span class="acf-label">carry · yd</span><input class="acf-input" type="text" id="acf-carry" placeholder="e.g. 205"></label>
             </div>
@@ -283,14 +286,44 @@
         </div>
     </div>
 </div>
-<datalist id="dl-brand">{% for v in autocomplete_data.brand %}<option value="{{ v }}">{% endfor %}</datalist>
-<datalist id="dl-model">{% for v in autocomplete_data.model %}<option value="{{ v }}">{% endfor %}</datalist>
-<datalist id="dl-shaft_brand">{% for v in autocomplete_data.shaft_brand %}<option value="{{ v }}">{% endfor %}</datalist>
-<datalist id="dl-shaft">{% for v in autocomplete_data.shaft %}<option value="{{ v }}">{% endfor %}</datalist>
-<datalist id="dl-grip">{% for v in autocomplete_data.grip %}<option value="{{ v }}">{% endfor %}</datalist>
 <script>
 var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
 var _editingClubId = null;
+var AC_DATA = {{ autocomplete_data|tojson|safe }};
+
+function initAutocomplete(inputId, field) {
+    var input = document.getElementById(inputId);
+    if (!input || !AC_DATA[field] || !AC_DATA[field].length) return;
+    var wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    var dd = document.createElement('div');
+    dd.className = 'ac-dd';
+    wrap.appendChild(dd);
+    function show() {
+        var v = input.value.toLowerCase();
+        var m = AC_DATA[field].filter(function(o){ return o.toLowerCase().indexOf(v) !== -1; });
+        if (v && m.length) {
+            dd.innerHTML = m.map(function(o){ return '<div class="ac-o" data-v="' + o.replace(/"/g,'&quot;') + '">' + esc(o) + '</div>'; }).join('');
+            dd.style.display = 'block';
+        } else { dd.style.display = 'none'; }
+    }
+    input.addEventListener('input', show);
+    input.addEventListener('focus', show);
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { dd.style.display = 'none'; }
+        if (e.key === 'Enter' && dd.style.display === 'block') {
+            var sel = dd.querySelector('.ac-o');
+            if (sel) { input.value = sel.dataset.v; dd.style.display = 'none'; e.preventDefault(); }
+        }
+    });
+    input.addEventListener('blur', function(){ setTimeout(function(){ dd.style.display = 'none'; }, 150); });
+    dd.addEventListener('mousedown', function(e) {
+        var o = e.target.closest('.ac-o');
+        if (o) { input.value = o.dataset.v; dd.style.display = 'none'; input.focus(); input.dispatchEvent(new Event('input')); }
+    });
+}
 
 function sortSlots() {
     var clubs = [];
@@ -588,6 +621,7 @@ document.addEventListener('DOMContentLoaded',function(){
         if (view==='sheet') updateGaps();
     }
     document.querySelectorAll('.bag-tab').forEach(function(t){t.onclick=function(){var v=t.dataset.view;location.hash=v;switchTab(v);};});
+    ['acf-brand','acf-model','acf-shaft_brand','acf-shaft','acf-grip'].forEach(function(id){initAutocomplete(id,id.replace('acf-',''));});
     sortSlots();
     while (BAG.slots.length < BAG.bagSize) BAG.slots.push(null);
     bindTileEvents(); bindEditFields(); renderEquipButtons();
