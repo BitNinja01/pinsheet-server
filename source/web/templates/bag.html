@@ -71,6 +71,19 @@
 .ebtn:disabled { opacity: 0.4; cursor: default; }
 .ebtn.in { color: var(--ps-accent); border-color: color-mix(in oklab, var(--ps-accent) 50%, transparent); }
 .ebtn.in:hover { color: var(--ps-warn); border-color: var(--ps-warn); }
+.chip { display: inline-flex; padding: 5px 10px; font-family: var(--ps-font-mono); font-size: 10px; letter-spacing: var(--ps-tracking-chip); text-transform: uppercase; border: var(--ps-rule) solid var(--ps-rule-c); color: var(--ps-ink-2); font-weight: var(--ps-fw-label); }
+.chip.on { background: var(--ps-ink); color: var(--ps-paper); border-color: var(--ps-ink); }
+.acf-body { padding: 22px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; }
+.acf-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.acf-field.wide { grid-column: 1 / -1; }
+.acf-label { font-family: var(--ps-font-mono); font-size: 10px; letter-spacing: var(--ps-tracking-eyebrow); text-transform: uppercase; color: var(--ps-ink-3); }
+.acf-input { font-family: var(--ps-font-mono); font-size: var(--ps-fs-body-lg); color: var(--ps-ink); background: transparent; border: var(--ps-rule) solid var(--ps-rule-c); padding: 9px 11px; outline: none; width: 100%; box-sizing: border-box; }
+.acf-input::placeholder { color: var(--ps-ink-3); opacity: 0.55; }
+.acf-input:focus { border-color: var(--ps-accent); background: var(--ps-accent-dim); }
+.acf-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.acf-cats .chip { appearance: none; background: transparent; cursor: pointer; }
+.acf-cats .chip.on { background: var(--ps-ink); color: var(--ps-paper); border-color: var(--ps-ink); }
+.acf-foot { display: flex; justify-content: flex-end; gap: 10px; padding: var(--ps-sp-4) var(--ps-sp-6); border-top: var(--ps-rule) solid var(--ps-rule-c); }
 .edit { outline: none; cursor: text; border-bottom: 1px solid transparent; padding: 0 1px; transition: background var(--ps-dur-quick) var(--ps-ease), border-color var(--ps-dur-quick) var(--ps-ease); }
 .edit:hover { border-bottom-color: var(--ps-rule-c); }
 .edit:focus { border-bottom-color: var(--ps-accent); background: var(--ps-accent-dim); }
@@ -94,7 +107,6 @@
         <div class="bag-stat"><span class="bag-stat-l">avg gap</span><span class="bag-stat-v" id="bag-avg-gap">—</span></div>
         <div class="bag-stat"><span class="bag-stat-l">swing wt</span><span class="bag-stat-v" id="bag-swing-wt">—</span></div>
         <a class="page-link" href="#" id="bag-to-equip">Equipment <span class="arr">→</span></a>
-        <button class="ps-btn" id="bag-add-club">+ Add club</button>
     </div>
 </div>
 <div class="bag-body" id="bag-body">
@@ -156,7 +168,10 @@
                     <span class="ps-eyebrow">Equipment</span>
                     <span class="gapband-note">{{ clubs|length }} owned · {{ slots|length }} in bag</span>
                 </div>
-                <a class="page-link back" href="#" id="bag-to-sheet" style="border:0;padding:0;font-size:10px;letter-spacing:0.16em;color:var(--ps-ink-3)"><span class="arr">←</span> Bag</a>
+                <div style="display:flex;align-items:center;gap:var(--ps-sp-4)">
+                    <button class="ps-btn" type="button" id="bag-eq-add-btn">+ Add club</button>
+                    <a class="page-link back" href="#" id="bag-to-sheet" style="border:0;padding:0;font-size:10px;letter-spacing:0.16em;color:var(--ps-ink-3)"><span class="arr">←</span> Bag</a>
+                </div>
             </div>
         </div>
         <div class="eqcards">
@@ -209,6 +224,40 @@
         </div>
     </div>
 </div>
+
+<div id="add-club-overlay" style="display:none">
+    <div class="picker-scrim">
+        <div class="picker acf">
+            <div class="picker-head">
+                <span class="ps-eyebrow">Add a club</span>
+                <button class="btile-x" type="button" id="add-club-close">×</button>
+            </div>
+            <div class="acf-body">
+                <div class="acf-field wide">
+                    <span class="acf-label">category</span>
+                    <div class="acf-cats" id="acf-cats">
+                        <button type="button" class="chip on" data-cat="Woods">Woods</button>
+                        <button type="button" class="chip" data-cat="Hybrids">Hybrids</button>
+                        <button type="button" class="chip" data-cat="Irons">Irons</button>
+                        <button type="button" class="chip" data-cat="Wedges">Wedges</button>
+                        <button type="button" class="chip" data-cat="Putter">Putter</button>
+                    </div>
+                </div>
+                <label class="acf-field"><span class="acf-label">club</span><input class="acf-input" type="text" id="acf-club" placeholder="e.g. 4-iron" autofocus></label>
+                <label class="acf-field"><span class="acf-label">loft</span><input class="acf-input" type="text" id="acf-loft" placeholder="e.g. 23°"></label>
+                <label class="acf-field"><span class="acf-label">head</span><input class="acf-input" type="text" id="acf-head" placeholder="e.g. t100"></label>
+                <label class="acf-field"><span class="acf-label">shaft</span><input class="acf-input" type="text" id="acf-shaft" placeholder="e.g. project x 6.5"></label>
+                <label class="acf-field"><span class="acf-label">grip</span><input class="acf-input" type="text" id="acf-grip" placeholder="e.g. tour velvet"></label>
+                <label class="acf-field"><span class="acf-label">swing wt</span><input class="acf-input" type="text" id="acf-sw" placeholder="e.g. D2"></label>
+                <label class="acf-field"><span class="acf-label">carry · yd</span><input class="acf-input" type="text" id="acf-carry" placeholder="e.g. 205"></label>
+            </div>
+            <div class="acf-foot">
+                <button class="ps-btn ps-btn--ghost" type="button" id="add-club-cancel">Cancel</button>
+                <button class="ps-btn" type="button" id="add-club-submit">Add club</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
 function saveAllSlots() {
@@ -220,8 +269,30 @@ function saveClub(id, field, value) {
     c[field] = value;
     fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 }
-function addClub() {
-    fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+var addClubCat = 'Irons';
+function openAddDialog() {
+    addClubCat = 'Irons';
+    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.classList.toggle('on',c.dataset.cat==='Irons');});
+    ['club','loft','head','shaft','grip','sw','carry'].forEach(function(f){document.getElementById('acf-'+f).value='';});
+    document.getElementById('acf-carry').placeholder = 'e.g. 205';
+    document.getElementById('add-club-overlay').style.display='block';
+    setTimeout(function(){document.getElementById('acf-club').focus();},100);
+}
+function closeAddDialog() {
+    document.getElementById('add-club-overlay').style.display='none';
+}
+function submitAddClub() {
+    var data = {
+        category: addClubCat,
+        club: document.getElementById('acf-club').value.trim() || 'New club',
+        loft: document.getElementById('acf-loft').value.trim(),
+        head: document.getElementById('acf-head').value.trim(),
+        shaft: document.getElementById('acf-shaft').value.trim(),
+        grip: document.getElementById('acf-grip').value.trim(),
+        sw: document.getElementById('acf-sw').value.trim(),
+        carry: document.getElementById('acf-carry').value.trim() === '' ? null : (parseInt(document.getElementById('acf-carry').value, 10) || null),
+    };
+    fetch('/bag/club', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
         .then(function(r) { return r.json(); })
         .then(function(d) { if (d.ok) location.reload(); });
 }
@@ -381,8 +452,13 @@ function deleteClub(clubId) {
 document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('picker-close').onclick=closePicker;
     document.getElementById('picker-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closePicker();};
-    document.getElementById('bag-add-club').onclick=addClub;
     document.querySelectorAll('[data-action="delete-club"]').forEach(function(el){el.onclick=function(){deleteClub(el.dataset.clubId);};});
+    document.getElementById('bag-eq-add-btn').onclick=openAddDialog;
+    document.getElementById('add-club-close').onclick=closeAddDialog;
+    document.getElementById('add-club-cancel').onclick=closeAddDialog;
+    document.getElementById('add-club-submit').onclick=submitAddClub;
+    document.getElementById('add-club-overlay').querySelector('.picker-scrim').onclick=function(e){if(e.target===e.currentTarget)closeAddDialog();};
+    document.querySelectorAll('#acf-cats .chip').forEach(function(c){c.onclick=function(){document.querySelectorAll('#acf-cats .chip').forEach(function(x){x.classList.remove('on');});c.classList.add('on');addClubCat=c.dataset.cat;var isP=addClubCat==='Putter';document.getElementById('acf-carry').placeholder=isP?'— (putter)':'e.g. 205';};});
     function showSheet(){document.getElementById('bag-sheet-view').style.display='block';document.getElementById('bag-equip-view').style.display='none';}
     function showEquip(){document.getElementById('bag-sheet-view').style.display='none';document.getElementById('bag-equip-view').style.display='block';}
     document.getElementById('bag-to-equip').onclick=function(e){e.preventDefault();showEquip();};
