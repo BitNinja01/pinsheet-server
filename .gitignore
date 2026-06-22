@@ -30,12 +30,10 @@ data/
 
 # Import archives
 pinsheet-import.zip
+pinsheet-pages.zip
 
 # Example / demo data (not for distribution)
-example_data/
-fake_players/
-demo_home_page/
-demo_scorecard_page/
+example/
 
 # Design system artifacts (internal)
 design-system/
