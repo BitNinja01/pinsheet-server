@@ -34,6 +34,7 @@ pinsheet-pages.zip
 
 # Example / demo data (not for distribution)
 example/
+examples/
 
 # Design system artifacts (internal)
 design-system/
