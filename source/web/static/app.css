@@ -1568,6 +1568,12 @@ select.hole-input { width: 3rem; appearance: none; }
     .ds-hero-text .ps-eyebrow {
         font-size: var(--ps-fs-body);
     }
+    .ds-hero-text > div:last-child {
+        gap: 14px !important;
+    }
+    .ds-hero-text > div:last-child > div {
+        font-size: var(--ps-fs-score) !important;
+    }
     .ds-hero-bg {
         display: none !important;
     }
@@ -1576,6 +1582,13 @@ select.hole-input { width: 3rem; appearance: none; }
     }
     .ds-hero-hcap .ps-eyebrow {
         text-align: left !important;
+        font-size: var(--ps-fs-body);
+    }
+    .board-card-cell-value {
+        font-size: var(--ps-fs-lg);
+    }
+    .board-card-cell-label {
+        font-size: var(--ps-fs-body-lg);
     }
     .ds-rail {
         border-left: none !important;
