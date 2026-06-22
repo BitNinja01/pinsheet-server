@@ -180,16 +180,20 @@
       <div class="board-card-grid">
         {% for key in board_stats %}
         {% set val = s[key] %}
-        {% set cm = board_meta[key] %}
-        {% set is_leader = (cm.min is not none) and (
-          (stat_meta[key].higher_better and val >= cm.max) or
-          (not stat_meta[key].higher_better and val <= cm.min)
-        ) %}
         <div class="board-card-cell">
           <div class="board-card-cell-label">{{ stat_meta[key].label }}</div>
-          <div class="board-card-cell-value{% if val is none %} is-empty{% elif is_leader %} is-leader{% endif %}">
-            {% if val is not none %}{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}{% else %}&mdash;{% endif %}
+          {% if val is not none %}
+          {% set cm = board_meta[key] %}
+          {% set is_leader = (cm.min is not none) and (
+            (stat_meta[key].higher_better and val >= cm.max) or
+            (not stat_meta[key].higher_better and val <= cm.min)
+          ) %}
+          <div class="board-card-cell-value{% if is_leader %} is-leader{% endif %}">
+            {{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}
           </div>
+          {% else %}
+          <div class="board-card-cell-value is-empty">&mdash;</div>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
