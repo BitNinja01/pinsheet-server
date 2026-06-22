@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div style="display:grid;grid-template-columns:1fr 268px;gap:36px;min-height:0;height:100%;">
+<div class="ds-layout" style="display:grid;grid-template-columns:1fr 268px;gap:36px;min-height:0;height:100%;">
 
   {#── Main column ──#}
   <main style="display:flex;flex-direction:column;min-width:0;min-height:0;">
@@ -20,11 +20,11 @@
     {% for w in current_user.display_name.split() %}
       {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
     {% endfor %}
-    <div style="flex-shrink:0;height:228px;background:var(--ps-paper-2);
+    <div class="ds-hero" style="flex-shrink:0;height:228px;background:var(--ps-paper-2);
                 display:flex;align-items:center;padding:0 36px;gap:40px;
                 border-top:1px solid var(--ps-ink);border-bottom:1px solid var(--ps-rule-c);
                 position:relative;overflow:hidden;">
-      <div style="font-family:var(--ps-font-display);font-weight:200;font-size:var(--ps-fs-hero);
+      <div class="ds-hero-bg" style="font-family:var(--ps-font-display);font-weight:200;font-size:var(--ps-fs-hero);
                   letter-spacing:-0.05em;line-height:1;color:var(--ps-rule-c);
                   position:absolute;right:320px;top:50%;transform:translateY(-50%);
                   user-select:none;pointer-events:none;font-variant-numeric:tabular-nums;">
@@ -69,6 +69,7 @@
     {% endif %}
     {% endfor %}
 
+    <div class="desktop-table">
     {# Column headers #}
     {% set cols = '220px 1fr 1fr 1fr 1fr 1fr 1fr' %}
     <div style="display:grid;grid-template-columns:{{ cols }};gap:14px;
@@ -158,6 +159,44 @@
       </div>
       {% endif %}
     </div>
+    </div>{#-- end .desktop-table --#}
+
+    {#-- Mobile board cards --#}
+    {% if rankings %}
+    <div class="mobile-cards">
+    {% for entry in rankings %}
+    {% set is_you = entry.user_id == current_user.id %}
+    {% set s = entry.stats %}
+    {% set initials = [] %}
+    {% for w in entry.display_name.split() %}
+      {% if loop.index <= 2 %}{% set _ = initials.append(w[:1] | upper) %}{% endif %}
+    {% endfor %}
+    <div class="board-card{% if is_you %} is-you{% endif %}">
+      <div class="board-card-head">
+        <span class="board-card-rank{% if is_you %} is-accent{% endif %}">{{ '%02d' % loop.index }}</span>
+        <div class="ps-avatar {{ 'is-self' if is_you }}">{{ initials | join('') }}</div>
+        <span class="board-card-name">{{ entry.display_name }}{% if is_you %}<span class="board-card-tag">you</span>{% endif %}</span>
+      </div>
+      <div class="board-card-grid">
+        {% for key in board_stats %}
+        {% set val = s[key] %}
+        {% set cm = board_meta[key] %}
+        {% set is_leader = (cm.min is not none) and (
+          (stat_meta[key].higher_better and val >= cm.max) or
+          (not stat_meta[key].higher_better and val <= cm.min)
+        ) %}
+        <div class="board-card-cell">
+          <div class="board-card-cell-label">{{ stat_meta[key].label }}</div>
+          <div class="board-card-cell-value{% if val is none %} is-empty{% elif is_leader %} is-leader{% endif %}">
+            {% if val is not none %}{{ '%.1f'|format(val) }}{{ stat_meta[key].suffix }}{% else %}&mdash;{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    </div>
+    {% endif %}
 
     <div style="padding-top:10px;border-top:1px solid var(--ps-rule-c);flex-shrink:0;">
       <div style="font-family:var(--ps-font-mono);font-size:var(--ps-fs-micro);color:var(--ps-ink-3);">
@@ -171,7 +210,7 @@
   </main>
 
   {#── Right rail ──#}
-  <aside style="display:flex;flex-direction:column;min-height:0;
+  <aside class="ds-rail" style="display:flex;flex-direction:column;min-height:0;
                 border-left:1px solid var(--ps-rule-c);padding-left:28px;">
 
     <div style="flex:1;padding:2px 0 0;display:flex;flex-direction:column;min-height:0;gap:14px;">
