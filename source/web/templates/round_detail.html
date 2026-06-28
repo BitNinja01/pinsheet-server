@@ -32,7 +32,16 @@
         </select>
       </div>
       <div class="summary-item"><span class="summary-label">Score</span> {{ total.gross }} ({% if total.diff is not none and total.diff > 0 %}+{% endif %}{{ total.diff }})</div>
-      <div class="summary-item"><span class="summary-label">Diff</span> {{ round.differential }}</div>
+      <div class="summary-item" id="diff-edit-row">
+        <span class="summary-label">Diff</span>
+        <input type="number" id="edit-diff" class="step-input" step="0.1"
+               value="{{ round.differential }}"
+               style="width:5rem;text-align:right;">
+        {% if round.differential_locked %}
+        <span id="diff-lock-badge" title="Manual override — will not be recomputed" style="margin-left:4px;cursor:default;">&#128274;</span>
+        <button type="button" id="btn-clear-diff-lock" class="btn-link" style="margin-left:6px;font-size:var(--ps-fs-eyebrow);">clear</button>
+        {% endif %}
+      </div>
       {% if round.computed_handicap %}
       <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
       {% endif %}
@@ -209,6 +218,11 @@
       <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:6px;font-family:var(--ps-font-mono);">
         {{ "%.1f"|format(hi_before) if hi_before is not none else '--' }} → {{ "%.1f"|format(hcp_val) }}
       </div>
+      {% if round.differential %}
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;font-family:var(--ps-font-mono);">
+        Diff {{ round.differential }}{% if round.differential_locked %} &#128274;{% endif %}
+      </div>
+      {% endif %}
       {% if hi_before is not none %}
       {% set hcp_diff = hi_before - hcp_val %}
       <div style="font-size:var(--ps-fs-round-meta);font-weight:500;margin-top:3px;font-family:var(--ps-font-mono);{% if hcp_diff > 0 %}color:var(--ps-accent);{% elif hcp_diff < 0 %}color:var(--ps-warn);{% endif %}">
@@ -525,20 +539,37 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
         });
     }
 
+    // Differential lock logic
+    var diffInput = document.getElementById("edit-diff");
+    var originalDiff = "{{ round.differential }}";
+    var isCurrentlyLocked = {{ 'true' if round.differential_locked else 'false' }};
+    var diffClearRequested = window._diffClearRequested || false;
+    var body = {
+        date: date,
+        course: course,
+        tees: tees,
+        holes_played: "{{ round.holes_played }}",
+        entry_mode: entryMode,
+        transport: transport,
+        notes: notes,
+        holes: holes,
+        gross_total: grossTotal,
+    };
+
+    if (diffClearRequested) {
+        body.differential_override = null;
+        body.differential_locked = false;
+    } else if (diffInput && diffInput.value !== originalDiff) {
+        body.differential_override = parseFloat(diffInput.value);
+        body.differential_locked = true;
+    } else {
+        body.differential_locked = isCurrentlyLocked;
+    }
+
     fetch("/api/rounds/{{ round.date }}/{{ round.index }}", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            date: date,
-            course: course,
-            tees: tees,
-            holes_played: "{{ round.holes_played }}",
-            entry_mode: entryMode,
-            transport: transport,
-            notes: notes,
-            holes: holes,
-            gross_total: grossTotal,
-        }),
+        body: JSON.stringify(body),
     }).then(function(r) {
         if (r.ok) {
             window.location.href = "/rounds/{{ round.date }}/{{ round.index }}";
@@ -549,6 +580,16 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
         alert("Save failed: " + err.message);
     });
 });
+
+var btnClearLock = document.getElementById("btn-clear-diff-lock");
+if (btnClearLock) {
+    btnClearLock.addEventListener("click", function() {
+        window._diffClearRequested = true;
+        var badge = document.getElementById("diff-lock-badge");
+        if (badge) badge.style.display = "none";
+        btnClearLock.style.display = "none";
+    });
+}
 {% else %}
 document.getElementById("btn-delete")?.addEventListener("click", function () {
     if (!confirm("Delete this round?")) return;
