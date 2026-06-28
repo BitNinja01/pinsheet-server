@@ -188,5 +188,10 @@ def init_db() -> None:
         db.execute("ALTER TABLE clubs DROP COLUMN head")
     except Exception:
         pass
+    try:
+        db.execute("ALTER TABLE rounds ADD COLUMN differential_locked INTEGER NOT NULL DEFAULT 0")
+        db.commit()
+    except Exception:
+        pass  # column already exists
     db.commit()
     db.close()

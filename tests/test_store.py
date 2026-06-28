@@ -46,6 +46,13 @@ def test_init_db_creates_tables(db):
     db.close()
 
 
+def test_differential_locked_column_exists(db):
+    cols = db.execute("PRAGMA table_info(rounds)").fetchall()
+    col_names = [c["name"] for c in cols]
+    assert "differential_locked" in col_names
+    db.close()
+
+
 def test_create_and_get_user(db):
     u = create_user("testuser", "Test User", "password123")
     assert u["username"] == "testuser"
