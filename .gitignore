@@ -36,6 +36,10 @@ pinsheet-pages.zip
 pinsheet-prod.db
 *-prod.db
 
+# Prod DB snapshots pulled for local debugging (real user data — never commit)
+pinsheet-prod.db
+*-prod.db
+
 # Example / demo data (not for distribution)
 example/
 examples/
