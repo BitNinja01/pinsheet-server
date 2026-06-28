@@ -283,7 +283,7 @@ def recompute_all_handicaps() -> None:
                                 )
                                 user_updated += 1
 
-                window = chronological[:i + 1]
+                window = chronological[max(0, i + 1 - 20):i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:
                     new_val = str(hi)

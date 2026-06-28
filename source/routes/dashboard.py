@@ -209,7 +209,7 @@ def _build_profile_context():
             "putts": total_putts,
         })
 
-    best_rounds = get_best_n_rounds(rounds, include_9hole)
+    best_rounds = get_best_n_rounds(rounds[:20], include_9hole)
     best_keys = {(r.date, r.index) for r in best_rounds}
     for rd in rounds_data:
         if (rd["date"], rd["index"]) in best_keys:
