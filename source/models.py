@@ -28,6 +28,7 @@ class RoundData:
     differential: str = ""
     computed_handicap: str = ""
     excluded: bool = False
+    differential_locked: bool = False
     index: int = 0
 
 
@@ -123,6 +124,7 @@ def dict_to_round(d: dict) -> RoundData:
         differential=d.get("differential", ""),
         computed_handicap=d.get("computed_handicap", ""),
         excluded=d.get("excluded", False),
+        differential_locked=bool(d.get("differential_locked", False)),
         index=d.get("index", 0),
     )
 

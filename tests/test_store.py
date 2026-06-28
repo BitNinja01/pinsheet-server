@@ -53,6 +53,18 @@ def test_differential_locked_column_exists(db):
     db.close()
 
 
+def test_dict_to_round_reads_differential_locked():
+    from source.models import dict_to_round
+    r = dict_to_round({"differential_locked": True, "differential": "21.5"})
+    assert r.differential_locked is True
+
+
+def test_dict_to_round_defaults_differential_locked_false():
+    from source.models import dict_to_round
+    r = dict_to_round({"differential": "21.5"})
+    assert r.differential_locked is False
+
+
 def test_create_and_get_user(db):
     u = create_user("testuser", "Test User", "password123")
     assert u["username"] == "testuser"
