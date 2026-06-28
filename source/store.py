@@ -133,6 +133,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
             "notes": row["notes"],
             "excluded": bool(row["excluded"]),
             "computed_handicap": row["computed_handicap"],
+            "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
@@ -162,6 +163,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
         "notes": row["notes"],
         "excluded": bool(row["excluded"]),
         "computed_handicap": row["computed_handicap"],
+        "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
     }
     if row["total_putts"]:
         r["total_putts"] = row["total_putts"]
@@ -180,8 +182,9 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
-            entry_mode, holes, total_gross, total_putts, differential, notes, excluded, computed_handicap)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            entry_mode, holes, total_gross, total_putts, differential, notes,
+            excluded, computed_handicap, differential_locked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id,
             golf_round.get("course", ""),
@@ -197,6 +200,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             golf_round.get("notes", ""),
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
+            1 if golf_round.get("differential_locked") else 0,
         ),
     )
     round_id = cur.lastrowid
@@ -229,6 +233,13 @@ def update_round_handicap(date: str, index: int, handicap: float, user_id: int) 
 
 def update_round_differential(date: str, index: int, differential: float, user_id: int) -> None:
     db = get_db()
+    locked = db.execute(
+        "SELECT differential_locked FROM rounds WHERE user_id = ? AND date = ? AND round_index = ?",
+        (user_id, date, index),
+    ).fetchone()
+    if locked and locked["differential_locked"]:
+        db.close()
+        return
     db.execute(
         "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
         (str(differential), user_id, date, index),
@@ -268,7 +279,7 @@ def recompute_all_handicaps() -> None:
             db = get_db()
 
             for i, r in enumerate(chronological):
-                if not r.differential or r.differential == "0":
+                if (not r.differential or r.differential == "0") and not r.differential_locked:
                     course_data = courses_data.get(r.course)
                     if course_data:
                         tee_data = course_data.get("tees", {}).get(r.tees)

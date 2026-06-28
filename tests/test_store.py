@@ -214,6 +214,38 @@ def test_update_round_handicap(db):
     db.close()
 
 
+def test_save_and_load_round_preserves_differential_locked(db):
+    create_user("golfer", "Golfer", "pass1234")
+    golf_round = {
+        "course": "Test GC", "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {}, "total_gross": "85",
+        "differential": "21.5", "notes": "", "excluded": False,
+        "computed_handicap": "19.8", "differential_locked": True,
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=1)
+    rounds = get_all_rounds(user_id=1)
+    assert len(rounds) == 1
+    assert rounds[0].differential_locked is True
+    assert rounds[0].differential == "21.5"
+    db.close()
+
+
+def test_update_round_differential_skips_locked_round(db):
+    from store import update_round_differential
+    create_user("golfer", "Golfer", "pass1234")
+    golf_round = {
+        "course": "Test GC", "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {}, "total_gross": "85",
+        "differential": "21.5", "notes": "", "excluded": False,
+        "computed_handicap": "19.8", "differential_locked": True,
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=1)
+    update_round_differential("2026-01-01", 0, 18.0, user_id=1)
+    rounds = get_all_rounds(user_id=1)
+    assert rounds[0].differential == "21.5"  # unchanged
+    db.close()
+
+
 def test_slope_rating_full_18(make_course):
     course = make_course()
     tee = course["Test GC"].tees["White"]
