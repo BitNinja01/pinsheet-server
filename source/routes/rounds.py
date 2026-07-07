@@ -10,6 +10,8 @@ from store import (
     get_slope_rating, save_round, delete_round,
     get_matches_for_user, link_round,
     recompute_all_handicaps,
+    recompute_handicaps_for_user,
+    set_round_excluded,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -104,6 +106,7 @@ def register_rounds_routes(app, csrf):
                 "differential": r.differential,
                 "index": r.index,
                 "in_handicap": False,
+                "excluded": r.excluded,
                 "entry_mode_display": display_mode,
                 "sparkline": sparkline,
                 "fir_display": fir_display,
@@ -597,6 +600,7 @@ def register_rounds_routes(app, csrf):
             "notes": data.get("notes", ""),
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
+            "excluded": data.get("excluded", old_round.excluded),
         }
 
         total_gross = 0
@@ -679,14 +683,29 @@ def register_rounds_routes(app, csrf):
         save_round(golf_round, data.get("date", date), int(index), current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
-        # Recompute cascade — update computed_handicap on all subsequent rounds
-        recompute_all_handicaps()
+        # Recompute cascade — update computed_handicap on this user's subsequent rounds
+        recompute_handicaps_for_user(current_user.id)
 
         return jsonify({"ok": True, "differential": differential})
+
+    @app.route("/api/rounds/<date>/<index>/exclude", methods=["POST"])
+    @login_required
+    @csrf.exempt
+    def api_rounds_exclude(date, index):
+        all_rounds = get_all_rounds_for_user()
+        found = any(r.date == date and str(r.index) == str(index) for r in all_rounds)
+        if not found:
+            return jsonify({"error": "Round not found"}), 404
+        data = request.get_json()
+        excluded = bool(data.get("excluded", False))
+        set_round_excluded(date, int(index), excluded, current_user.id)
+        recompute_handicaps_for_user(current_user.id)
+        return jsonify({"ok": True, "excluded": excluded})
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
     @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)
+        recompute_handicaps_for_user(current_user.id)
         return jsonify({"ok": True})

@@ -455,6 +455,43 @@ body {
     border-left: var(--ps-rule) solid var(--ps-accent);
     padding-left: calc(var(--ps-sp-3) - 1px);
 }
+.ps-table tbody tr.is-excluded td:first-child {
+    border-left: var(--ps-rule) solid var(--ps-warn);
+    padding-left: calc(var(--ps-sp-3) - 1px);
+}
+.ps-badge.is-excluded {
+    display: inline-block;
+    font-size: var(--ps-fs-micro);
+    font-family: var(--ps-font-mono);
+    letter-spacing: 0.06em;
+    color: var(--ps-warn);
+    border: 1px solid var(--ps-warn);
+    border-radius: 0;
+    padding: 0 4px;
+    margin-left: 4px;
+    line-height: 1.4;
+}
+.btn-round-del {
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--ps-ink-3);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 6px;
+    line-height: 1;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+.btn-round-del:hover {
+    opacity: 1;
+    color: var(--ps-warn);
+}
+.round-card .btn-round-del {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+}
 .ps-table .ps-course {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-body);
@@ -1604,9 +1641,14 @@ select.hole-input { width: 3rem; appearance: none; }
     border: var(--ps-rule) solid var(--ps-rule-c);
     padding: var(--ps-sp-3);
     cursor: pointer;
+    position: relative;
 }
 .round-card.is-handicap {
     border-left: var(--ps-rule) solid var(--ps-accent);
+    padding-left: calc(var(--ps-sp-3) - 1px);
+}
+.round-card.is-excluded {
+    border-left: var(--ps-rule) solid var(--ps-warn);
     padding-left: calc(var(--ps-sp-3) - 1px);
 }
 .round-card + .round-card { margin-top: 6px; }

@@ -8,6 +8,19 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     });
+
+    document.querySelectorAll(".btn-round-del").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (!confirm("Delete this round?")) return;
+            var date = this.dataset.date;
+            var index = this.dataset.index;
+            fetch("/api/rounds/" + date + "/" + index, { method: "DELETE" })
+                .then(function (r) {
+                    if (r.ok) location.reload();
+                });
+        });
+    });
 });
 
 (function () {

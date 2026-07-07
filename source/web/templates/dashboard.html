@@ -133,6 +133,7 @@
                 <th class="r">GIR</th>
                 <th class="r">Putt</th>
                 <th class="r">By hole</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -173,6 +174,7 @@
                     </svg>
                     {% endif %}
                 </td>
+                <td><button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -199,6 +201,7 @@
                         <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
+                <button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button>
             </div>
             <div class="round-card-stats">
                 <div class="round-card-stat"><span class="rcd-label">Diff</span><span class="rcd-value">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</span></div>

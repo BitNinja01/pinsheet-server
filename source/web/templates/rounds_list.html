@@ -29,15 +29,17 @@
                 <th class="r">GIR</th>
                 <th class="r">Putt</th>
                 <th class="r">By hole</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
         {% for r in rounds %}
             <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
-                class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}">
+                class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}{% if r.excluded %} is-excluded{% endif %}">
                 <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ r.date }}</td>
                 <td>
                     <div class="ps-course">{{ r.course }}</div>
+                    {% if r.excluded %}<span class="ps-badge is-excluded">Excluded</span>{% endif %}
                 </td>
                 <td style="color: var(--ps-ink-3);">{{ r.tees }}</td>
                 <td class="r">
@@ -69,6 +71,7 @@
                     </svg>
                     {% endif %}
                 </td>
+                <td><button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -78,12 +81,12 @@
     <!-- Mobile cards -->
     <div class="mobile-cards">
     {% for r in rounds %}
-        <div class="round-card{% if r.in_handicap %} is-handicap{% endif %}"
+        <div class="round-card{% if r.in_handicap %} is-handicap{% endif %}{% if r.excluded %} is-excluded{% endif %}"
              data-date="{{ r.date }}" data-index="{{ r.index }}">
             <div class="round-card-header">
                 <div>
                     <div class="round-card-date">{{ r.date }}</div>
-                    <div class="round-card-course">{{ r.course }}</div>
+                    <div class="round-card-course">{{ r.course }}{% if r.excluded %} <span class="ps-badge is-excluded">Excluded</span>{% endif %}</div>
                     <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
                 </div>
                 <div class="round-card-score">
@@ -95,6 +98,7 @@
                         <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
+                <button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button>
             </div>
             <div class="round-card-stats">
                 <div class="round-card-stat"><span class="rcd-label">Diff</span><span class="rcd-value">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</span></div>

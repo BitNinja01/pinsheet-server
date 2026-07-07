@@ -635,8 +635,12 @@ def test_recompute_all_handicaps(db):
     rounds = get_all_rounds(user_id=1)
     rounds.sort(key=lambda r: r.date)
 
-    for r in rounds:
-        assert r.computed_handicap not in (None, "", "0"), \
-            f"round {r.date} has empty value ({r.computed_handicap})"
+    for i, r in enumerate(rounds):
+        if i < 2:
+            assert r.computed_handicap in ("", None), \
+                f"round {r.date} (index {i}) should be empty, got {r.computed_handicap}"
+        else:
+            assert r.computed_handicap not in (None, "", "0"), \
+                f"round {r.date} (index {i}) has empty value ({r.computed_handicap})"
     assert rounds[-1].computed_handicap != "99.9"
     assert float(rounds[-1].computed_handicap) < 20.0

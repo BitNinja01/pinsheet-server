@@ -42,6 +42,10 @@
         <button type="button" id="btn-clear-diff-lock" class="btn-link" style="margin-left:6px;font-size:var(--ps-fs-eyebrow);">clear</button>
         {% endif %}
       </div>
+      <div class="summary-item">
+        <span class="summary-label">Exclude from HCP</span>
+        <input type="checkbox" id="edit-excluded"{% if round.excluded %} checked{% endif %}>
+      </div>
       {% if round.computed_handicap %}
       <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
       {% endif %}
@@ -221,6 +225,11 @@
       {% if round.differential %}
       <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;font-family:var(--ps-font-mono);">
         Diff {{ round.differential }}{% if round.differential_locked %} &#128274;{% endif %}
+      </div>
+      {% endif %}
+      {% if round.excluded %}
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-warn);margin-top:4px;font-family:var(--ps-font-mono);">
+        Excluded from handicap
       </div>
       {% endif %}
       {% if hi_before is not none %}
@@ -544,6 +553,7 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
     var originalDiff = "{{ round.differential }}";
     var isCurrentlyLocked = {{ 'true' if round.differential_locked else 'false' }};
     var diffClearRequested = window._diffClearRequested || false;
+    var excludedEl = document.getElementById("edit-excluded");
     var body = {
         date: date,
         course: course,
@@ -554,6 +564,7 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
         notes: notes,
         holes: holes,
         gross_total: grossTotal,
+        excluded: excludedEl ? excludedEl.checked : false,
     };
 
     if (diffClearRequested) {
