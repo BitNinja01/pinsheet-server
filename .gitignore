@@ -30,16 +30,17 @@ data/
 
 # Import archives
 pinsheet-import.zip
+pinsheet-pages.zip
 
 # Prod DB snapshots pulled for local debugging (real user data — never commit)
 pinsheet-prod.db
 *-prod.db
+*-prod.db-shm
+*-prod.db-wal
 
 # Example / demo data (not for distribution)
-example_data/
-fake_players/
-demo_home_page/
-demo_scorecard_page/
+example/
+examples/
 
 # Design system artifacts (internal)
 design-system/

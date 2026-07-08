@@ -9,6 +9,9 @@ from store import (
     load_course_draft, save_course_draft, clear_course_draft,
     get_slope_rating, save_round, delete_round,
     get_matches_for_user, link_round,
+    recompute_all_handicaps,
+    recompute_handicaps_for_user,
+    set_round_excluded,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -103,6 +106,7 @@ def register_rounds_routes(app, csrf):
                 "differential": r.differential,
                 "index": r.index,
                 "in_handicap": False,
+                "excluded": r.excluded,
                 "entry_mode_display": display_mode,
                 "sparkline": sparkline,
                 "fir_display": fir_display,
@@ -596,6 +600,7 @@ def register_rounds_routes(app, csrf):
             "notes": data.get("notes", ""),
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
+            "excluded": data.get("excluded", old_round.excluded),
         }
 
         total_gross = 0
@@ -638,7 +643,28 @@ def register_rounds_routes(app, csrf):
                         adjusted_total += int(hole_data.get("gross", 0))
                 adjusted_gross = adjusted_total
 
-        differential = calc_round_dif(slope, adjusted_gross, rating)
+        # --- Differential: lock-aware ---
+        diff_override = data.get("differential_override")  # float or None
+        send_override = "differential_override" in data
+        client_locked = data.get("differential_locked", False)
+
+        if send_override and diff_override is not None:
+            # User explicitly provided a new manual value — lock it
+            differential = round(float(diff_override), 1)
+            golf_round["differential_locked"] = True
+        elif send_override and diff_override is None:
+            # User cleared the lock — recompute
+            differential = calc_round_dif(slope, adjusted_gross, rating)
+            golf_round["differential_locked"] = False
+        elif old_round.differential_locked:
+            # Preserve existing lock — don't recompute
+            differential = float(old_round.differential)
+            golf_round["differential_locked"] = True
+        else:
+            # Normal recompute
+            differential = calc_round_dif(slope, adjusted_gross, rating)
+            golf_round["differential_locked"] = False
+
         golf_round["differential"] = str(differential)
 
         if data.get("date", date) != date:
@@ -656,11 +682,33 @@ def register_rounds_routes(app, csrf):
 
         save_round(golf_round, data.get("date", date), int(index), current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
+
+        # Recompute cascade — update computed_handicap on this user's subsequent rounds
+        recompute_handicaps_for_user(current_user.id)
+
         return jsonify({"ok": True, "differential": differential})
+
+    @app.route("/api/rounds/<date>/<index>/exclude", methods=["POST"])
+    @login_required
+    @csrf.exempt
+    def api_rounds_exclude(date, index):
+        all_rounds = get_all_rounds_for_user()
+        found = any(r.date == date and str(r.index) == str(index) for r in all_rounds)
+        if not found:
+            return jsonify({"error": "Round not found"}), 404
+        data = request.get_json()
+        excluded = bool(data.get("excluded", False))
+        set_round_excluded(date, int(index), excluded, current_user.id)
+        recompute_handicaps_for_user(current_user.id)
+        new_all = get_all_rounds_for_user(force=True)
+        new_hi_obj = calc_handicap_index(new_all, get_settings().get("include_9hole", True))
+        new_hi = round(new_hi_obj, 1) if new_hi_obj is not None else None
+        return jsonify({"ok": True, "excluded": excluded, "handicap": new_hi})
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
     @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)
+        recompute_handicaps_for_user(current_user.id)
         return jsonify({"ok": True})

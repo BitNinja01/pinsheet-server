@@ -15,8 +15,8 @@ def get_courses():
     return g._courses
 
 
-def get_all_rounds_for_user():
-    if not hasattr(g, '_all_rounds'):
+def get_all_rounds_for_user(force=False):
+    if force or not hasattr(g, '_all_rounds'):
         g._all_rounds = store.get_all_rounds(current_user.id)
     return g._all_rounds
 

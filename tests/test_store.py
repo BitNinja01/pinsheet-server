@@ -46,6 +46,25 @@ def test_init_db_creates_tables(db):
     db.close()
 
 
+def test_differential_locked_column_exists(db):
+    cols = db.execute("PRAGMA table_info(rounds)").fetchall()
+    col_names = [c["name"] for c in cols]
+    assert "differential_locked" in col_names
+    db.close()
+
+
+def test_dict_to_round_reads_differential_locked():
+    from source.models import dict_to_round
+    r = dict_to_round({"differential_locked": True, "differential": "21.5"})
+    assert r.differential_locked is True
+
+
+def test_dict_to_round_defaults_differential_locked_false():
+    from source.models import dict_to_round
+    r = dict_to_round({"differential": "21.5"})
+    assert r.differential_locked is False
+
+
 def test_create_and_get_user(db):
     u = create_user("testuser", "Test User", "password123")
     assert u["username"] == "testuser"
@@ -192,6 +211,38 @@ def test_update_round_handicap(db):
     update_round_handicap("2026-05-01", 0, 12.5, user_id=1)
     rounds = get_all_rounds(user_id=1)
     assert rounds[0].computed_handicap == "12.5"
+    db.close()
+
+
+def test_save_and_load_round_preserves_differential_locked(db):
+    create_user("golfer", "Golfer", "pass1234")
+    golf_round = {
+        "course": "Test GC", "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {}, "total_gross": "85",
+        "differential": "21.5", "notes": "", "excluded": False,
+        "computed_handicap": "19.8", "differential_locked": True,
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=1)
+    rounds = get_all_rounds(user_id=1)
+    assert len(rounds) == 1
+    assert rounds[0].differential_locked is True
+    assert rounds[0].differential == "21.5"
+    db.close()
+
+
+def test_update_round_differential_skips_locked_round(db):
+    from store import update_round_differential
+    create_user("golfer", "Golfer", "pass1234")
+    golf_round = {
+        "course": "Test GC", "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {}, "total_gross": "85",
+        "differential": "21.5", "notes": "", "excluded": False,
+        "computed_handicap": "19.8", "differential_locked": True,
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=1)
+    update_round_differential("2026-01-01", 0, 18.0, user_id=1)
+    rounds = get_all_rounds(user_id=1)
+    assert rounds[0].differential == "21.5"  # unchanged
     db.close()
 
 
@@ -584,8 +635,12 @@ def test_recompute_all_handicaps(db):
     rounds = get_all_rounds(user_id=1)
     rounds.sort(key=lambda r: r.date)
 
-    for r in rounds:
-        assert r.computed_handicap not in (None, "", "0"), \
-            f"round {r.date} has empty value ({r.computed_handicap})"
+    for i, r in enumerate(rounds):
+        if i < 2:
+            assert r.computed_handicap in ("", None), \
+                f"round {r.date} (index {i}) should be empty, got {r.computed_handicap}"
+        else:
+            assert r.computed_handicap not in (None, "", "0"), \
+                f"round {r.date} (index {i}) has empty value ({r.computed_handicap})"
     assert rounds[-1].computed_handicap != "99.9"
     assert float(rounds[-1].computed_handicap) < 20.0

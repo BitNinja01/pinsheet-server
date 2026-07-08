@@ -133,6 +133,7 @@ def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
             "notes": row["notes"],
             "excluded": bool(row["excluded"]),
             "computed_handicap": row["computed_handicap"],
+            "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
@@ -162,6 +163,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
         "notes": row["notes"],
         "excluded": bool(row["excluded"]),
         "computed_handicap": row["computed_handicap"],
+        "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
     }
     if row["total_putts"]:
         r["total_putts"] = row["total_putts"]
@@ -180,8 +182,9 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
-            entry_mode, holes, total_gross, total_putts, differential, notes, excluded, computed_handicap)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            entry_mode, holes, total_gross, total_putts, differential, notes,
+            excluded, computed_handicap, differential_locked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id,
             golf_round.get("course", ""),
@@ -197,6 +200,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             golf_round.get("notes", ""),
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
+            1 if golf_round.get("differential_locked") else 0,
         ),
     )
     round_id = cur.lastrowid
@@ -208,6 +212,13 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
 
 def delete_round(date: str, index: str, user_id: int = 1) -> None:
     db = get_db()
+    row = db.execute(
+        "SELECT id FROM rounds WHERE user_id = ? AND date = ? AND round_index = ?",
+        (user_id, date, int(index)),
+    ).fetchone()
+    round_id = row["id"] if row else None
+    if round_id:
+        db.execute("DELETE FROM match_rounds WHERE round_id = ?", (round_id,))
     db.execute(
         "DELETE FROM rounds WHERE user_id = ? AND date = ? AND round_index = ?",
         (user_id, date, int(index)),
@@ -229,9 +240,79 @@ def update_round_handicap(date: str, index: int, handicap: float, user_id: int) 
 
 def update_round_differential(date: str, index: int, differential: float, user_id: int) -> None:
     db = get_db()
+    locked = db.execute(
+        "SELECT differential_locked FROM rounds WHERE user_id = ? AND date = ? AND round_index = ?",
+        (user_id, date, index),
+    ).fetchone()
+    if locked and locked["differential_locked"]:
+        db.close()
+        return
     db.execute(
         "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
         (str(differential), user_id, date, index),
+    )
+    db.commit()
+    db.close()
+
+
+def recompute_handicaps_for_user(user_id: int) -> int:
+    from calc.handicap import calc_handicap_index
+
+    courses_data = get_courses()
+    settings = load_settings(user_id)
+    include_9hole = settings.get("include_9hole", True)
+
+    all_rounds = get_all_rounds(user_id)
+    if not all_rounds:
+        return 0
+
+    chronological = list(reversed(all_rounds))
+    updated = 0
+    db = get_db()
+
+    for i, r in enumerate(chronological):
+        if (not r.differential or r.differential == "0") and not r.differential_locked:
+            course_data = courses_data.get(r.course)
+            if course_data:
+                tee_data = course_data.get("tees", {}).get(r.tees)
+                if tee_data and r.total_gross and r.total_gross != "0":
+                    slope, rating = get_slope_rating(tee_data, r.holes_selection)
+                    diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                    str_diff = str(diff)
+                    if r.differential != str_diff:
+                        db.execute(
+                            "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+                            (str_diff, user_id, r.date, r.index),
+                        )
+                        updated += 1
+
+        window = chronological[max(0, i + 1 - 20):i + 1]
+        hi = calc_handicap_index(window, include_9hole)
+        if hi is not None:
+            new_val = str(hi)
+            if r.computed_handicap != new_val:
+                db.execute(
+                    "UPDATE rounds SET computed_handicap = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+                    (str(hi), user_id, r.date, r.index),
+                )
+                updated += 1
+        elif r.computed_handicap:
+            db.execute(
+                "UPDATE rounds SET computed_handicap = '' WHERE user_id = ? AND date = ? AND round_index = ?",
+                (user_id, r.date, r.index),
+            )
+            updated += 1
+
+    db.commit()
+    db.close()
+    return updated
+
+
+def set_round_excluded(date: str, index: int, excluded: bool, user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE rounds SET excluded = ? WHERE user_id = ? AND date = ? AND round_index = ?",
+        (1 if excluded else 0, user_id, date, index),
     )
     db.commit()
     db.close()
@@ -245,63 +326,20 @@ def recompute_all_handicaps() -> None:
 
     _log.info("Recomputing handicaps for %d user(s)...", len(users))
     import time
-    from calc.handicap import calc_handicap_index
     t0 = time.time()
     total_rounds = 0
     total_updated = 0
 
-    courses_data = get_courses()
-
     for u in users:
         uid = u["id"]
         try:
-            settings = load_settings(uid)
-            include_9hole = settings.get("include_9hole", True)
-
             all_rounds = get_all_rounds(uid)
-            if not all_rounds:
-                _log.info("  User '%s': 0 rounds, skipped", u["username"])
-                continue
-
-            chronological = list(reversed(all_rounds))
-            user_updated = 0
-            db = get_db()
-
-            for i, r in enumerate(chronological):
-                if not r.differential or r.differential == "0":
-                    course_data = courses_data.get(r.course)
-                    if course_data:
-                        tee_data = course_data.get("tees", {}).get(r.tees)
-                        if tee_data and r.total_gross and r.total_gross != "0":
-                            slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                            diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
-                            str_diff = str(diff)
-                            if r.differential != str_diff:
-                                db.execute(
-                                    "UPDATE rounds SET differential = ? WHERE user_id = ? AND date = ? AND round_index = ?",
-                                    (str_diff, uid, r.date, r.index),
-                                )
-                                user_updated += 1
-
-                window = chronological[max(0, i + 1 - 20):i + 1]
-                hi = calc_handicap_index(window, include_9hole)
-                if hi is not None:
-                    new_val = str(hi)
-                    if r.computed_handicap != new_val:
-                        db.execute(
-                            "UPDATE rounds SET computed_handicap = ? WHERE user_id = ? AND date = ? AND round_index = ?",
-                            (str(hi), uid, r.date, r.index),
-                        )
-                        user_updated += 1
-
-            db.commit()
-            db.close()
-
-            total_rounds += len(chronological)
-            total_updated += user_updated
+            updated = recompute_handicaps_for_user(uid)
+            total_rounds += len(all_rounds) if all_rounds else 0
+            total_updated += updated
             _log.info(
                 "  User '%s': %d rounds, %d updated",
-                u["username"], len(chronological), user_updated,
+                u["username"], len(all_rounds) if all_rounds else 0, updated,
             )
         except Exception as exc:
             _log.error("  User '%s': error — %s", u["username"], exc)
