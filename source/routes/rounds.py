@@ -700,7 +700,10 @@ def register_rounds_routes(app, csrf):
         excluded = bool(data.get("excluded", False))
         set_round_excluded(date, int(index), excluded, current_user.id)
         recompute_handicaps_for_user(current_user.id)
-        return jsonify({"ok": True, "excluded": excluded})
+        new_all = get_all_rounds_for_user(force=True)
+        new_hi_obj = calc_handicap_index(new_all, get_settings().get("include_9hole", True))
+        new_hi = round(new_hi_obj, 1) if new_hi_obj is not None else None
+        return jsonify({"ok": True, "excluded": excluded, "handicap": new_hi})
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required

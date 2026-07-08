@@ -49,6 +49,25 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    function updateHandicap(hi) {
+        var hero = document.querySelector(".ps-hero-numeral");
+        if (!hero) return;
+        if (hi == null) {
+            hero.innerHTML = '<span>--</span>';
+            var sv = document.querySelector(".ps-stat:last-child .ps-stat-v");
+            if (sv) sv.textContent = "--";
+            return;
+        }
+        var parts = String(hi).split(".");
+        var intPart = parts[0];
+        var decPart = parts[1] ? parts[1][0] : "0";
+        hero.innerHTML = intPart + '<span class="ps-decimal">.</span><span class="ps-frac">' + decPart + '</span>';
+        var sv = document.querySelector(".ps-stat:last-child .ps-stat-v");
+        if (sv) sv.textContent = hi;
+        var chartCard = document.querySelector(".ps-chart-card");
+        if (chartCard) chartCard.dataset.heroValue = hi;
+    }
+
     document.querySelectorAll(".clickable-row").forEach(function (row) {
         row.addEventListener("click", function () {
             if (this.dataset.href) {
@@ -89,7 +108,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ excluded: excluded }),
             }).then(function (r) {
-                if (r.ok) updateExclusion(date, index, excluded);
+                if (!r.ok) return;
+                r.json().then(function (data) {
+                    updateExclusion(date, index, data.excluded);
+                    updateHandicap(data.handicap);
+                });
             });
         });
     });
