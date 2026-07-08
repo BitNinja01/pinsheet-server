@@ -201,6 +201,7 @@ def _build_profile_context():
             "differential": r.differential,
             "index": r.index,
             "in_handicap": False,
+            "excluded": r.excluded,
             "entry_mode_display": display_mode,
             "sparkline": sparkline,
             "fir_display": fir_display,
