@@ -492,6 +492,33 @@ body {
     top: 4px;
     right: 4px;
 }
+.btn-round-eye {
+    appearance: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 2px;
+    line-height: 1;
+    vertical-align: middle;
+    color: var(--ps-ink-3);
+    opacity: 0.35;
+    transition: opacity 0.15s;
+}
+.btn-round-eye:hover {
+    opacity: 1;
+}
+.btn-round-eye.is-included {
+    opacity: 0.7;
+    color: var(--ps-accent);
+}
+.btn-round-eye.is-included:hover {
+    opacity: 1;
+}
+.round-card .btn-round-eye {
+    position: absolute;
+    top: 4px;
+    right: 24px;
+}
 .ps-table .ps-course {
     font-family: var(--ps-font-mono);
     font-size: var(--ps-fs-body);

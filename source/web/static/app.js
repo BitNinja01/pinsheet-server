@@ -21,6 +21,22 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
         });
     });
+
+    document.querySelectorAll(".btn-round-eye").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var date = this.dataset.date;
+            var index = this.dataset.index;
+            var excluded = this.classList.contains("is-included");
+            fetch("/api/rounds/" + date + "/" + index + "/exclude", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ excluded: excluded }),
+            }).then(function (r) {
+                if (r.ok) location.reload();
+            });
+        });
+    });
 });
 
 (function () {

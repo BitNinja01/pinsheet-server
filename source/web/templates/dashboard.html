@@ -174,7 +174,7 @@
                     </svg>
                     {% endif %}
                 </td>
-                <td><button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button></td>
+                <td><button class="btn-round-eye{% if not r.excluded %} is-included{% endif %}" data-date="{{ r.date }}" data-index="{{ r.index }}" title="{% if r.excluded %}Include in handicap{% else %}Exclude from handicap{% endif %}">{% if r.excluded %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>{% else %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{% endif %}</button><button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -201,7 +201,7 @@
                         <span class="ps-topar">{{ '%+d'|format(r.score_to_par) }}</span>
                     {% endif %}
                 </div>
-                <button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button>
+                <button class="btn-round-eye{% if not r.excluded %} is-included{% endif %}" data-date="{{ r.date }}" data-index="{{ r.index }}" title="{% if r.excluded %}Include in handicap{% else %}Exclude from handicap{% endif %}">{% if r.excluded %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>{% else %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{% endif %}</button><button class="btn-round-del" data-date="{{ r.date }}" data-index="{{ r.index }}">&#10005;</button>
             </div>
             <div class="round-card-stats">
                 <div class="round-card-stat"><span class="rcd-label">Diff</span><span class="rcd-value">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</span></div>

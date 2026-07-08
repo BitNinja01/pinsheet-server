@@ -229,11 +229,7 @@
       {% endif %}
       {% if round.excluded %}
       <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-warn);margin-top:4px;font-family:var(--ps-font-mono);">
-        Excluded from handicap &nbsp;<button class="btn-link btn-toggle-exclude" data-date="{{ round.date }}" data-index="{{ round.index }}" data-excluded="1" style="font-size:var(--ps-fs-eyebrow);">include</button>
-      </div>
-      {% else %}
-      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;font-family:var(--ps-font-mono);">
-        <button class="btn-link btn-toggle-exclude" data-date="{{ round.date }}" data-index="{{ round.index }}" data-excluded="0" style="font-size:var(--ps-fs-eyebrow);padding:0;">Exclude from handicap</button>
+        Excluded from handicap
       </div>
       {% endif %}
       {% if hi_before is not none %}
@@ -610,18 +606,6 @@ document.getElementById("btn-delete")?.addEventListener("click", function () {
     if (!confirm("Delete this round?")) return;
     fetch("/api/rounds/{{ round.date }}/{{ round.index }}", { method: "DELETE" })
         .then(function () { window.location.href = "/"; });
-});
-document.querySelectorAll(".btn-toggle-exclude").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-        var excluded = this.dataset.excluded === "1" ? false : true;
-        fetch("/api/rounds/{{ round.date }}/{{ round.index }}/exclude", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ excluded: excluded }),
-        }).then(function (r) {
-            if (r.ok) location.reload();
-        });
-    });
 });
 {% endif %}
 </script>
