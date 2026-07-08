@@ -1,4 +1,54 @@
 document.addEventListener("DOMContentLoaded", function () {
+    var EYE_OPEN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var EYE_CLOSED = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+    function updateExclusion(date, index, excluded) {
+        var sel = '[data-date="' + date + '"][data-index="' + index + '"]';
+
+        // Update all eye buttons for this round
+        document.querySelectorAll(".btn-round-eye" + sel).forEach(function (btn) {
+            btn.innerHTML = excluded ? EYE_CLOSED : EYE_OPEN;
+            btn.classList.toggle("is-included", !excluded);
+            btn.title = excluded ? "Include in handicap" : "Exclude from handicap";
+        });
+
+        // Update desktop table row
+        var row = document.querySelector("tr.clickable-row" + sel);
+        if (row) {
+            row.classList.toggle("is-excluded", excluded);
+            var courseCell = row.querySelector("td:nth-child(2)");
+            if (courseCell) {
+                var badge = courseCell.querySelector(".ps-badge.is-excluded");
+                if (excluded && !badge) {
+                    var s = document.createElement("span");
+                    s.className = "ps-badge is-excluded";
+                    s.textContent = "Excluded";
+                    courseCell.appendChild(s);
+                } else if (!excluded && badge) {
+                    badge.remove();
+                }
+            }
+        }
+
+        // Update mobile card
+        var card = document.querySelector(".round-card" + sel);
+        if (card) {
+            card.classList.toggle("is-excluded", excluded);
+            var courseEl = card.querySelector(".round-card-course");
+            if (courseEl) {
+                var badge = courseEl.querySelector(".ps-badge.is-excluded");
+                if (excluded && !badge) {
+                    var s = document.createElement("span");
+                    s.className = "ps-badge is-excluded";
+                    s.textContent = "Excluded";
+                    courseEl.appendChild(s);
+                } else if (!excluded && badge) {
+                    badge.remove();
+                }
+            }
+        }
+    }
+
     document.querySelectorAll(".clickable-row").forEach(function (row) {
         row.addEventListener("click", function () {
             if (this.dataset.href) {
@@ -15,9 +65,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!confirm("Delete this round?")) return;
             var date = this.dataset.date;
             var index = this.dataset.index;
+            var self = this;
             fetch("/api/rounds/" + date + "/" + index, { method: "DELETE" })
                 .then(function (r) {
-                    if (r.ok) location.reload();
+                    if (!r.ok) return;
+                    var sel = '[data-date="' + date + '"][data-index="' + index + '"]';
+                    var row = document.querySelector("tr.clickable-row" + sel);
+                    if (row) row.remove();
+                    var card = document.querySelector(".round-card" + sel);
+                    if (card) card.remove();
                 });
         });
     });
@@ -33,7 +89,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ excluded: excluded }),
             }).then(function (r) {
-                if (r.ok) location.reload();
+                if (r.ok) updateExclusion(date, index, excluded);
             });
         });
     });
