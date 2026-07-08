@@ -504,6 +504,13 @@ body {
     opacity: 0.35;
     transition: opacity 0.15s;
 }
+.btn-round-eye:not(.is-included) {
+    color: var(--ps-warn);
+    opacity: 0.7;
+}
+.btn-round-eye:not(.is-included):hover {
+    opacity: 1;
+}
 .ps-table td:last-child {
     vertical-align: middle;
 }
