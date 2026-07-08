@@ -504,6 +504,9 @@ body {
     opacity: 0.35;
     transition: opacity 0.15s;
 }
+.ps-table td:last-child {
+    vertical-align: middle;
+}
 .btn-round-eye:hover {
     opacity: 1;
 }

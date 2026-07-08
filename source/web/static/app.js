@@ -5,48 +5,17 @@ document.addEventListener("DOMContentLoaded", function () {
     function updateExclusion(date, index, excluded) {
         var sel = '[data-date="' + date + '"][data-index="' + index + '"]';
 
-        // Update all eye buttons for this round
         document.querySelectorAll(".btn-round-eye" + sel).forEach(function (btn) {
             btn.innerHTML = excluded ? EYE_CLOSED : EYE_OPEN;
             btn.classList.toggle("is-included", !excluded);
             btn.title = excluded ? "Include in handicap" : "Exclude from handicap";
         });
 
-        // Update desktop table row
         var row = document.querySelector("tr.clickable-row" + sel);
-        if (row) {
-            row.classList.toggle("is-excluded", excluded);
-            var courseCell = row.querySelector("td:nth-child(2)");
-            if (courseCell) {
-                var badge = courseCell.querySelector(".ps-badge.is-excluded");
-                if (excluded && !badge) {
-                    var s = document.createElement("span");
-                    s.className = "ps-badge is-excluded";
-                    s.textContent = "Excluded";
-                    courseCell.appendChild(s);
-                } else if (!excluded && badge) {
-                    badge.remove();
-                }
-            }
-        }
+        if (row) row.classList.toggle("is-excluded", excluded);
 
-        // Update mobile card
         var card = document.querySelector(".round-card" + sel);
-        if (card) {
-            card.classList.toggle("is-excluded", excluded);
-            var courseEl = card.querySelector(".round-card-course");
-            if (courseEl) {
-                var badge = courseEl.querySelector(".ps-badge.is-excluded");
-                if (excluded && !badge) {
-                    var s = document.createElement("span");
-                    s.className = "ps-badge is-excluded";
-                    s.textContent = "Excluded";
-                    courseEl.appendChild(s);
-                } else if (!excluded && badge) {
-                    badge.remove();
-                }
-            }
-        }
+        if (card) card.classList.toggle("is-excluded", excluded);
     }
 
     function updateHandicap(hi) {

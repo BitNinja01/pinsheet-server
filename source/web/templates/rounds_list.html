@@ -39,7 +39,6 @@
                 <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ r.date }}</td>
                 <td>
                     <div class="ps-course">{{ r.course }}</div>
-                    {% if r.excluded %}<span class="ps-badge is-excluded">Excluded</span>{% endif %}
                 </td>
                 <td style="color: var(--ps-ink-3);">{{ r.tees }}</td>
                 <td class="r">
@@ -86,7 +85,7 @@
             <div class="round-card-header">
                 <div>
                     <div class="round-card-date">{{ r.date }}</div>
-                    <div class="round-card-course">{{ r.course }}{% if r.excluded %} <span class="ps-badge is-excluded">Excluded</span>{% endif %}</div>
+                    <div class="round-card-course">{{ r.course }}</div>
                     <div class="round-card-meta">#{{ r.index }} · {{ r.tees }} · {{ r.entry_mode_display }}</div>
                 </div>
                 <div class="round-card-score">
