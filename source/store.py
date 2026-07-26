@@ -170,15 +170,33 @@ def get_round_by_id(round_id: int) -> RoundData | None:
     return dict_to_round(r)
 
 
+def next_round_index(date: str, user_id: int = 1) -> int:
+    """Lowest free round_index for a given date+user, so multiple rounds on the
+    same day don't collide on UNIQUE(user_id, date, round_index)."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT round_index FROM rounds WHERE user_id = ? AND date = ?",
+        (user_id, date),
+    ).fetchall()
+    db.close()
+    used = {row["round_index"] for row in rows}
+    idx = 0
+    while idx in used:
+        idx += 1
+    return idx
+
+
 def save_round(golf_round, date, index, user_id: int = 1) -> int:
     db = get_db()
     total_putts = None
     holes = golf_round.get("holes", {})
     if holes:
-        total_putts = sum(
-            int(h.get("putts", 0) or 0)
-            for h in holes.values()
-        )
+        def _to_int(v):
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return 0
+        total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
