@@ -12,6 +12,7 @@ from store import (
     recompute_all_handicaps,
     recompute_handicaps_for_user,
     set_round_excluded,
+    next_round_index,
 )
 from calc import (
     calc_round_dif, calc_handicap_index, calc_round_vs_par,
@@ -32,6 +33,26 @@ from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 _log = logging.getLogger("pinsheet")
+
+
+def _safe_int(val, default=0):
+    """Parse an int from user input, tolerating blank/non-numeric values."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _scored_hole_count(holes):
+    """Number of holes with a real (positive) gross entered."""
+    return sum(1 for h in holes.values() if _safe_int(h.get("gross"), 0) > 0)
+
+
+def _expected_hole_count(course, holes_sel):
+    """How many holes a complete round of this selection should have."""
+    if holes_sel == "all":
+        return len(course.get("holes", {})) or 18
+    return 9
 
 
 def register_rounds_routes(app, csrf):
@@ -206,13 +227,24 @@ def register_rounds_routes(app, csrf):
 
         total_gross = 0
         if data.get("entry_mode") == "score_only":
-            total_gross = int(data.get("gross_total", "0"))
+            total_gross = _safe_int(data.get("gross_total"), 0)
             golf_round["total_gross"] = str(total_gross)
         elif data.get("holes"):
             for h in data["holes"].values():
-                gross = int(h.get("gross", 0))
-                total_gross += gross
+                total_gross += _safe_int(h.get("gross"), 0)
             golf_round["total_gross"] = str(total_gross)
+
+        # A round without a fair, complete score must not produce a differential
+        # that poisons the handicap. Two cases: (a) an incomplete detailed round
+        # (fewer holes scored than the selection requires), and (b) a round with
+        # no real score at all (blank/zero gross). Both get the "0" sentinel.
+        incomplete = (
+            data.get("entry_mode") != "score_only"
+            and bool(data.get("holes"))
+            and _scored_hole_count(data["holes"]) < _expected_hole_count(course, holes_sel)
+        )
+        no_score = total_gross <= 0
+        skip_differential = incomplete or no_score
 
         all_rounds_for_user = get_all_rounds_for_user()
         adjusted_gross = total_gross
@@ -234,15 +266,21 @@ def register_rounds_routes(app, csrf):
                     if hc_hole:
                         par = int(hc_hole.get("par", 0))
                         stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = int(hole_data.get("gross", 0))
+                        gross = _safe_int(hole_data.get("gross"), 0)
                         _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
                         adjusted_total += esc_gross
                     else:
-                        adjusted_total += int(hole_data.get("gross", 0))
+                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
                 adjusted_gross = adjusted_total
 
-        differential = calc_round_dif(slope, adjusted_gross, rating)
-        golf_round["differential"] = str(differential)
+        if skip_differential:
+            differential = 0.0
+            # Exactly "0" is the sentinel that excludes a round from the
+            # handicap calc (str(0.0) == "0.0" would NOT be excluded).
+            golf_round["differential"] = "0"
+        else:
+            differential = calc_round_dif(slope, adjusted_gross, rating)
+            golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
         all_rounds_for_user.insert(0, golf_round_typed)
@@ -251,9 +289,9 @@ def register_rounds_routes(app, csrf):
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        round_id = save_round(golf_round, date_val, 0, current_user.id)
+        index = next_round_index(date_val, current_user.id)
+        round_id = save_round(golf_round, date_val, index, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
-        index = 0
 
         if match_id and golf_round.get("computed_handicap"):
             try:
@@ -605,13 +643,19 @@ def register_rounds_routes(app, csrf):
 
         total_gross = 0
         if data.get("entry_mode") == "score_only":
-            total_gross = int(data.get("gross_total", "0"))
+            total_gross = _safe_int(data.get("gross_total"), 0)
             golf_round["total_gross"] = str(total_gross)
         elif data.get("holes"):
             for h in data["holes"].values():
-                gross = int(h.get("gross", 0))
-                total_gross += gross
+                total_gross += _safe_int(h.get("gross"), 0)
             golf_round["total_gross"] = str(total_gross)
+
+        incomplete = (
+            data.get("entry_mode") != "score_only"
+            and bool(data.get("holes"))
+            and _scored_hole_count(data["holes"]) < _expected_hole_count(course, holes_sel)
+        )
+        skip_differential = incomplete or total_gross <= 0
 
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
@@ -636,11 +680,11 @@ def register_rounds_routes(app, csrf):
                     if hc_hole:
                         par = int(hc_hole.get("par", 0))
                         stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = int(hole_data.get("gross", 0))
+                        gross = _safe_int(hole_data.get("gross"), 0)
                         _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
                         adjusted_total += esc_gross
                     else:
-                        adjusted_total += int(hole_data.get("gross", 0))
+                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
                 adjusted_gross = adjusted_total
 
         # --- Differential: lock-aware ---
@@ -652,20 +696,22 @@ def register_rounds_routes(app, csrf):
             # User explicitly provided a new manual value — lock it
             differential = round(float(diff_override), 1)
             golf_round["differential_locked"] = True
+            golf_round["differential"] = str(differential)
         elif send_override and diff_override is None:
             # User cleared the lock — recompute
-            differential = calc_round_dif(slope, adjusted_gross, rating)
+            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
             golf_round["differential_locked"] = False
+            golf_round["differential"] = "0" if skip_differential else str(differential)
         elif old_round.differential_locked:
             # Preserve existing lock — don't recompute
             differential = float(old_round.differential)
             golf_round["differential_locked"] = True
+            golf_round["differential"] = str(differential)
         else:
             # Normal recompute
-            differential = calc_round_dif(slope, adjusted_gross, rating)
+            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
             golf_round["differential_locked"] = False
-
-        golf_round["differential"] = str(differential)
+            golf_round["differential"] = "0" if skip_differential else str(differential)
 
         if data.get("date", date) != date:
             delete_round(date, index, current_user.id)

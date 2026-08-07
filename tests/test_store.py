@@ -644,3 +644,37 @@ def test_recompute_all_handicaps(db):
                 f"round {r.date} (index {i}) has empty value ({r.computed_handicap})"
     assert rounds[-1].computed_handicap != "99.9"
     assert float(rounds[-1].computed_handicap) < 20.0
+
+
+class _FakeConn:
+    """Minimal connection stub whose execute() raises, to prove link_round/unlink_round
+    always close the connection (try/finally) even when the SQL fails."""
+    def __init__(self):
+        self.closed = False
+
+    def execute(self, *a, **k):
+        raise sqlite3.OperationalError("boom")
+
+    def commit(self):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+def test_link_round_closes_connection_on_error(monkeypatch):
+    import store as store_mod
+    fake = _FakeConn()
+    monkeypatch.setattr(store_mod, "get_db", lambda: fake)
+    with pytest.raises(sqlite3.OperationalError):
+        link_round(1, 1, 1, 70.0)
+    assert fake.closed is True
+
+
+def test_unlink_round_closes_connection_on_error(monkeypatch):
+    import store as store_mod
+    fake = _FakeConn()
+    monkeypatch.setattr(store_mod, "get_db", lambda: fake)
+    with pytest.raises(sqlite3.OperationalError):
+        unlink_round(1, 1, 1)
+    assert fake.closed is True

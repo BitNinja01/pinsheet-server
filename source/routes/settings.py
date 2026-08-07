@@ -3,13 +3,14 @@ import json
 import zipfile
 import logging
 
-from flask import render_template, request, jsonify, g, current_app
+from flask import render_template, request, jsonify, g, current_app, redirect, url_for
 from flask_login import login_required, current_user
 
 from store import (
     save_settings, save_course, save_round,
     get_all_rounds, update_round_handicap, update_round_differential,
     get_slope_rating,
+    create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
 from calc import calc_handicap_index
 from source.request_data import get_settings, get_courses, base_context
@@ -80,6 +81,9 @@ def register_settings_routes(app, csrf):
                             slope, rating = get_slope_rating(tee_data, r.holes_selection)
                             diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
                             update_round_differential(r.date, r.index, diff, user_id)
+                            # Keep the in-memory object in sync with the DB write so the
+                            # handicap window below sees the fresh differential (not stale "0").
+                            r.differential = str(diff)
                 window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:
@@ -103,3 +107,36 @@ def register_settings_routes(app, csrf):
         _log.info("api_settings_put user_id=%s, data=%s", current_user.id, data)
         save_settings(data, current_user.id)
         return jsonify({"ok": True})
+
+    # --- API-key management UI (UC-APIKEY-001) — session-only, CSRF-protected ---
+    @app.route("/settings/api-keys")
+    @login_required
+    def api_keys_page():
+        return render_template("api_keys.html", **base_context(
+            current_page="settings",
+            keys=list_api_keys(current_user.id),
+            permission_options=list(API_KEY_PERMISSIONS),
+            new_key=None,
+            new_key_meta=None,
+        ))
+
+    @app.route("/settings/api-keys", methods=["POST"])
+    @login_required
+    def api_keys_create():
+        label = request.form.get("label", "").strip() or "Unnamed key"
+        permissions = [p for p in request.form.getlist("permissions") if p in API_KEY_PERMISSIONS]
+        plaintext, meta = create_api_key(current_user.id, label, permissions)
+        # Render the plaintext exactly once; it is never stored or shown again.
+        return render_template("api_keys.html", **base_context(
+            current_page="settings",
+            keys=list_api_keys(current_user.id),
+            permission_options=list(API_KEY_PERMISSIONS),
+            new_key=plaintext,
+            new_key_meta=meta,
+        ))
+
+    @app.route("/settings/api-keys/<int:key_id>/revoke", methods=["POST"])
+    @login_required
+    def api_keys_revoke(key_id):
+        revoke_api_key(key_id, current_user.id)
+        return redirect(url_for("api_keys_page"))
