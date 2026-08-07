@@ -175,6 +175,18 @@ Five stats are captured manually each hole using a record-by-exception shorthand
 - **Personal bests** — best gross, best differential, most fairways, most GIR, fewest putts
 - **Best and nemesis holes** — highest/lowest avg vs par
 
+## Documentation
+
+Design and architecture reference for contributors and LLM coding agents lives in
+[`docs/design/`](docs/design/) — supplementary material, not shipped at runtime:
+
+- [`docs/design/AGENT_GUIDE.md`](docs/design/AGENT_GUIDE.md) — vendor-neutral entrypoint: conventions, how to run/verify
+- [`docs/design/FILE_MAP.md`](docs/design/FILE_MAP.md) — glob → responsibility map
+- [`docs/design/SEQUENCES.md`](docs/design/SEQUENCES.md) — sequence diagrams for the core flows
+- [`docs/design/ARCHITECTURE.md`](docs/design/ARCHITECTURE.md) — stack, layers, data model, handicap engine
+- [`docs/design/INVARIANTS.md`](docs/design/INVARIANTS.md) — rules the code depends on (each linked to its test)
+- Plugin authoring: [`docs/PLUGINS.md`](docs/PLUGINS.md)
+
 ## Tech Stack
 
 - **Python** — Flask + waitress
