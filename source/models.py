@@ -97,11 +97,19 @@ class ChallengeData:
     created_at: str = ""
 
 
+def _safe_int(val, default=0):
+    """Parse an int, tolerating blank/non-numeric user input."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def dict_to_hole(d: dict) -> HoleData:
     return HoleData(
-        gross=int(d.get("gross", 0)),
-        putts=int(d.get("putts", 0)),
-        penalties=int(d.get("penalties", 0)),
+        gross=_safe_int(d.get("gross"), 0),
+        putts=_safe_int(d.get("putts"), 0),
+        penalties=_safe_int(d.get("penalties"), 0),
         fairway=d.get("fairway", ""),
         gir=d.get("gir", ""),
     )

@@ -9,7 +9,9 @@ from source.routes import register_routes
 from database import set_db_path, init_db
 from store import create_user
 
-register_routes(app, limiter, csrf, User)
+# The Flask `app` is a shared singleton across test modules; register once.
+if "rounds_list" not in app.view_functions:
+    register_routes(app, limiter, csrf, User)
 
 
 @pytest.fixture
