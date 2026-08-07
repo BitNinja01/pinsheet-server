@@ -81,6 +81,9 @@ def register_settings_routes(app, csrf):
                             slope, rating = get_slope_rating(tee_data, r.holes_selection)
                             diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
                             update_round_differential(r.date, r.index, diff, user_id)
+                            # Keep the in-memory object in sync with the DB write so the
+                            # handicap window below sees the fresh differential (not stale "0").
+                            r.differential = str(diff)
                 window = chronological[:i + 1]
                 hi = calc_handicap_index(window, include_9hole)
                 if hi is not None:

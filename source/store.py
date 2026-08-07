@@ -748,26 +748,28 @@ def remove_match_player(match_id: int, user_id: int) -> bool:
 
 def link_round(match_id: int, user_id: int, round_id: int, net: float) -> int:
     db = get_db()
-    cur = db.execute(
-        "INSERT OR IGNORE INTO match_rounds (match_id, user_id, round_id, net) VALUES (?, ?, ?, ?)",
-        (match_id, user_id, round_id, net),
-    )
-    db.commit()
-    link_id = cur.lastrowid
-    db.close()
-    return link_id
+    try:
+        cur = db.execute(
+            "INSERT OR IGNORE INTO match_rounds (match_id, user_id, round_id, net) VALUES (?, ?, ?, ?)",
+            (match_id, user_id, round_id, net),
+        )
+        db.commit()
+        return cur.lastrowid
+    finally:
+        db.close()
 
 
 def unlink_round(match_id: int, user_id: int, round_id: int) -> bool:
     db = get_db()
-    cur = db.execute(
-        "DELETE FROM match_rounds WHERE match_id = ? AND user_id = ? AND round_id = ?",
-        (match_id, user_id, round_id),
-    )
-    db.commit()
-    affected = cur.rowcount
-    db.close()
-    return affected > 0
+    try:
+        cur = db.execute(
+            "DELETE FROM match_rounds WHERE match_id = ? AND user_id = ? AND round_id = ?",
+            (match_id, user_id, round_id),
+        )
+        db.commit()
+        return cur.rowcount > 0
+    finally:
+        db.close()
 
 
 def get_match_rounds(match_id: int) -> list[dict]:
