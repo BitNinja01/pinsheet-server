@@ -171,15 +171,33 @@ def get_round_by_id(round_id: int) -> RoundData | None:
     return dict_to_round(r)
 
 
+def next_round_index(date: str, user_id: int = 1) -> int:
+    """Lowest free round_index for a given date+user, so multiple rounds on the
+    same day don't collide on UNIQUE(user_id, date, round_index)."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT round_index FROM rounds WHERE user_id = ? AND date = ?",
+        (user_id, date),
+    ).fetchall()
+    db.close()
+    used = {row["round_index"] for row in rows}
+    idx = 0
+    while idx in used:
+        idx += 1
+    return idx
+
+
 def save_round(golf_round, date, index, user_id: int = 1) -> int:
     db = get_db()
     total_putts = None
     holes = golf_round.get("holes", {})
     if holes:
-        total_putts = sum(
-            int(h.get("putts", 0) or 0)
-            for h in holes.values()
-        )
+        def _to_int(v):
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return 0
+        total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
@@ -256,6 +274,20 @@ def update_round_differential(date: str, index: int, differential: float, user_i
     db.close()
 
 
+def _is_incomplete_round(r, course_data) -> bool:
+    """A detailed round with fewer scored holes than its selection requires.
+    Such a round's gross can't be fairly rated, so it must stay excluded from
+    the handicap (differential sentinel "0") and never be resurrected by the
+    recompute cascade."""
+    holes = r.holes
+    if not holes:
+        return False  # score_only / no per-hole data: user asserted the total
+    scored = sum(1 for h in holes.values() if getattr(h, "gross", 0) > 0)
+    course_holes = course_data.get("holes", {})
+    expected = (len(course_holes) or 18) if r.holes_selection == "all" else 9
+    return scored < expected
+
+
 def recompute_handicaps_for_user(user_id: int) -> int:
     from calc.handicap import calc_handicap_index
 
@@ -274,7 +306,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
     for i, r in enumerate(chronological):
         if (not r.differential or r.differential == "0") and not r.differential_locked:
             course_data = courses_data.get(r.course)
-            if course_data:
+            if course_data and not _is_incomplete_round(r, course_data):
                 tee_data = course_data.get("tees", {}).get(r.tees)
                 if tee_data and r.total_gross and r.total_gross != "0":
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
