@@ -178,6 +178,19 @@ def init_db() -> None:
             slot_ids TEXT NOT NULL DEFAULT '[]'
         );
 
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id           INTEGER PRIMARY KEY,
+            user_id      INTEGER NOT NULL REFERENCES users(id),
+            label        TEXT NOT NULL,
+            key_hash     TEXT UNIQUE NOT NULL,
+            prefix       TEXT NOT NULL,
+            permissions  TEXT NOT NULL DEFAULT '',
+            created_at   TEXT DEFAULT (datetime('now')),
+            last_used_at TEXT,
+            expires_at   TEXT,
+            revoked_at   TEXT
+        );
+
     """)
     for col in ("number", "brand", "model", "lie", "length", "shaft_flex", "shaft_brand"):
         try:

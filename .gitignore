@@ -18,6 +18,7 @@ docs/DECISIONS.md
 docs/CONTEXT.md
 docs/RUNBOOK.md
 docs/superpowers/
+docs/design/
 
 # Build scripts (internal only)
 scripts/build.sh

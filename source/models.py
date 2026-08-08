@@ -38,6 +38,10 @@ class TeeData:
     rating: float = 72.0
     yardage: str = "0"
     yardages: dict[str, str] = field(default_factory=dict)
+    front_slope: int | None = None
+    front_rating: float | None = None
+    back_slope: int | None = None
+    back_rating: float | None = None
 
 
 @dataclass
@@ -93,11 +97,19 @@ class ChallengeData:
     created_at: str = ""
 
 
+def _safe_int(val, default=0):
+    """Parse an int, tolerating blank/non-numeric user input."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def dict_to_hole(d: dict) -> HoleData:
     return HoleData(
-        gross=int(d.get("gross", 0)),
-        putts=int(d.get("putts", 0)),
-        penalties=int(d.get("penalties", 0)),
+        gross=_safe_int(d.get("gross"), 0),
+        putts=_safe_int(d.get("putts"), 0),
+        penalties=_safe_int(d.get("penalties"), 0),
         fairway=d.get("fairway", ""),
         gir=d.get("gir", ""),
     )
@@ -137,6 +149,10 @@ def dict_to_course(name: str, d: dict) -> CourseData:
             rating=float(tdata.get("rating", 72.0)),
             yardage=str(tdata.get("yardage", "0")),
             yardages=tdata.get("yardages", {}),
+            front_slope=int(tdata["front_slope"]) if tdata.get("front_slope") not in (None, "") else None,
+            front_rating=float(tdata["front_rating"]) if tdata.get("front_rating") not in (None, "") else None,
+            back_slope=int(tdata["back_slope"]) if tdata.get("back_slope") not in (None, "") else None,
+            back_rating=float(tdata["back_rating"]) if tdata.get("back_rating") not in (None, "") else None,
         )
     holes_data = {}
     for hn, hdata in d.get("holes", {}).items():

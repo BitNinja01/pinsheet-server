@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>API Keys</h2>
+<p class="settings-hint">
+    API keys let your own scripts reach the PinSheet API without a browser session.
+    A key acts as you, is limited to your own data, and can never access admin functions.
+</p>
+
+{% if new_key %}
+<div class="settings-group api-key-reveal">
+    <h3>Key created — copy it now</h3>
+    <p class="settings-hint">
+        This is the only time the full key is shown. Store it somewhere safe;
+        if you lose it, revoke it and create a new one.
+    </p>
+    <pre class="api-key-plaintext"><code>{{ new_key }}</code></pre>
+    <p class="settings-hint">
+        Label: <strong>{{ new_key_meta.label }}</strong>
+        {% if new_key_meta.permissions %}
+        · Scopes: {{ new_key_meta.permissions | join(", ") }}
+        {% else %}
+        · Scopes: none (v1: authenticated + your data only)
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<div class="settings-group">
+    <h3>Create a key</h3>
+    <form method="POST" action="{{ url_for('api_keys_create') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="settings-field">
+            <label>Label</label>
+            <input type="text" class="step-input" name="label" maxlength="100"
+                   placeholder="e.g. Export script">
+        </div>
+        <div class="settings-field">
+            <label>Scopes <span class="settings-hint">(stored for future per-endpoint enforcement — GAP-029)</span></label>
+            {% for perm in permission_options %}
+            <label class="settings-toggle">
+                <input type="checkbox" name="permissions" value="{{ perm }}"> {{ perm }}
+            </label>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn-primary">Create key</button>
+    </form>
+</div>
+
+<div class="settings-group">
+    <h3>Your keys</h3>
+    {% if keys %}
+    <table class="api-key-table">
+        <thead>
+            <tr>
+                <th>Label</th><th>Prefix</th><th>Scopes</th>
+                <th>Created</th><th>Last used</th><th>Status</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for k in keys %}
+            <tr>
+                <td>{{ k.label }}</td>
+                <td><code>{{ k.prefix }}…</code></td>
+                <td>{{ k.permissions | join(", ") if k.permissions else "—" }}</td>
+                <td>{{ k.created_at or "—" }}</td>
+                <td>{{ k.last_used_at or "never" }}</td>
+                <td>
+                    {% if k.revoked_at %}<span class="api-key-revoked">revoked</span>
+                    {% else %}<span class="api-key-active">active</span>{% endif %}
+                </td>
+                <td>
+                    {% if not k.revoked_at %}
+                    <form method="POST" action="{{ url_for('api_keys_revoke', key_id=k.id) }}"
+                          onsubmit="return confirm('Revoke this key? Calls using it will stop working immediately.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-danger">Revoke</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="settings-hint">You have no API keys yet.</p>
+    {% endif %}
+</div>
+
+<p><a href="{{ url_for('settings_page') }}">← Back to Settings</a></p>
+{% endblock %}
