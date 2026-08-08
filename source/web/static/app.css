@@ -455,6 +455,38 @@ body {
     border-left: var(--ps-rule) solid var(--ps-accent);
     padding-left: calc(var(--ps-sp-3) - 1px);
 }
+.ps-table tbody tr.is-handicap td {
+    background: color-mix(in srgb, var(--ps-accent) 7%, transparent);
+}
+/* Legend explaining the handicap highlight. */
+.hcap-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 6px;
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    letter-spacing: 0.03em;
+}
+.hcap-legend .hcap-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border-left: var(--ps-rule) solid var(--ps-accent);
+    background: color-mix(in srgb, var(--ps-accent) 12%, transparent);
+}
+/* Small dot marking a counted round in the Diff cell. */
+.hcap-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--ps-accent);
+    margin-left: 5px;
+    vertical-align: middle;
+}
 .ps-table tbody tr.is-excluded td:first-child {
     border-left: var(--ps-rule) solid var(--ps-warn);
     padding-left: calc(var(--ps-sp-3) - 1px);
