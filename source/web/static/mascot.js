@@ -108,6 +108,8 @@
 
             if (el.tagName === "CANVAS") {
                 drawMascot(el, seedStr, isLeader);
+                el.setAttribute("role", "img");
+                el.setAttribute("aria-label", "mascot: " + nicknameFor(seedStr, isLeader));
             }
             var nickEl = el.querySelector("[data-nickname]") ||
                 (el.hasAttribute("data-nickname") ? el : null);
@@ -127,6 +129,7 @@
             var choice = seeds[Math.floor(Math.random() * seeds.length)];
             var cv = document.createElement("canvas");
             cv.className = "ps-mascot ps-mascot--roamer";
+            cv.setAttribute("aria-hidden", "true");
             drawMascot(cv, choice.seed, choice.leader);
             var rect = board.getBoundingClientRect();
             var top = Math.max(8, Math.random() * Math.max(8, rect.height - 40));

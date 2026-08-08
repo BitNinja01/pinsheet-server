@@ -112,6 +112,11 @@
     --ps-rule: 1px;
     --ps-radius: 0;
 
+    /* Fixed element sizes (dots, pixel mascots) */
+    --ps-size-dot: 5px;
+    --ps-size-mascot-sm: 20px;
+    --ps-size-mascot: 26px;
+
     --ps-ease: cubic-bezier(0.2, 0, 0, 1);
     --ps-dur-quick: 120ms;
     --ps-dur-base: 200ms;
@@ -127,6 +132,7 @@
     --ps-rule-c: #d6cdb8;
     --ps-accent: #3d8a72;
     --ps-accent-dim: rgba(61, 138, 114, 0.12);
+    --ps-accent-tint: rgba(61, 138, 114, 0.06);
     --ps-brass: #a4843c;
     --ps-warn: #b04848;
     --ps-warn-dim: rgba(176, 72, 72, 0.08);
@@ -143,6 +149,7 @@
     --ps-rule-c: #2a2925;
     --ps-accent: #5db49a;
     --ps-accent-dim: rgba(93, 180, 154, 0.14);
+    --ps-accent-tint: rgba(93, 180, 154, 0.07);
     --ps-brass: #c9a35a;
     --ps-warn: #d96a6a;
     --ps-warn-dim: rgba(217, 106, 106, 0.12);
@@ -456,7 +463,7 @@ body {
     padding-left: calc(var(--ps-sp-3) - 1px);
 }
 .ps-table tbody tr.is-handicap td {
-    background: color-mix(in srgb, var(--ps-accent) 7%, transparent);
+    background: var(--ps-accent-tint);
 }
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
@@ -473,18 +480,18 @@ body {
     display: inline-block;
     width: 10px;
     height: 10px;
-    border-radius: 2px;
+    border-radius: var(--ps-radius);
     border-left: var(--ps-rule) solid var(--ps-accent);
-    background: color-mix(in srgb, var(--ps-accent) 12%, transparent);
+    background: var(--ps-accent-dim);
 }
 /* Small dot marking a counted round in the Diff cell. */
 .hcap-dot {
     display: inline-block;
-    width: 5px;
-    height: 5px;
+    width: var(--ps-size-dot);
+    height: var(--ps-size-dot);
     border-radius: 50%;
     background: var(--ps-accent);
-    margin-left: 5px;
+    margin-left: var(--ps-sp-1);
     vertical-align: middle;
 }
 .ps-table tbody tr.is-excluded td:first-child {
@@ -2749,15 +2756,15 @@ select.hole-input { width: 3rem; appearance: none; }
 .ps-mascot {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    width: 26px;
-    height: 26px;
+    width: var(--ps-size-mascot);
+    height: var(--ps-size-mascot);
     flex-shrink: 0;
-    border-radius: 4px;
-    background: var(--ps-paper-2, rgba(255, 255, 255, 0.04));
+    border-radius: var(--ps-radius);
+    background: var(--ps-paper-2);
 }
 .ps-mascot--sm {
-    width: 20px;
-    height: 20px;
+    width: var(--ps-size-mascot-sm);
+    height: var(--ps-size-mascot-sm);
 }
 .ps-nickname {
     font-family: var(--ps-font-mono);
