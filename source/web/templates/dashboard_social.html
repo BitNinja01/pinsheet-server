@@ -92,7 +92,7 @@
     <div style="height:0;border-top:1px solid var(--ps-ink);flex-shrink:0;"></div>
 
     {# Ranked rows #}
-    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0;position:relative;overflow:hidden;" data-mascot-stage>
       {% if rankings %}
       {% for entry in rankings %}
       {% set is_you = entry.user_id == current_user.id %}
@@ -111,11 +111,13 @@
                       letter-spacing:-0.04em;color:{{ 'var(--ps-accent)' if is_you else 'var(--ps-ink-3)' }};
                       font-variant-numeric:tabular-nums;width:32px;flex-shrink:0;">{{ '%02d' % loop.index }}</div>
           <div class="ps-avatar {{ 'is-self' if is_you }}" style="width:34px;height:34px;font-size:var(--ps-fs-micro);">{{ initials | join('') }}</div>
+          <canvas class="ps-mascot" title="mascot" data-mascot-seed="{{ entry.user_id }}"{% if loop.index == 1 %} data-mascot-leader="1"{% endif %}></canvas>
             <div>
               <div style="font-family:var(--ps-font-mono);font-size:var(--ps-fs-body-lg);line-height:1.2;">
                 {{ entry.display_name }}
                 {% if is_you %}<span style="color:var(--ps-accent);font-size:var(--ps-fs-micro);margin-left:5px;">you</span>{% endif %}
               </div>
+              <div class="ps-nickname" data-mascot-seed="{{ entry.user_id }}"{% if loop.index == 1 %} data-mascot-leader="1"{% endif %} data-nickname></div>
             </div>
         </div>
         {% for key in board_stats %}
@@ -175,7 +177,10 @@
       <div class="board-card-head">
         <span class="board-card-rank{% if is_you %} is-accent{% endif %}">{{ '%02d' % loop.index }}</span>
         <div class="ps-avatar {{ 'is-self' if is_you }}">{{ initials | join('') }}</div>
-        <span class="board-card-name">{{ entry.display_name }}{% if is_you %}<span class="board-card-tag">you</span>{% endif %}</span>
+        <canvas class="ps-mascot ps-mascot--sm" title="mascot" data-mascot-seed="{{ entry.user_id }}"{% if loop.index == 1 %} data-mascot-leader="1"{% endif %}></canvas>
+        <span class="board-card-name">{{ entry.display_name }}{% if is_you %}<span class="board-card-tag">you</span>{% endif %}
+          <span class="ps-nickname" data-mascot-seed="{{ entry.user_id }}"{% if loop.index == 1 %} data-mascot-leader="1"{% endif %} data-nickname style="display:block;"></span>
+        </span>
       </div>
       <div class="board-card-grid">
         {% for key in board_stats %}
@@ -295,4 +300,5 @@
   </aside>
 
 </div>
+<script src="/static/mascot.js"></script>
 {% endblock %}
