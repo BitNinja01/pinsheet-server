@@ -217,15 +217,50 @@ def test_match_detail_marks_lowest_net_as_winner(client):
     assert loser["total_net"] == 75.0
 
 
-def test_match_detail_accessible_to_non_participant(client):
-    """A logged-in user who is not a match participant can still view it
-    (is_participant flips to False, but no 403)."""
+def test_match_detail_visible_to_participant(client):
+    """A participant can view their own match (200)."""
+    # First-created user is auto-admin; create a throwaway admin first so the
+    # participant below is a plain non-admin whose access comes purely from
+    # participation, not the admin exemption.
+    store.create_user("admin", "Admin", "adminpw")
+    _save_course_direct()
+
+    user1 = _login(client, username="alice", display="Alice", password="alicepass")
+    match_id = store.create_match(created_by=user1["id"], course_name="Test GC", date="2026-06-01")
+    store.add_match_player(match_id, user1["id"])
+
+    resp = client.get(f"/matches/{match_id}")
+    assert resp.status_code == 200
+
+
+def test_match_detail_hidden_from_non_participant(client):
+    """A logged-in non-participant, non-admin must NOT be able to read a match
+    they aren't in. Returns 404 (not 403) so the response doesn't confirm the
+    resource exists -- IDOR fix, see PR #28."""
+    # Auto-admin absorbed by a throwaway first user; owner is a plain user.
+    store.create_user("admin", "Admin", "adminpw")
     user1 = store.create_user("alice", "Alice", "alicepass")
     _save_course_direct()
     match_id = store.create_match(created_by=user1["id"], course_name="Test GC", date="2026-06-01")
     store.add_match_player(match_id, user1["id"])
 
-    _login(client, username="outsider", password="outsiderpw")
+    _login(client, username="outsider", display="Outsider", password="outsiderpw")
+    resp = client.get(f"/matches/{match_id}")
+    assert resp.status_code == 404
+
+
+def test_match_detail_visible_to_admin_non_participant(client):
+    """An admin who is not a participant retains access (200) -- admins are
+    exempt from the participant gate."""
+    # First-created user is the auto-admin; log in as them.
+    admin = _login(client, username="admin", display="Admin", password="adminpw")
+    assert admin["is_admin"] is True
+
+    user1 = store.create_user("alice", "Alice", "alicepass")
+    _save_course_direct()
+    match_id = store.create_match(created_by=user1["id"], course_name="Test GC", date="2026-06-01")
+    store.add_match_player(match_id, user1["id"])
+
     resp = client.get(f"/matches/{match_id}")
     assert resp.status_code == 200
 
