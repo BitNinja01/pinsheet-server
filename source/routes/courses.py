@@ -53,6 +53,7 @@ def register_courses_routes(app, csrf):
         play_count = 0
         first_played = None
         last_played = None
+        tee_scores = {}
         for r in get_all_rounds_for_user():
             if r.course == name:
                 play_count += 1
@@ -61,6 +62,26 @@ def register_courses_routes(app, csrf):
                     first_played = d
                 if last_played is None or d > last_played:
                     last_played = d
+
+                # Collect gross scores per tee for full 18-hole rounds only.
+                if r.holes_selection == "all" and r.total_gross and r.total_gross != "0":
+                    try:
+                        gross = int(r.total_gross)
+                    except (ValueError, TypeError):
+                        gross = None
+                    if gross is not None:
+                        tee_scores.setdefault(r.tees or "—", []).append(gross)
+
+        score_stats = []
+        for tee_name, scores in tee_scores.items():
+            score_stats.append({
+                "tee": tee_name,
+                "rounds": len(scores),
+                "best": min(scores),
+                "avg": round(sum(scores) / len(scores), 1),
+                "worst": max(scores),
+            })
+        score_stats.sort(key=lambda s: s["tee"].lower())
 
         tees = course.get("tees", {})
         holes = course.get("holes", {})
@@ -87,7 +108,7 @@ def register_courses_routes(app, csrf):
         return render_template("course_detail.html", **base_context(
             course=course, name=name, tees=tees, holes=hole_rows,
             play_count=play_count, first_played=first_played, last_played=last_played,
-            edit_mode=edit_mode,
+            score_stats=score_stats, edit_mode=edit_mode,
         ))
 
     @app.route("/api/courses", methods=["POST"])
