@@ -136,7 +136,11 @@ def register_rounds_routes(app, csrf):
                 "putts": total_putts,
             })
 
-        best_rounds = get_best_n_rounds(all_rounds_for_user, include_9hole)
+        # The current handicap index uses the best 8 differentials from the
+        # most recent 20 eligible rounds (WHS), so only that window can light up.
+        # all_rounds_for_user is newest-first, so the recent 20 are the first 20.
+        recent_20 = all_rounds_for_user[:20]
+        best_rounds = get_best_n_rounds(recent_20, include_9hole)
         best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
