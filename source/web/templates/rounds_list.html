@@ -60,9 +60,9 @@
                     {% endif %}
                 </td>
                 <td class="r" style="color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</td>
-                <td class="r hcap-white">{{ r.fir_display or '—' }}</td>
-                <td class="r hcap-white">{{ r.gir_display or '—' }}</td>
-                <td class="r hcap-white">{{ r.putts or '—' }}</td>
+                <td class="r">{{ r.fir_display or '—' }}</td>
+                <td class="r">{{ r.gir_display or '—' }}</td>
+                <td class="r">{{ r.putts or '—' }}</td>
                 <td class="r" style="width: 220px;">
                     {% if r.sparkline %}
                     <svg viewBox="0 0 210 28" style="display: block; max-width: 100%; height: auto;">

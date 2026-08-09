@@ -467,10 +467,10 @@ body {
 }
 /* Solid accent borders on the left and right edges of a counting row. */
 .ps-table tbody tr.is-handicap td:first-child {
-    border-left: var(--ps-rule) solid var(--ps-accent);
+    border-left: calc(var(--ps-rule) * 3) solid var(--ps-accent);
 }
 .ps-table tbody tr.is-handicap td:last-child {
-    border-right: var(--ps-rule) solid var(--ps-accent);
+    border-right: calc(var(--ps-rule) * 3) solid var(--ps-accent);
 }
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
@@ -1120,15 +1120,6 @@ select.hole-input { width: 3rem; appearance: none; }
 .ps-table tbody tr.is-you td .ps-avatar {
     color: var(--ps-paper);
     border-color: var(--ps-paper);
-}
-
-/* On counting rows, recolor the normally-white text to the accent.
-   Grey cells (date/tees/diff via inline styles, +/- via .ps-topar) and
-   semantic score colors (.is-under/.is-over) are left untouched. */
-.ps-table tbody tr.is-handicap td .ps-course,
-.ps-table tbody tr.is-handicap td .ps-score:not(.is-under):not(.is-over),
-.ps-table tbody tr.is-handicap td.hcap-white {
-    color: var(--ps-accent);
 }
 
 /* Stats grid (3-column numeric cells) */
