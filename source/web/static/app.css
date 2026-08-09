@@ -486,6 +486,10 @@ body {
 .ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-over {
     color: var(--ps-warn) !important;
 }
+/* Unify all rounds-list cell text to one size (scores match body). */
+.ps-table tbody tr.clickable-row td .ps-score {
+    font-size: var(--ps-fs-body);
+}
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
     display: inline-flex;
