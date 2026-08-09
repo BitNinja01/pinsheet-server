@@ -476,7 +476,7 @@ body {
    Semantic over/under score colors are preserved below. */
 .ps-table tbody tr.clickable-row:not(.is-handicap) td,
 .ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar {
-    color: var(--ps-ink) !important;
+    color: var(--ps-ink-2) !important;
 }
 .ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-under,
 .ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar.is-under {
