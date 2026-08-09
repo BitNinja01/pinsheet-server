@@ -1710,7 +1710,7 @@ select.hole-input { width: 3rem; appearance: none; }
     position: relative;
 }
 .round-card.is-handicap {
-    outline: calc(var(--ps-rule) * 2) dashed var(--ps-accent);
+    outline: calc(var(--ps-rule) * 2) solid var(--ps-accent);
     outline-offset: -2px;
 }
 .round-card.is-excluded {
