@@ -451,12 +451,9 @@ body {
 .ps-table td.r {
     font-variant-numeric: tabular-nums;
 }
-.ps-table tbody tr.is-handicap td:first-child {
-    border-left: var(--ps-rule) solid var(--ps-accent);
-    padding-left: calc(var(--ps-sp-3) - 1px);
-}
-.ps-table tbody tr.is-handicap td {
-    background: var(--ps-accent);
+.ps-table tbody tr.is-handicap {
+    outline: var(--ps-rule) dashed var(--ps-accent);
+    outline-offset: -2px;
 }
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
@@ -1703,9 +1700,8 @@ select.hole-input { width: 3rem; appearance: none; }
     position: relative;
 }
 .round-card.is-handicap {
-    border-left: var(--ps-rule) solid var(--ps-accent);
-    padding-left: calc(var(--ps-sp-3) - 1px);
-    background: var(--ps-accent);
+    outline: var(--ps-rule) dashed var(--ps-accent);
+    outline-offset: -2px;
 }
 .round-card.is-excluded {
     border-left: var(--ps-rule) solid var(--ps-warn);
