@@ -1,0 +1,42 @@
+/* ── Leaderboard mascots ──────────────────────────────────────────── */
+.lbm-mascot {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    background: var(--ps-paper-2, rgba(255, 255, 255, 0.04));
+}
+.lbm-mascot--sm {
+    width: 20px;
+    height: 20px;
+}
+.lbm-nickname {
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    letter-spacing: 0.03em;
+    font-style: italic;
+}
+/* Roaming mascot that randomly spawns over the board. */
+.lbm-mascot--roamer {
+    position: absolute;
+    left: -32px;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0.9;
+    animation: lbm-mascot-roam var(--roam-dur, 7s) linear forwards;
+}
+@keyframes lbm-mascot-roam {
+    0%   { transform: translateX(0) translateY(0); opacity: 0; }
+    8%   { opacity: 0.9; }
+    25%  { transform: translateX(30vw) translateY(-6px); }
+    50%  { transform: translateX(55vw) translateY(4px); }
+    75%  { transform: translateX(80vw) translateY(-6px); }
+    92%  { opacity: 0.9; }
+    100% { transform: translateX(105vw) translateY(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .lbm-mascot--roamer { display: none; }
+}

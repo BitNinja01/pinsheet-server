@@ -1,0 +1,12 @@
+{
+  "name": "leaderboard-mascots-dom-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "jsdom DOM-behaviour test for mascot.js (loader-ignored; not shipped).",
+  "scripts": {
+    "test": "node dom_test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^21.1.2"
+  }
+}
