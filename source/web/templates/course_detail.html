@@ -304,7 +304,7 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
         var holeNum = input.getAttribute("data-hole");
         holes[holeNum] = {
             par: input.value,
-            index: document.querySelector(".edit-hole-index[data-hole='" + holeNum + "']").value,
+            hole_index: document.querySelector(".edit-hole-index[data-hole='" + holeNum + "']").value,
         };
     });
 
