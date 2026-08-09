@@ -1115,6 +1115,15 @@ select.hole-input { width: 3rem; appearance: none; }
     border-color: var(--ps-paper);
 }
 
+/* On counting rows, recolor the normally-white text to the accent.
+   Grey cells (date/tees/diff via inline styles, +/- via .ps-topar) and
+   semantic score colors (.is-under/.is-over) are left untouched. */
+.ps-table tbody tr.is-handicap td .ps-course,
+.ps-table tbody tr.is-handicap td .ps-score:not(.is-under):not(.is-over),
+.ps-table tbody tr.is-handicap td.hcap-white {
+    color: var(--ps-accent);
+}
+
 /* Stats grid (3-column numeric cells) */
 .stats-grid {
     display: grid;
