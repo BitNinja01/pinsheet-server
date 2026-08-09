@@ -604,9 +604,6 @@ body {
     margin-top: 2px;
     letter-spacing: var(--ps-tracking-mono);
 }
-.ps-table tbody tr:hover {
-    background: var(--ps-hover);
-}
 
 /* ── Score pill ────────────────────────────────────────────────────── */
 .ps-score {
@@ -1357,7 +1354,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-size: var(--ps-fs-body);
     vertical-align: middle;
 }
-.data-table tbody tr:hover { background: var(--ps-hover); }
+
 
 .stat-panel {
     background: var(--ps-paper-2);
@@ -2149,6 +2146,12 @@ select.hole-input { width: 3rem; appearance: none; }
 .ps-table tbody tr:nth-child(even) td,
 .rd-table tbody tr:nth-child(even) td {
     background: var(--ps-paper-2);
+}
+/* Hover must sit after the zebra rule: equal specificity, later source
+   order wins, so both odd and even rows get the hover background. */
+.ps-table tbody tr:hover td,
+.data-table tbody tr:hover td {
+    background: var(--ps-hover);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
