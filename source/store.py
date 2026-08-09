@@ -385,16 +385,34 @@ def recompute_all_handicaps() -> None:
     )
 
 
+def _num(*candidates):
+    """First candidate that parses as a float; last candidate is the default.
+
+    Tee slope/rating can be stored as a blank string (the edit UI sends "" for
+    an empty field) or be missing entirely. A blank/None/non-numeric value must
+    fall back to the default rather than crash the differential calc.
+    """
+    default = candidates[-1]
+    for c in candidates[:-1]:
+        if c is None or c == "":
+            continue
+        try:
+            return float(c)
+        except (ValueError, TypeError):
+            continue
+    return float(default)
+
+
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
     if holes_sel == "front":
-        slope  = float(tee_data.get("front_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("front_rating", tee_data.get("rating", 72.0)))
+        slope  = _num(tee_data.get("front_slope"),  tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("front_rating"), tee_data.get("rating"), 72.0)
     elif holes_sel == "back":
-        slope  = float(tee_data.get("back_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("back_rating", tee_data.get("rating", 72.0)))
+        slope  = _num(tee_data.get("back_slope"),  tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("back_rating"), tee_data.get("rating"), 72.0)
     else:
-        slope  = float(tee_data.get("slope",  113))
-        rating = float(tee_data.get("rating", 72.0))
+        slope  = _num(tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("rating"), 72.0)
     return slope, rating
 
 

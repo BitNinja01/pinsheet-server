@@ -35,6 +35,7 @@
         {% endif %}
     </div>
 
+    {% if edit_mode or current_user.is_admin %}
     <div class="round-actions">
         {% if edit_mode %}
         <button class="btn" id="btn-save-course">Save</button>
@@ -44,6 +45,7 @@
         <button class="btn" id="btn-delete-course">Delete</button>
         {% endif %}
     </div>
+    {% endif %}
 
     {% if score_stats and not edit_mode %}
     <h3>Scores by Tee</h3>
