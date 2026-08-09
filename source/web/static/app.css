@@ -466,6 +466,7 @@ body {
 .ps-table tbody tr.is-handicap td .ps-score,
 .ps-table tbody tr.is-handicap td .ps-topar {
     color: var(--ps-accent) !important;
+    font-weight: var(--ps-fw-strong) !important;
 }
 /* Preserve the semantic over-par (red) score color. */
 .ps-table tbody tr.is-handicap td .ps-score.is-over {
