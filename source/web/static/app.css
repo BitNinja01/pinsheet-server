@@ -1744,7 +1744,7 @@ select.hole-input { width: 3rem; appearance: none; }
     position: relative;
 }
 .round-card.is-handicap {
-    outline: var(--ps-rule) solid var(--ps-accent);
+    outline: calc(var(--ps-rule) * 3) solid var(--ps-accent);
     outline-offset: -2px;
 }
 .round-card.is-excluded {
@@ -1803,6 +1803,45 @@ select.hole-input { width: 3rem; appearance: none; }
     font-size: var(--ps-fs-body);
     color: var(--ps-ink);
 }
+
+/* ── Rounds-list mobile card: mirror the desktop row unifications ── */
+/* Unify value font size: gross score down to body size (matches net/stats). */
+.round-card .round-card-score .ps-score {
+    font-size: var(--ps-fs-body);
+}
+/* Counting cards: accent + bold across all text (keeps the label/value
+   size hierarchy; semantic over/under scores preserved). */
+.round-card.is-handicap .round-card-date,
+.round-card.is-handicap .round-card-course,
+.round-card.is-handicap .round-card-meta,
+.round-card.is-handicap .round-card-score .ps-score,
+.round-card.is-handicap .round-card-score .ps-topar,
+.round-card.is-handicap .rcd-label,
+.round-card.is-handicap .rcd-value {
+    color: var(--ps-accent) !important;
+    font-weight: var(--ps-fw-strong) !important;
+}
+.round-card.is-handicap .round-card-score .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+.round-card.is-handicap svg path { stroke: var(--ps-accent); }
+.round-card.is-handicap svg circle { fill: var(--ps-accent); }
+/* Uncounted cards: unify greys to white ink (semantic scores + white
+   sparkline preserved). */
+.round-card:not(.is-handicap) .round-card-date,
+.round-card:not(.is-handicap) .round-card-meta,
+.round-card:not(.is-handicap) .round-card-score .ps-topar,
+.round-card:not(.is-handicap) .rcd-label {
+    color: var(--ps-ink) !important;
+}
+.round-card:not(.is-handicap) .round-card-score .ps-score.is-under {
+    color: var(--ps-accent) !important;
+}
+.round-card:not(.is-handicap) .round-card-score .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+.round-card:not(.is-handicap) svg path { stroke: var(--ps-ink); }
+.round-card:not(.is-handicap) svg circle { fill: var(--ps-ink); }
 
 /* ─────────────────────────────────────────────────────────────────────
  * HOLE CARDS (round entry mobile)
