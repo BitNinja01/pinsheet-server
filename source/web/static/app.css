@@ -490,6 +490,13 @@ body {
 .ps-table tbody tr.clickable-row td .ps-score {
     font-size: var(--ps-fs-body);
 }
+/* Uncounted rows: sparkline matches the white text (counting rows keep accent). */
+.ps-table tbody tr.clickable-row:not(.is-handicap) td svg path {
+    stroke: var(--ps-ink);
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td svg circle {
+    fill: var(--ps-ink);
+}
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
     display: inline-flex;
