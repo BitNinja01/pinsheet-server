@@ -101,6 +101,26 @@ plugins/
 
 Only `__init__.py` is required. The loader skips directories without it.
 
+### Bundled (first-party) plugins vs. drop-in plugins
+
+The `plugins/` directory is primarily a **runtime drop-in area**: `/plugins/*`
+is gitignored (with `!/plugins/.gitkeep`) so user-installed third-party plugins
+are not committed to the repo. A **bundled first-party plugin** that should ship
+with the repo is opted back in with a single `.gitignore` negation:
+
+```gitignore
+/plugins/*
+!/plugins/.gitkeep
+!/plugins/leaderboard_mascots/      # bundled first-party plugin
+```
+
+Because `/plugins/*` is a single-level glob, negating the directory
+(`!/plugins/<name>/`) is enough for git to track everything inside it; the
+`__pycache__/` ignore further down still keeps build artifacts out. At runtime
+the loader treats bundled and drop-in plugins **identically** — there is no
+special enable/disable semantics for first-party plugins. `leaderboard_mascots`
+is the reference example of this pattern.
+
 ### `blueprint.py` convention
 
 For plugins with many routes, split the Blueprint into its own file:
@@ -224,7 +244,7 @@ def unregister(app):
 ### What NOT to do in register()
 
 - **Do not modify core `app.config` keys** like `SECRET_KEY`, `DB_PATH`, or `DATA_DIR`. Use the `plugins.<name>.` namespace instead (see §12).
-- **Do not mutate `app._plugin_blocks` or `app._plugin_nav` after `register()`** unless you're responding to a runtime event — these are read by the context processor at template-render time.
+- **Do not mutate `app._plugin_blocks` or `app._plugin_nav` after `register()`** unless you're responding to a runtime event — these are read by the context processor at template-render time. Reversing your own `register()`-time block injections inside `unregister()` (shutdown) is an allowed exception, since it runs at process exit when no template render is in flight.
 - **Do not open long-lived database connections.** Open and close connections per operation.
 
 ## 6. Blueprints and Routes
@@ -515,7 +535,7 @@ def register(app):
     app._plugin_blocks["foot"] = '<script src="/plugins/achievements/static/achievements.js"></script>'
 ```
 
-These are rendered raw (marked `|safe`) so HTML is not escaped.
+These are rendered raw (marked `|safe`) so HTML is not escaped. **Security invariant:** because these blocks bypass Jinja autoescaping, they MUST be static/constant strings — never build them from request, database, session, or any user-controlled data, or you open an XSS hole. Load user-dependent data client-side from a served static script instead (as `leaderboard_mascots` does).
 
 ### Extending base.html
 

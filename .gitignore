@@ -8,6 +8,11 @@ CODEBASE_IMPROVEMENTS.md
 .superpowers/
 /plugins/*
 !/plugins/.gitkeep
+# Bundled first-party plugin — shipped with the repo (see docs/PLUGINS.md).
+!/plugins/leaderboard_mascots/
+# ...but never its locally-installed JS test deps / lockfile.
+/plugins/leaderboard_mascots/tests/node_modules/
+/plugins/leaderboard_mascots/tests/package-lock.json
 
 # Internal documentation (session memory framework, design docs, internal brainstorming)
 docs/HANDOFF.md

@@ -34,6 +34,22 @@ jobs:
           SECRET_KEY: ci-test-key-placeholder
         run: pytest -v --cov --cov-report=term
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Plugin JS syntax check (leaderboard_mascots)
+        run: |
+          node --check plugins/leaderboard_mascots/static/mascot.js
+          node --check plugins/leaderboard_mascots/tests/dom_test.js
+
+      - name: Plugin DOM tests (leaderboard_mascots)
+        working-directory: plugins/leaderboard_mascots/tests
+        run: |
+          npm install
+          node dom_test.js
+
       - name: Secrets check
         run: |
           if git ls-files | xargs grep -l 'password\s*=\s*' 2>/dev/null; then
