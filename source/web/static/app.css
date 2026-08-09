@@ -465,6 +465,13 @@ body {
     border-radius: 50%;
     background: var(--ps-accent);
 }
+/* Solid accent borders on the left and right edges of a counting row. */
+.ps-table tbody tr.is-handicap td:first-child {
+    border-left: var(--ps-rule) solid var(--ps-accent);
+}
+.ps-table tbody tr.is-handicap td:last-child {
+    border-right: var(--ps-rule) solid var(--ps-accent);
+}
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
     display: inline-flex;
