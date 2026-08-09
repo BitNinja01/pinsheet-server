@@ -455,6 +455,9 @@ body {
     border-left: var(--ps-rule) solid var(--ps-accent);
     padding-left: calc(var(--ps-sp-3) - 1px);
 }
+.ps-table tbody tr.is-handicap td {
+    background: var(--ps-accent);
+}
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
     display: inline-flex;
@@ -1702,6 +1705,7 @@ select.hole-input { width: 3rem; appearance: none; }
 .round-card.is-handicap {
     border-left: var(--ps-rule) solid var(--ps-accent);
     padding-left: calc(var(--ps-sp-3) - 1px);
+    background: var(--ps-accent);
 }
 .round-card.is-excluded {
     border-left: var(--ps-rule) solid var(--ps-warn);
