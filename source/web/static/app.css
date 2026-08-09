@@ -471,6 +471,20 @@ body {
 .ps-table tbody tr.is-handicap td .ps-score.is-over {
     color: var(--ps-warn) !important;
 }
+/* Uncounted rows: unify all text to white ink (no grey variation).
+   !important overrides the per-cell inline colors (date/tees/diff).
+   Semantic over/under score colors are preserved below. */
+.ps-table tbody tr.clickable-row:not(.is-handicap) td,
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar {
+    color: var(--ps-ink) !important;
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-under,
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar.is-under {
+    color: var(--ps-accent) !important;
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
     display: inline-flex;
