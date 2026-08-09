@@ -121,6 +121,7 @@
 :root, .ps-light {
     --ps-paper: #faf6ec;
     --ps-paper-2: #f1ebda;
+    --ps-hover: color-mix(in srgb, var(--ps-paper-2) 45%, var(--ps-paper));
     --ps-ink: #16110a;
     --ps-ink-2: #4a4239;
     --ps-ink-3: #8a8174;
@@ -137,6 +138,7 @@
 .ps-dark {
     --ps-paper: #131312;
     --ps-paper-2: #1c1c1a;
+    --ps-hover: color-mix(in srgb, var(--ps-paper-2) 45%, var(--ps-paper));
     --ps-ink: #ecebe6;
     --ps-ink-2: #a8a59d;
     --ps-ink-3: #6c685f;
@@ -603,7 +605,7 @@ body {
     letter-spacing: var(--ps-tracking-mono);
 }
 .ps-table tbody tr:hover {
-    background: var(--ps-paper-2);
+    background: var(--ps-hover);
 }
 
 /* ── Score pill ────────────────────────────────────────────────────── */
@@ -1355,7 +1357,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-size: var(--ps-fs-body);
     vertical-align: middle;
 }
-.data-table tbody tr:hover { background: var(--ps-paper-2); }
+.data-table tbody tr:hover { background: var(--ps-hover); }
 
 .stat-panel {
     background: var(--ps-paper-2);
