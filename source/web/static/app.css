@@ -519,8 +519,10 @@ body {
     background: color-mix(in srgb, var(--ps-accent) 12%, transparent);
 }
 .ps-table tbody tr.is-excluded td:first-child {
-    border-left: var(--ps-rule) solid var(--ps-warn);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    border-left: calc(var(--ps-rule) * 3) solid var(--ps-warn);
+}
+.ps-table tbody tr.is-excluded td:last-child {
+    border-right: calc(var(--ps-rule) * 3) solid var(--ps-warn);
 }
 .ps-badge.is-excluded {
     display: inline-block;
@@ -1745,8 +1747,8 @@ select.hole-input { width: 3rem; appearance: none; }
     outline-offset: -2px;
 }
 .round-card.is-excluded {
-    border-left: var(--ps-rule) solid var(--ps-warn);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    outline: calc(var(--ps-rule) * 3) solid var(--ps-warn);
+    outline-offset: -2px;
 }
 .round-card + .round-card { margin-top: 6px; }
 .round-card-header {
