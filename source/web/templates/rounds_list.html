@@ -37,7 +37,7 @@
         {% for r in rounds %}
             <tr data-date="{{ r.date }}" data-index="{{ r.index }}"
                 class="clickable-row{% if r.in_handicap %} is-handicap{% endif %}{% if r.excluded %} is-excluded{% endif %}">
-                <td class="hcap-gutter-cell" style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{% if r.in_handicap %}<span class="hcap-gutter-dot" title="counts toward handicap index"></span>{% endif %}{{ r.date }}</td>
+                <td style="color: var(--ps-ink-2); letter-spacing: 0.04em; font-weight: var(--ps-fw-label);">{{ r.date }}</td>
                 <td>
                     <div class="ps-course">{{ r.course }}</div>
                 </td>

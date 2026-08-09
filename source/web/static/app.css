@@ -451,20 +451,6 @@ body {
 .ps-table td.r {
     font-variant-numeric: tabular-nums;
 }
-/* Counting rounds are marked by a dot in the left gutter, outside the table. */
-.ps-table td.hcap-gutter-cell {
-    position: relative;
-}
-.hcap-gutter-dot {
-    position: absolute;
-    left: -16px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--ps-accent);
-}
 /* Solid accent borders on the left and right edges of a counting row. */
 .ps-table tbody tr.is-handicap td:first-child {
     border-left: calc(var(--ps-rule) * 3) solid var(--ps-accent);
