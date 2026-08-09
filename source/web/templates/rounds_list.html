@@ -5,6 +5,7 @@
     <div>
         <div class="ps-eyebrow">Rounds</div>
         <div class="ps-serif" style="font-size: var(--ps-fs-score); margin-top: 2px;">{{ rounds|length }} rounds</div>
+        <div class="hcap-legend"><span class="hcap-swatch"></span> counts toward handicap index (best 8 of last 20)</div>
     </div>
     <div class="ps-row">
     <a href="/rounds/new" class="ps-btn">+ Log Round</a>
@@ -58,7 +59,7 @@
                         <span class="ps-topar">&mdash;</span>
                     {% endif %}
                 </td>
-                <td class="r" style="color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}</td>
+                <td class="r" style="color: var(--ps-ink-2);">{% if r.differential and r.differential != '0.0' %}{{ r.differential }}{% else %}&mdash;{% endif %}{% if r.in_handicap %}<span class="hcap-dot" title="counts toward handicap index"></span>{% endif %}</td>
                 <td class="r">{{ r.fir_display or '—' }}</td>
                 <td class="r">{{ r.gir_display or '—' }}</td>
                 <td class="r">{{ r.putts or '—' }}</td>

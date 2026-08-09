@@ -203,6 +203,73 @@ class TestApiCoursesPut:
 
 
 # ---------------------------------------------------------------------------
+# /api/courses hole-key validation (canonical stroke-index key is "hole_index")
+# ---------------------------------------------------------------------------
+
+class TestApiCoursesHoleKeyValidation:
+    @staticmethod
+    def _bad_holes():
+        return {str(n): {"par": "4", "index": str(n)} for n in range(1, 19)}
+
+    def test_post_rejects_wrong_index_key(self, logged_in_client):
+        payload = dict(VALID_COURSE)
+        payload["holes"] = self._bad_holes()
+        resp = logged_in_client.post("/api/courses", json=payload)
+        assert resp.status_code == 400
+        assert "hole_index" in resp.get_json()["error"]
+        assert get_courses() == {}
+
+    def test_put_rejects_wrong_index_key_and_leaves_store_unchanged(self, logged_in_client):
+        logged_in_client.post("/api/courses", json=VALID_COURSE)
+        payload = dict(VALID_COURSE)
+        payload["holes"] = self._bad_holes()
+        resp = logged_in_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 400
+        assert "hole_index" in resp.get_json()["error"]
+        courses = get_courses()
+        assert "Pebble Valley" in courses
+        holes = courses["Pebble Valley"]["holes"]
+        assert all("hole_index" in h for h in holes.values())
+        assert all("index" not in h for h in holes.values())
+
+    def test_post_valid_course_with_hole_index_still_succeeds(self, logged_in_client):
+        resp = logged_in_client.post("/api/courses", json=VALID_COURSE)
+        assert resp.status_code == 200
+        assert "Pebble Valley" in get_courses()
+
+    def test_put_edit_form_payload_with_hole_index_succeeds(self, logged_in_client):
+        logged_in_client.post("/api/courses", json=VALID_COURSE)
+        payload = dict(VALID_COURSE)
+        payload["location"] = {"city": "Editville", "state/province": "TS", "country": "Testland"}
+        resp = logged_in_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 200
+        courses = get_courses()
+        assert courses["Pebble Valley"]["location"]["city"] == "Editville"
+        holes = courses["Pebble Valley"]["holes"]
+        assert all("hole_index" in h for h in holes.values())
+        assert all("index" not in h for h in holes.values())
+
+    def test_post_holes_null_rejected_cleanly(self, logged_in_client):
+        payload = dict(VALID_COURSE)
+        payload["holes"] = None
+        resp = logged_in_client.post("/api/courses", json=payload)
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "holes must be an object"
+        assert get_courses() == {}
+
+    def test_put_rename_with_bad_holes_rejected_before_rename(self, logged_in_client):
+        logged_in_client.post("/api/courses", json=VALID_COURSE)
+        payload = dict(VALID_COURSE)
+        payload["name"] = "Renamed GC"
+        payload["holes"] = self._bad_holes()
+        resp = logged_in_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 400
+        courses = get_courses()
+        assert "Pebble Valley" in courses
+        assert "Renamed GC" not in courses
+
+
+# ---------------------------------------------------------------------------
 # /courses (list) and /courses/<name> (detail)
 # ---------------------------------------------------------------------------
 

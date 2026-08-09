@@ -643,3 +643,37 @@ def test_api_rounds_delete_scoped_to_own_user_only(client):
 
     alice_rounds = store.get_all_rounds(alice["id"])
     assert len(alice_rounds) == 1  # bob did not actually delete alice's round
+
+
+# ---------------------------------------------------------------------------
+# GET /rounds  — handicap highlight window (best 8 of most recent 20)
+# ---------------------------------------------------------------------------
+def test_rounds_list_handicap_highlight_uses_recent_20_window(client, capture_render):
+    """A best-differential round that falls outside the most-recent-20 window
+    must NOT be marked in_handicap; only the recent window can light up.
+
+    Regression: the highlight previously scanned all rounds, so an all-time
+    best round older than the last 20 was wrongly flagged as counting toward
+    the current index.
+    """
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+
+    # Oldest round: lowest differential all-time, but outside the recent 20.
+    _post_round(client, date="2025-01-01", gross_total="71")  # diff ~0.9
+    # 20 recent, higher-differential rounds that form the actual window.
+    for i in range(1, 21):
+        _post_round(client, date="2026-03-%02d" % i, gross_total="100")  # diff ~28.2
+
+    resp = client.get("/rounds")
+    assert resp.status_code == 200
+
+    rounds = capture_render["ctx"]["rounds"]
+    assert len(rounds) == 21
+
+    ancient = [r for r in rounds if r["date"] == "2025-01-01"]
+    assert ancient and ancient[0]["in_handicap"] is False
+
+    counted = [r for r in rounds if r["in_handicap"]]
+    assert len(counted) == 8  # count_table_n(20) == 8
+    assert all(r["date"].startswith("2026-03") for r in counted)

@@ -45,6 +45,47 @@
         {% endif %}
     </div>
 
+    {% if score_stats and not edit_mode %}
+    <h3>Scores by Tee</h3>
+    <div class="desktop-table">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Tee</th>
+                <th>Rounds</th>
+                <th>Best</th>
+                <th>Average</th>
+                <th>Worst</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in score_stats %}
+            <tr>
+                <td>{{ s.tee }}</td>
+                <td>{{ s.rounds }}</td>
+                <td>{{ s.best }}</td>
+                <td>{{ s.avg }}</td>
+                <td>{{ s.worst }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="tee-cards">
+    {% for s in score_stats %}
+        <div class="tee-card-item">
+            <div class="tee-card-name">{{ s.tee }}</div>
+            <div class="tee-card-stats">
+                <div class="tee-card-stat">Rounds: <span>{{ s.rounds }}</span></div>
+                <div class="tee-card-stat">Best: <span>{{ s.best }}</span></div>
+                <div class="tee-card-stat">Average: <span>{{ s.avg }}</span></div>
+                <div class="tee-card-stat">Worst: <span>{{ s.worst }}</span></div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+    {% endif %}
+
     {% if tees %}
     <h3>Tees</h3>
     <!-- Desktop table -->
@@ -263,7 +304,7 @@ document.getElementById("btn-save-course")?.addEventListener("click", function()
         var holeNum = input.getAttribute("data-hole");
         holes[holeNum] = {
             par: input.value,
-            index: document.querySelector(".edit-hole-index[data-hole='" + holeNum + "']").value,
+            hole_index: document.querySelector(".edit-hole-index[data-hole='" + holeNum + "']").value,
         };
     });
 

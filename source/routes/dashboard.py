@@ -442,6 +442,8 @@ def register_dashboard_routes(app, limiter, csrf):
         if not challenge:
             return "Challenge not found.", 404
         participant_ids = get_challenge_participants(challenge_id)
+        if current_user.id not in participant_ids and not current_user.is_admin:
+            return "Challenge not found.", 404
         all_users = store_get_users()
         user_lookup = {u["id"]: u for u in all_users}
         courses_dict = {name: dict_to_course(name, d) for name, d in get_courses().items()}
