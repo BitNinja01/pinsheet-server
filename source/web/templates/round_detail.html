@@ -583,7 +583,11 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
         body: JSON.stringify(body),
     }).then(function(r) {
         if (r.ok) {
-            window.location.href = "/rounds/{{ round.date }}/{{ round.index }}";
+            return r.json().then(function(d) {
+                var dt = d.date || "{{ round.date }}";
+                var ix = (d.index !== undefined && d.index !== null) ? d.index : "{{ round.index }}";
+                window.location.href = "/rounds/" + encodeURIComponent(dt) + "/" + encodeURIComponent(ix);
+            });
         } else {
             return r.json().then(function(d) { alert(d.error || "Save failed"); });
         }

@@ -229,6 +229,59 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
     return round_id
 
 
+def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> int:
+    """Update an existing round row in place, keyed by its primary id.
+
+    Used by the edit path (including date changes) so the round keeps its id.
+    A delete + INSERT-OR-REPLACE would mint a new id and orphan any
+    match_rounds rows that reference this round.
+
+    Returns the number of rows updated (0 if the round no longer exists or is
+    owned by another user), so callers can detect a lost-row race.
+    """
+    db = get_db()
+    total_putts = None
+    holes = golf_round.get("holes", {})
+    if holes:
+        def _to_int(v):
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return 0
+        total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    cur = db.execute(
+        """UPDATE rounds SET
+             course_name = ?, date = ?, round_index = ?, tee_name = ?,
+             holes_played = ?, entry_mode = ?, holes = ?, total_gross = ?,
+             total_putts = ?, differential = ?, notes = ?, excluded = ?,
+             computed_handicap = ?, differential_locked = ?
+           WHERE id = ? AND user_id = ?""",
+        (
+            golf_round.get("course", ""),
+            date,
+            index,
+            golf_round.get("tees", ""),
+            _norm_holes(golf_round.get("holes_played") or golf_round.get("holes_selection", "")),
+            golf_round.get("entry_mode", ""),
+            json.dumps(golf_round.get("holes", {})),
+            golf_round.get("total_gross", ""),
+            str(total_putts) if total_putts is not None else None,
+            golf_round.get("differential", ""),
+            golf_round.get("notes", ""),
+            1 if golf_round.get("excluded") else 0,
+            golf_round.get("computed_handicap", ""),
+            1 if golf_round.get("differential_locked") else 0,
+            round_id,
+            user_id,
+        ),
+    )
+    rowcount = cur.rowcount
+    db.commit()
+    db.close()
+    _log.info("round updated in place: id=%s -> %s #%s (rows=%s)", round_id, date, index, rowcount)
+    return rowcount
+
+
 def delete_round(date: str, index: str, user_id: int = 1) -> None:
     db = get_db()
     row = db.execute(
