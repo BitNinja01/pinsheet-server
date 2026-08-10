@@ -83,13 +83,21 @@ const mNick = d.querySelectorAll(".mobile-cards .lbm-nickname");
 chk(mMasc.length === 2, "mobile: 2 sm mascot canvases (" + mMasc.length + ")");
 chk(mNick.length === 2, "mobile: 2 nicknames (" + mNick.length + ")");
 
-// Every mascot canvas is decorative → aria-hidden. Not filtered by type: the
-// roamer is built by the same makeCanvas() factory, so this asserts the shared
-// treatment rather than excluding the roamer variant.
-const allMasc = d.querySelectorAll("canvas.lbm-mascot");
-chk(allMasc.length >= 4 &&
-    [...allMasc].every(c => c.getAttribute("aria-hidden") === "true" && c.title === "mascot"),
-    "all mascot canvases aria-hidden + titled (" + allMasc.length + ")");
+// Per-row mascots are meaningful images: role="img" + aria-label carrying the
+// nickname, and titled. (Roamer canvases are aria-hidden — set in spawn(), not
+// present at init time.) Ported from PR #33's mascot-a11y refactor.
+const rowMasc = d.querySelectorAll("canvas.lbm-mascot:not(.lbm-mascot--roamer)");
+chk(rowMasc.length === 4 && [...rowMasc].every(c =>
+    c.getAttribute("role") === "img" &&
+    /^mascot: .+/.test(c.getAttribute("aria-label") || "") &&
+    c.getAttribute("aria-hidden") === null &&
+    c.title === "mascot"),
+    "row mascots: role=img + aria-label nickname + titled (" + rowMasc.length + ")");
+// aria-label matches the visible nickname text for the same row.
+const aLabel = (d.querySelector(".desktop-table canvas.lbm-mascot")
+    .getAttribute("aria-label") || "").replace(/^mascot: /, "");
+chk(aLabel === d.querySelector(".desktop-table .lbm-nickname").textContent,
+    "aria-label matches visible nickname ('" + aLabel + "')");
 
 // Leader (Alice, rank 1) gets a LEADER_NICK; Bob gets a regular NICK.
 const LEADER = ["The Closer","Birdie Boss","Fairway Finisher","Green Reaper","Ace of Clubs","Eagle Eye","Pin Seeker","The Bag Man"];

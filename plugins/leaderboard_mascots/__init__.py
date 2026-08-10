@@ -21,7 +21,7 @@ _FOOT_BLOCK = (
 
 plugin_info = {
     "name": "leaderboard_mascots",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Pixel mascots and golf-pun nicknames on the friends leaderboard.",
     "author": "PinSheet Community",
 }

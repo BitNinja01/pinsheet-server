@@ -1,5 +1,25 @@
 # Changelog — leaderboard_mascots
 
+## 1.1.0
+
+Fold in the **mascot-a11y** improvements from **PR #33**
+(`refactor(design-system): accent-tint + size tokens, mascot a11y`).
+
+- **Accessible mascots (a11y):** per-row mascot canvases are now exposed to
+  assistive tech as `role="img"` with `aria-label="mascot: <nickname>"` instead
+  of being hidden. The roaming mascot stays `aria-hidden` (purely decorative).
+  The `aria-label` is derived from the same nickname shown as visible text, so
+  they always agree. DOM test updated (row canvases assert role/label; a
+  label↔visible-text match check added).
+- **Design tokens:** `mascot.css` now consumes `--ps-size-mascot`,
+  `--ps-size-mascot-sm`, and `--ps-radius` (with `26px`/`20px`/`4px` fallbacks),
+  aligning with PR #33's size/radius token set while remaining self-contained
+  when those core tokens are absent.
+
+Scope note: PR #33's non-mascot changes (accent-tint highlight, handicap
+legend/dot, `rounds_list.html`) are core design-system edits outside this
+plugin and are intentionally not vendored here.
+
 ## 1.0.0
 
 Initial release. Ports **PR #31** (`feat(board): pixel mascots + golf-pun

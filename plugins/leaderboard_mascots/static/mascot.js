@@ -125,16 +125,21 @@
         var cv = document.createElement("canvas");
         cv.className = cls;
         cv.title = "mascot";
-        // Purely decorative — the substantive text lives in the .lbm-nickname.
-        cv.setAttribute("aria-hidden", "true");
         drawMascot(cv, seedStr, isLeader);
         return cv;
     }
 
-    function makeNickname(tag, seedStr, isLeader) {
+    // A per-row mascot is a meaningful image: expose it to assistive tech with
+    // its nickname as the label (roaming mascots are decorative — see spawn()).
+    function labelMascot(cv, nick) {
+        cv.setAttribute("role", "img");
+        cv.setAttribute("aria-label", "mascot: " + nick);
+    }
+
+    function makeNickname(tag, nick) {
         var el = document.createElement(tag);
         el.className = "lbm-nickname";
-        el.textContent = nicknameFor(seedStr, isLeader);
+        el.textContent = nick;
         return el;
     }
 
@@ -152,8 +157,11 @@
         var seedStr = "pinsheet:" + name;
         seeds.push({ seed: seedStr, leader: isLeader });
 
-        cell.insertBefore(makeCanvas("lbm-mascot", seedStr, isLeader), nameWrap);
-        nameWrap.appendChild(makeNickname("div", seedStr, isLeader));
+        var nick = nicknameFor(seedStr, isLeader);
+        var canvas = makeCanvas("lbm-mascot", seedStr, isLeader);
+        labelMascot(canvas, nick);
+        cell.insertBefore(canvas, nameWrap);
+        nameWrap.appendChild(makeNickname("div", nick));
     }
 
     // Attach a mascot + nickname to one mobile board card's avatar.
@@ -170,9 +178,11 @@
         var seedStr = "pinsheet:" + name;
         seeds.push({ seed: seedStr, leader: isLeader });
 
-        head.insertBefore(
-            makeCanvas("lbm-mascot lbm-mascot--sm", seedStr, isLeader), nameEl);
-        var nick = makeNickname("span", seedStr, isLeader);
+        var nickStr = nicknameFor(seedStr, isLeader);
+        var canvas = makeCanvas("lbm-mascot lbm-mascot--sm", seedStr, isLeader);
+        labelMascot(canvas, nickStr);
+        head.insertBefore(canvas, nameEl);
+        var nick = makeNickname("span", nickStr);
         nick.style.display = "block";
         nameEl.appendChild(nick);
     }
@@ -216,9 +226,10 @@
 
         function spawn() {
             var choice = seeds[Math.floor(Math.random() * seeds.length)];
-            // Built via makeCanvas() so the roamer inherits the same decorative
-            // treatment as the row mascots (aria-hidden, title).
+            // The roamer is purely decorative — hide it from assistive tech
+            // (unlike the per-row mascots, which are labelled via labelMascot()).
             var cv = makeCanvas("lbm-mascot lbm-mascot--roamer", choice.seed, choice.leader);
+            cv.setAttribute("aria-hidden", "true");
             var rect = board.getBoundingClientRect();
             var top = Math.max(8, Math.random() * Math.max(8, rect.height - 40));
             cv.style.top = top + "px";
