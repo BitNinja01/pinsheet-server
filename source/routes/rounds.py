@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import date
 
 from flask import render_template, request, jsonify, g, current_app
@@ -7,7 +8,7 @@ from flask_login import login_required, current_user
 from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
-    get_slope_rating, save_round, delete_round,
+    get_slope_rating, save_round, update_round, delete_round,
     get_matches_for_user, link_round,
     recompute_all_handicaps,
     recompute_handicaps_for_user,
@@ -33,6 +34,14 @@ from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 _log = logging.getLogger("pinsheet")
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _valid_date(val) -> bool:
+    """True for a well-formed ISO YYYY-MM-DD string. Keeps a malformed date out
+    of the DB (and out of the client-side redirect that builds a round URL)."""
+    return isinstance(val, str) and bool(_DATE_RE.match(val))
 
 
 def _safe_int(val, default=0):
@@ -199,6 +208,8 @@ def register_rounds_routes(app, csrf):
     def api_rounds_post():
         data = request.get_json()
         date_val = data.get("date", "")
+        if not _valid_date(date_val):
+            return jsonify({"error": "Invalid date"}), 400
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
         match_id = data.get("match_id")
@@ -616,6 +627,9 @@ def register_rounds_routes(app, csrf):
             return jsonify({"error": "Round not found"}), 404
 
         data = request.get_json()
+        new_date = data.get("date", date)
+        if not _valid_date(new_date):
+            return jsonify({"error": "Invalid date"}), 400
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
         course = get_courses().get(course_name, {})
@@ -632,7 +646,7 @@ def register_rounds_routes(app, csrf):
         slope, rating = get_slope_rating(tees, holes_sel)
 
         golf_round = {
-            "date": data.get("date", date),
+            "date": new_date,
             "course": course_name,
             "tees": tees_name,
             "holes_played": data.get("holes_played", "18"),
@@ -717,10 +731,16 @@ def register_rounds_routes(app, csrf):
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
 
-        if data.get("date", date) != date:
-            delete_round(date, index, current_user.id)
+        if new_date != date:
+            # Moving to a different day: claim a free index there so we don't
+            # collide with an existing round on that date. The round stays put
+            # in the DB until update_round runs, so it isn't counted here.
+            new_index = next_round_index(new_date, current_user.id)
+        else:
+            new_index = int(index)
 
         golf_round_typed = dict_to_round(golf_round)
+        golf_round_typed.index = new_index
         for i, r in enumerate(all_rounds_for_user):
             if r.date == date and str(r.index) == str(index):
                 all_rounds_for_user[i] = golf_round_typed
@@ -730,13 +750,18 @@ def register_rounds_routes(app, csrf):
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        save_round(golf_round, data.get("date", date), int(index), current_user.id)
+        # Update in place by row id so the round keeps its identity — any
+        # match_rounds link (and the round's own URL) survives a date edit.
+        updated = update_round(old_round.id, golf_round, new_date, new_index, current_user.id)
+        if not updated:
+            # Row vanished between the read above and this write (concurrent delete).
+            return jsonify({"error": "Round not found"}), 404
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
         # Recompute cascade — update computed_handicap on this user's subsequent rounds
         recompute_handicaps_for_user(current_user.id)
 
-        return jsonify({"ok": True, "differential": differential})
+        return jsonify({"ok": True, "differential": differential, "date": new_date, "index": new_index})
 
     @app.route("/api/rounds/<date>/<index>/exclude", methods=["POST"])
     @login_required

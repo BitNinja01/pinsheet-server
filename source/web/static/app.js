@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var indexEl = row.querySelector(".course-index");
             var holeData = {
                 par: parEl ? parEl.value : "",
-                index: indexEl ? indexEl.value : "",
+                hole_index: indexEl ? indexEl.value : "",
             };
             if (holeData.par) totalPar += parseInt(holeData.par) || 0;
             holes[holeNum] = holeData;
@@ -571,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var r = '<tr data-hole="' + num + '"' + cls + '>';
             r += '<td>' + num + '</td>';
             r += '<td class="hole-par">' + par + '</td>';
-            r += '<td>' + (hole.index || hole.hole_index || '') + '</td>';
+            r += '<td>' + (hole.hole_index || hole.index || '') + '</td>';
 
             if (isCurrent) {
                 var savedShorthand = buildShorthand(saved);
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function () {
             html += '<div class="hole-card-hole-num">' + num + '</div>';
             html += '<div class="hole-card-hole-info">';
             html += 'Par <span>' + par + '</span>';
-            html += ' &middot; Index <span>' + (hole.index || '') + '</span>';
+            html += ' &middot; Index <span>' + (hole.hole_index || hole.index || '') + '</span>';
             html += '</div></div>';
             html += '<div class="hole-card-parsed" id="hole-parsed-' + num + '">';
             html += '<div class="hole-card-parsed-field"><div class="hole-card-parsed-label">Score</div><div class="hole-card-parsed-value" id="parsed-gross-' + num + '">' + (saved.gross || '&mdash;') + '</div></div>';

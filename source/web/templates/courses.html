@@ -24,11 +24,11 @@
                 {% if c.location is mapping %}
                     {{ c.location.city }}, {{ c.location.get("state/province", "") }}
                 {% else %}
-                    {{ c.location or "&mdash;" }}
+                    {{ c.location or "—" }}
                 {% endif %}
             </td>
             <td>{{ c.play_count }}</td>
-            <td>{{ c.last_played or "&mdash;" }}</td>
+            <td>{{ c.last_played or "Not played" }}</td>
         </tr>
     {% endfor %}
     </tbody>

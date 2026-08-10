@@ -98,9 +98,11 @@ def register_matches_routes(app):
         if not match:
             return "Match not found.", 404
         players = get_match_players(match_id)
+        is_participant = any(p["user_id"] == current_user.id for p in players)
+        if not is_participant and not current_user.is_admin:
+            return "Match not found.", 404
         match_rounds = get_match_rounds(match_id)
         round_details = _build_round_details(match_rounds)
-        is_participant = any(p["user_id"] == current_user.id for p in players)
         if players:
             min_net = min(p["total_net"] for p in players)
             for p in players:

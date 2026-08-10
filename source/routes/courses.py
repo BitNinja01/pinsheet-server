@@ -6,6 +6,20 @@ from source.request_data import get_settings, get_courses, get_all_rounds_for_us
 from source.plugin import fire_hook
 
 
+def _validate_hole_keys(holes) -> str | None:
+    """Return an error message if the holes payload uses the wrong stroke-index key."""
+    if not isinstance(holes, dict):
+        return "holes must be an object"
+    for num, hole in holes.items():
+        if not isinstance(hole, dict):
+            continue
+        if "index" in hole:
+            return f"hole {num}: stroke index must use key 'hole_index', not 'index'"
+        if "hole_index" not in hole and hole:
+            return f"hole {num}: stroke index must use key 'hole_index'"
+    return None
+
+
 def register_courses_routes(app, csrf):
     @app.route("/courses/new")
     @login_required
@@ -101,7 +115,7 @@ def register_courses_routes(app, csrf):
             hole_rows.append({
                 "num": int(hn),
                 "par": h.get("par", ""),
-                "index": h.get("index", h.get("hole_index", "")),
+                "index": h.get("hole_index", h.get("index", "")),
                 "yardages": yardages,
             })
 
@@ -123,6 +137,10 @@ def register_courses_routes(app, csrf):
         location = data.get("location", {})
         if not isinstance(location, dict) or not location.get("city") or not location.get("state/province") or not location.get("country"):
             return jsonify({"error": "City, state/province, and country are required"}), 400
+
+        err = _validate_hole_keys(data.get("holes", {}))
+        if err:
+            return jsonify({"error": err}), 400
 
         course = {
             "location": location,
@@ -163,6 +181,10 @@ def register_courses_routes(app, csrf):
         location = data.get("location", {})
         if not isinstance(location, dict) or not location.get("city") or not location.get("state/province") or not location.get("country"):
             return jsonify({"error": "City, state/province, and country are required"}), 400
+
+        err = _validate_hole_keys(data.get("holes", {}))
+        if err:
+            return jsonify({"error": err}), 400
 
         if new_name != name:
             rename_course(name, new_name)
