@@ -294,6 +294,92 @@ def test_api_rounds_post_non_numeric_match_id_does_not_crash_save(client):
     assert len(saved) == 1  # round itself still saved despite bad match_id
 
 
+def test_edit_date_preserves_match_link_and_round_identity(client):
+    """Editing a round's date must keep the round's id, so its match_rounds
+    link survives and the round is still reachable at the new date. A previous
+    bug deleted + re-inserted the round on a date change, minting a new id and
+    orphaning the match link (round vanished behind a 404)."""
+    user = _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    for i, diff in enumerate(["10.0", "12.0"]):
+        store.save_round(
+            {"course": "Test GC", "tees": "White", "holes_played": "all",
+             "entry_mode": "score_only", "holes": {}, "total_gross": "80",
+             "differential": diff, "notes": "", "excluded": False,
+             "computed_handicap": "", "differential_locked": False},
+            f"2026-05-0{i + 1}", 0, user_id=user["id"],
+        )
+
+    match_id = store.create_match(created_by=user["id"], course_name="Test GC", date="2026-06-01")
+    store.add_match_player(match_id, user["id"])
+
+    resp = _post_round(client, date="2026-06-10", gross_total="85", match_id=match_id)
+    assert resp.status_code == 200
+    links = store.get_match_rounds(match_id)
+    assert len(links) == 1
+    original_round_id = links[0]["round_id"]
+
+    # Edit the date of the linked round.
+    resp = client.put("/api/rounds/2026-06-10/0", json={
+        "date": "2026-06-12", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only",
+        "gross_total": "85", "notes": "", "holes": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["date"] == "2026-06-12"
+
+    # Match link survives and still points at the same round id.
+    links_after = store.get_match_rounds(match_id)
+    assert len(links_after) == 1
+    assert links_after[0]["round_id"] == original_round_id
+
+    # Round now lives at the new date; the old date is gone.
+    saved = [r for r in store.get_all_rounds(user["id"]) if r.date == "2026-06-12"]
+    assert len(saved) == 1
+    assert saved[0].id == original_round_id
+    assert not any(r.date == "2026-06-10" for r in store.get_all_rounds(user["id"]))
+
+    # New URL resolves; old one 404s.
+    assert client.get(f"/rounds/2026-06-12/{body['index']}").status_code == 200
+    assert client.get("/rounds/2026-06-10/0").status_code == 404
+
+
+def test_edit_date_to_occupied_day_does_not_clobber_existing_round(client):
+    """Moving a round onto a date that already has a round must pick a free
+    index rather than overwrite the sitting round."""
+    user = _login(client)
+    _make_course(client)
+    _post_round(client, date="2026-07-01", gross_total="90")  # sitting round, idx 0
+    _post_round(client, date="2026-07-05", gross_total="85")  # round to move, idx 0
+
+    resp = client.put("/api/rounds/2026-07-05/0", json={
+        "date": "2026-07-01", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only",
+        "gross_total": "85", "notes": "", "holes": {},
+    })
+    assert resp.status_code == 200
+
+    on_day = [r for r in store.get_all_rounds(user["id"]) if r.date == "2026-07-01"]
+    assert len(on_day) == 2  # both rounds coexist, none clobbered
+    grosses = sorted(r.total_gross for r in on_day)
+    assert grosses == ["85", "90"]
+
+
+def test_edit_rejects_malformed_date(client):
+    """A non-ISO date must be rejected with 400 and never reach the DB / the
+    client-side redirect that builds a round URL from it."""
+    _login(client)
+    _make_course(client)
+    _post_round(client, date="2026-08-01", gross_total="85")
+    resp = client.put("/api/rounds/2026-08-01/0", json={
+        "date": "not-a-date", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only",
+        "gross_total": "85", "notes": "", "holes": {},
+    })
+    assert resp.status_code == 400
+
+
 # ---------------------------------------------------------------------------
 # GET /rounds/<date>/<index>  (round_detail)
 # ---------------------------------------------------------------------------
