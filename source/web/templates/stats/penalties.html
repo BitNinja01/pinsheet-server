@@ -37,7 +37,7 @@
       {"label": "Avg vs Par \u2014 OB Holes", "value": _fmt(ob_stats.get("fir_ob_avg_vs_par"), "", 2), "warn": true},
     ]) }}
     {{ DistSection(title="Clean vs Dirty", bars=None, class="stats-section--footer", footer_rows=[
-      {"label": "Clean Rds", "value": _fmt(pen_free_pct, "%", 0)},
+      {"label": "Clean Holes", "value": _fmt(hole_breakdown.clean_pct, "", 1), "unit": "%"},
       {"label": "Pen-Free %", "value": _fmt(pen_free_pct, "", 1), "unit": "%"},
       {"label": "OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
     ]) }}
