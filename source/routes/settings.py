@@ -14,6 +14,7 @@ from store import (
 )
 from calc import calc_handicap_index
 from source.request_data import get_settings, get_courses, base_context
+from source.routes.courses import _coerce_course_numerics
 
 
 _log = logging.getLogger("pinsheet")
@@ -56,6 +57,10 @@ def register_settings_routes(app, csrf):
                 if name.endswith("courses.json"):
                     courses_data = json.loads(zf.read(name))
                     for cname, cdata in courses_data.items():
+                        # Same numeric-field validation as the API write path
+                        # (finding U1 / GH#68), but lenient: blank out any
+                        # non-numeric value instead of rejecting the import.
+                        _coerce_course_numerics(cdata, strict=False)
                         save_course(cdata, cname)
                         courses_count += 1
                 elif "rounds/" in name and name.endswith(".json"):

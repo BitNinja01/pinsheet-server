@@ -243,6 +243,19 @@ def main():
 
     register_routes(app, limiter, csrf, User)
 
+    @app.after_request
+    def _set_csp(response):
+        # Defense-in-depth for finding U1 / GH#68 (stored XSS via course
+        # catalog fields). Does not weaken CSP with 'unsafe-inline' or
+        # 'unsafe-eval' — see caveat below re: existing inline <script>
+        # blocks in course_detail.html, bag.html, round_detail.html,
+        # round_entry.html, and welcome.html, which this policy will block
+        # until they are refactored to external/nonced scripts.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"
+        )
+        return response
+
     port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
 
