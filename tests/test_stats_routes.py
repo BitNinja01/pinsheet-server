@@ -306,6 +306,14 @@ def test_stats_penalties_computes_expected_values(auth_client, capture_render):
     assert ctx["pen_free_pct"] == pytest.approx(66.6666, rel=1e-4)
     assert ctx["total_ob_rd"] == 0.0
 
+    # hole breakdown is data-driven: 54 holes, only r3's 18 carry penalties, no OB
+    hb = ctx["hole_breakdown"]
+    assert hb["total_holes"] == 54
+    assert hb["clean_pct"] == pytest.approx(66.6666, rel=1e-4)
+    assert hb["penalty_pct"] == pytest.approx(33.3333, rel=1e-4)
+    assert hb["ob_pct"] == pytest.approx(0.0)
+    assert hb["clean_pct"] + hb["penalty_pct"] + hb["ob_pct"] == pytest.approx(100.0)
+
 
 # ---------------------------------------------------------------------------
 # /stats/fairways

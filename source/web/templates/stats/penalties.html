@@ -15,9 +15,9 @@
 <div class="stats-two-col">
   <div class="stats-left">
     {{ DistSection(title="Penalty Breakdown", bars=[
-      {"label": "Clean Holes", "pct": 94.4, "display": "94.4%", "max": 100, "color": "var(--ps-accent)"},
-      {"label": "Penalty Holes", "pct": 4.4, "display": "4.4%", "max": 100, "color": "var(--ps-warn)"},
-      {"label": "OB Holes", "pct": 1.2, "display": "1.2%", "max": 100, "color": "var(--ps-warn)"},
+      {"label": "Clean Holes", "pct": hole_breakdown.clean_pct or 0, "display": _fmt(hole_breakdown.clean_pct, "%", 1), "max": 100, "color": "var(--ps-accent)"},
+      {"label": "Penalty Holes", "pct": hole_breakdown.penalty_pct or 0, "display": _fmt(hole_breakdown.penalty_pct, "%", 1), "max": 100, "color": "var(--ps-warn)"},
+      {"label": "OB Holes", "pct": hole_breakdown.ob_pct or 0, "display": _fmt(hole_breakdown.ob_pct, "%", 1), "max": 100, "color": "var(--ps-warn)"},
     ], has_stacked_bar=True, stacked_max=100, footer_rows=[
       {"label": "Pen / Rd", "value": _fmt(penalties_per_round, "", 2)},
       {"label": "Penalty \u2192", "value": _fmt(penalty_vs_par, "", 2)},
@@ -38,7 +38,7 @@
     ]) }}
     {{ DistSection(title="Clean vs Dirty", bars=None, class="stats-section--footer", footer_rows=[
       {"label": "Clean Rds", "value": _fmt(pen_free_pct, "%", 0)},
-      {"label": "Pen-Free %", "value": "94.4", "unit": "%"},
+      {"label": "Pen-Free %", "value": _fmt(pen_free_pct, "", 1), "unit": "%"},
       {"label": "OB / Rd", "value": _fmt(total_ob_rd, "", 2)},
     ]) }}
   </div>

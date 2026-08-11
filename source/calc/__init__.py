@@ -76,6 +76,7 @@ from calc.scoring import (
 )
 from calc.analysis import (
     calc_penalty_stats,
+    calc_penalty_hole_breakdown,
     calc_momentum_recovery,
 )
 from calc.milestones import (
