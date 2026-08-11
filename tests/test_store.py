@@ -339,16 +339,20 @@ def test_rounds_isolated_by_user(db):
 
 
 class TestPluginStates:
-    def test_seed_creates_enabled_row(self, db):
+    def test_seed_creates_disabled_row(self, db):
+        # Provenance gate: a newly discovered plugin is seeded DISABLED — an
+        # admin must explicitly enable (validate) it before its code runs.
         from store import seed_plugin_state, get_plugin_states
         seed_plugin_state("test-plugin")
         states = get_plugin_states()
-        assert states["test-plugin"] is True
+        assert states["test-plugin"] is False
 
     def test_seed_is_idempotent(self, db):
-        from store import seed_plugin_state, get_plugin_states
+        # seed must not re-disable a plugin an admin already enabled
+        from store import seed_plugin_state, set_plugin_state, get_plugin_states
         seed_plugin_state("test-plugin")
-        seed_plugin_state("test-plugin")
+        set_plugin_state("test-plugin", True)
+        seed_plugin_state("test-plugin")  # INSERT OR IGNORE — must not reset
         states = get_plugin_states()
         assert states["test-plugin"] is True
 

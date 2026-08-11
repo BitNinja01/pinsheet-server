@@ -106,7 +106,10 @@ def rename_course(old_name: str, new_name: str) -> None:
     _log.info("course renamed: %r -> %r", old_name, new_name)
 
 
-def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
+def get_all_rounds(user_id: int, limit: int = None) -> list[RoundData]:
+    # user_id is REQUIRED (no default). A default of 1 silently returned the
+    # first user's rounds for any caller that forgot to pass an id — a
+    # cross-user data-exposure footgun in a multi-user DB (eng-architect T6).
     db = get_db()
     query = "SELECT * FROM rounds WHERE user_id = ? ORDER BY date DESC, round_index DESC"
     if limit is not None:
@@ -575,9 +578,14 @@ def consume_invite_code(code: str, used_by: int) -> bool:
 
 
 def seed_plugin_state(plugin_name: str) -> None:
+    # Trust model: a newly discovered plugin is seeded DISABLED (enabled=0).
+    # Dropping a folder into plugins/ must NOT auto-run its code — an admin
+    # has to explicitly enable it in the admin UI first, which is the point at
+    # which they validate/vouch for the plugin. This is the provenance gate:
+    # "plugin present on disk" is not "plugin trusted to execute".
     db = get_db()
     db.execute(
-        "INSERT OR IGNORE INTO plugin_states (plugin_name, enabled) VALUES (?, 1)",
+        "INSERT OR IGNORE INTO plugin_states (plugin_name, enabled) VALUES (?, 0)",
         (plugin_name,),
     )
     db.commit()
