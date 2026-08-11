@@ -11,7 +11,68 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    calc_adjusted_gross_score,
 )
+
+
+# ---------------------------------------------------------------------------
+# Adjusted Gross Score (WHS net double bogey) — the fix for the Cedar Irons vs
+# Scarecrow ranking bug (raw gross was used instead of adjusted gross).
+# ---------------------------------------------------------------------------
+def test_adjusted_gross_score_caps_blowup_at_net_double_bogey():
+    course_holes = {str(n): {"par": 4, "index": n} for n in range(1, 19)}
+    round_holes = {str(n): {"gross": 4} for n in range(1, 19)}
+    round_holes["1"]["gross"] = 10  # blow-up on the hardest hole (SI 1)
+
+    # course handicap 0 -> net double bogey cap = par + 2 = 6 (raw sum is 78)
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 17 * 4 + 6
+    # course handicap 18 -> 1 stroke on SI 1 -> cap = par + 2 + 1 = 7
+    assert calc_adjusted_gross_score(round_holes, course_holes, 18) == 17 * 4 + 7
+
+
+def test_adjusted_gross_score_reads_legacy_hole_index_key():
+    # Older courses store the stroke index under "hole_index", not "index".
+    course_holes = {"1": {"par": 5, "hole_index": 1}}
+    round_holes = {"1": {"gross": 10}}
+    # course handicap 0 -> cap = 5 + 2 = 7
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 7
+
+
+def test_adjusted_gross_score_none_without_hole_data():
+    course_holes = {str(n): {"par": 4, "index": n} for n in range(1, 19)}
+    assert calc_adjusted_gross_score({}, course_holes, 0) is None
+    assert calc_adjusted_gross_score(None, course_holes, 0) is None
+
+
+def test_adjusted_gross_score_handles_blank_or_bad_par_without_crash_or_deflation():
+    # Course-hole par comes from client JSON — a blank or non-numeric par must
+    # neither crash nor silently cap the hole against par 0. Such holes stay
+    # uncapped (raw gross); a valid par still caps.
+    course_holes = {
+        "1": {"par": "", "index": 1},     # blank -> uncapped
+        "2": {"par": "N/A", "index": 2},  # non-numeric -> uncapped (no crash)
+        "3": {"par": 4, "index": 3},      # valid -> cap at par + 2 = 6
+    }
+    round_holes = {"1": {"gross": 9}, "2": {"gross": 8}, "3": {"gross": 10}}
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 9 + 8 + 6
+
+
+def test_calc_hole_scores_allocates_third_stroke_tier():
+    # WHS gives a 3rd stroke on the hardest holes once course handicap >= SI+36.
+    _, net, esc = calc_hole_scores(1, 37, 4, 15)  # SI 1, CH 37
+    assert esc == 4 + 2 + 3  # net double bogey cap includes 3 strokes
+    assert net == 15 - 3
+
+
+def test_adjusted_gross_lowers_differential_versus_raw():
+    # Reproduces the Cedar Irons case: a 10 on a par 5 inflates the raw
+    # differential; capping to net double bogey lowers it.
+    course_holes = {"1": {"par": 5, "index": 1}}
+    round_holes = {"1": {"gross": 10}}
+    ags = calc_adjusted_gross_score(round_holes, course_holes, 0)  # -> 7
+    raw_diff = calc_round_dif(121, 10, 68.5)
+    ags_diff = calc_round_dif(121, ags, 68.5)
+    assert ags_diff < raw_diff
 
 
 def test_count_table_n_all_boundaries():

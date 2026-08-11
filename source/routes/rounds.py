@@ -25,7 +25,7 @@ from calc import (
     calc_scoring_average,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
-    calc_hole_scores,
+    calc_adjusted_gross_score,
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
@@ -275,18 +275,9 @@ def register_rounds_routes(app, csrf):
                 else:
                     played_par = int(course.get("par", 0))
                 course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                adjusted_total = 0
-                for hole_num, hole_data in data["holes"].items():
-                    hc_hole = course_holes.get(hole_num, {})
-                    if hc_hole:
-                        par = int(hc_hole.get("par", 0))
-                        stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = _safe_int(hole_data.get("gross"), 0)
-                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
-                        adjusted_total += esc_gross
-                    else:
-                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
-                adjusted_gross = adjusted_total
+                ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+                if ags is not None:
+                    adjusted_gross = ags
 
         if skip_differential:
             differential = 0.0
@@ -692,18 +683,9 @@ def register_rounds_routes(app, csrf):
                 else:
                     played_par = int(course.get("par", 0))
                 course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                adjusted_total = 0
-                for hole_num, hole_data in data["holes"].items():
-                    hc_hole = course_holes.get(hole_num, {})
-                    if hc_hole:
-                        par = int(hc_hole.get("par", 0))
-                        stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = _safe_int(hole_data.get("gross"), 0)
-                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
-                        adjusted_total += esc_gross
-                    else:
-                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
-                adjusted_gross = adjusted_total
+                ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+                if ags is not None:
+                    adjusted_gross = ags
 
         # --- Differential: lock-aware ---
         diff_override = data.get("differential_override")  # float or None
