@@ -1,20 +1,19 @@
 # Leaderboard Mascots — validation screenshots
 
-Captured from the real PinSheet server (two seeded users) with the
-`leaderboard_mascots` plugin loaded, driven by headless Google Chrome. They
-show the plugin executing on The Board (`/`): a deterministic pixel mascot +
-golf-pun nickname per player, a gold crown on the rank-1 leader, and the mobile
-board-card layout.
+The `leaderboard_mascots` plugin lives in its **own repository**:
+https://github.com/malcolm-x-evo/pinsheet-leaderboard-mascots — the screenshots
+are hosted there (this repo vendors the plugin via git subtree; see PR #59).
 
-| File | View |
-|------|------|
-| `board-desktop.png` | Full desktop board |
-| `board-closeup.png` | Top rows — crown + nicknames close-up |
-| `board-mobile.png`  | Mobile board cards |
+Captured from a real PinSheet server (two seeded users) with the plugin loaded,
+driven by headless Google Chrome — the plugin executing on The Board (`/`):
+pixel mascot + golf-pun nickname per player, a gold crown on the rank-1 leader,
+and the mobile board-card layout.
 
-Programmatic evidence from the same run: 4 row mascots, all with drawn
-(non-transparent) pixels; `aria-label`s `"mascot: The Closer"` (leader) and
-`"mascot: Duffer"`; computed mascot width 26px (size-token fallback).
+### Desktop — standings table
+![desktop board](https://raw.githubusercontent.com/malcolm-x-evo/pinsheet-leaderboard-mascots/main/docs/screenshots/board-desktop.png)
 
-Plugin feature PR: #59. Standalone plugin repo:
-https://github.com/malcolm-x-evo/pinsheet-leaderboard-mascots
+### Close-up — crown + nicknames
+![closeup](https://raw.githubusercontent.com/malcolm-x-evo/pinsheet-leaderboard-mascots/main/docs/screenshots/board-closeup.png)
+
+### Mobile — board cards
+![mobile board](https://raw.githubusercontent.com/malcolm-x-evo/pinsheet-leaderboard-mascots/main/docs/screenshots/board-mobile.png)
