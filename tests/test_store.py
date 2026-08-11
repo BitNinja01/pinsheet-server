@@ -9,7 +9,7 @@ from store import (
     load_settings, save_settings,
     get_courses, save_course, delete_course, rename_course,
     get_all_rounds, save_round, delete_round, update_round_handicap,
-    recompute_all_handicaps,
+    recompute_all_handicaps, recompute_handicaps_for_user,
     get_slope_rating,
     save_course_draft, load_course_draft, clear_course_draft,
     save_round_draft, load_round_draft, clear_round_draft,
@@ -644,6 +644,47 @@ def test_recompute_all_handicaps(db):
                 f"round {r.date} (index {i}) has empty value ({r.computed_handicap})"
     assert rounds[-1].computed_handicap != "99.9"
     assert float(rounds[-1].computed_handicap) < 20.0
+
+
+def test_force_resync_repropagates_course_change_and_preserves_locked_and_skip(db):
+    # A course slope/rating correction must NOT rewrite already-set differentials
+    # on the normal (sticky) pass, but MUST on a forced resync — while leaving a
+    # locked (manual) differential and a genuinely-unratable (incomplete) round
+    # untouched.
+    create_user("golfer", "Golfer", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+    save_course({"par": 72, "tees": {"W": {"slope": "120", "rating": "70"}}, "holes": {}}, "GC")
+
+    # normal round with a stale (wrong) differential
+    save_round({"course": "GC", "tees": "W", "total_gross": "90", "differential": "15.0",
+                "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}}, "2026-05-01", 0, user_id=1)
+    # manual override — locked, must never change
+    save_round({"course": "GC", "tees": "W", "total_gross": "90", "differential": "99.9",
+                "computed_handicap": "", "holes_selection": "all", "entry_mode": "score_only",
+                "holes": {}, "differential_locked": True}, "2026-05-02", 0, user_id=1)
+    # incomplete detailed round (1 scored hole of 18) — unratable, stays "0"
+    save_round({"course": "GC", "tees": "W", "total_gross": "90", "differential": "0",
+                "computed_handicap": "", "holes_selection": "all", "entry_mode": "detailed",
+                "holes": {"1": {"gross": "4", "putts": "2"}}}, "2026-05-03", 0, user_id=1)
+
+    def diff_on(date):
+        return {r.date: r for r in get_all_rounds(user_id=1)}[date].differential
+
+    # Correct the course: slope 113 / rating 72 -> (113/113)*(90-72) = 18.0
+    save_course({"par": 72, "tees": {"W": {"slope": "113", "rating": "72"}}, "holes": {}}, "GC")
+
+    # Sticky pass leaves the already-set differential alone.
+    recompute_handicaps_for_user(1, force=False)
+    assert diff_on("2026-05-01") == "15.0"
+
+    # Forced pass repropagates from current course data...
+    recompute_handicaps_for_user(1, force=True)
+    assert diff_on("2026-05-01") == "18.0"
+    # ...but never touches locked or unratable/incomplete rounds.
+    assert diff_on("2026-05-02") == "99.9"
+    assert diff_on("2026-05-03") == "0"
+    db.close()
 
 
 class _FakeConn:

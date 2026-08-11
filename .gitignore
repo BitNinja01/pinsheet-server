@@ -24,6 +24,7 @@ docs/design/
 scripts/build.sh
 scripts/dist.sh
 scripts/*.py
+!scripts/resync_handicaps.py
 
 # User data (keep only reference data like benchmarks)
 data/

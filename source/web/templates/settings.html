@@ -80,6 +80,18 @@
         <a href="/settings/api-keys" class="ps-btn">Manage API Keys</a>
     </div>
 
+    {% if current_user.is_admin %}
+    <div class="settings-group">
+        <h3>Admin</h3>
+        <button type="button" class="ps-btn" id="btn-recompute-handicaps">Recalculate Handicap Scores</button>
+        <div class="settings-toggle" style="margin-top:6px;color:var(--ps-ink-3);">
+            Forces every round's differential + index to resync with current course
+            data. Keeps manual (locked) differentials and excluded rounds.
+        </div>
+        <div id="recompute-status" style="margin-top:8px;"></div>
+    </div>
+    {% endif %}
+
 </form>
 <div style="margin-top: 24px; font-family: 'JetBrains Mono', monospace; font-size: var(--ps-fs-micro); color: var(--ps-ink-3); text-transform: uppercase; letter-spacing: 0.16em;">PinSheet v{{ version }}</div>
 {% endblock %}

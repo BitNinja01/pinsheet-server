@@ -8,7 +8,10 @@ import main as main_mod
 from main import app, User, limiter, csrf
 from source.routes import register_routes
 from database import set_db_path, init_db
-from store import create_user, load_settings, get_courses, get_all_rounds
+from store import (
+    create_user, load_settings, get_courses, get_all_rounds,
+    save_course, save_round,
+)
 
 
 @pytest.fixture
@@ -299,3 +302,47 @@ class TestSettingsImport:
         client = test_app.test_client()
         resp = client.get("/settings/import", follow_redirects=True)
         assert b"login" in resp.data.lower() or b"Login" in resp.data
+
+
+# ---------------------------------------------------------------------------
+# Admin: recalculate handicap scores (forced resync)
+# ---------------------------------------------------------------------------
+
+class TestAdminRecomputeHandicaps:
+    def test_admin_button_renders_on_settings_page(self, logged_in_client):
+        # logged_in_client's "player" is the first user -> admin.
+        resp = logged_in_client.get("/settings")
+        assert resp.status_code == 200
+        assert b'id="btn-recompute-handicaps"' in resp.data
+
+    def test_admin_recompute_forces_resync(self, logged_in_client):
+        # Save a round with a stale differential, then correct the course; the
+        # forced resync must repropagate the new slope/rating.
+        save_course({"par": 72, "tees": {"W": {"slope": "113", "rating": "72"}}, "holes": {}}, "GC")
+        save_round({"course": "GC", "tees": "W", "total_gross": "90", "differential": "15.0",
+                    "computed_handicap": "", "holes_selection": "all",
+                    "entry_mode": "score_only", "holes": {}}, "2026-05-01", 0, user_id=1)
+
+        resp = logged_in_client.post("/api/admin/recompute-handicaps")
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+        # (113/113)*(90-72) = 18.0
+        assert get_all_rounds(1)[0].differential == "18.0"
+
+    def test_non_admin_recompute_forbidden(self, test_app):
+        create_user("owner", "Owner", "pass1234")   # first user -> admin
+        create_user("guest", "Guest", "pass1234")   # second user -> non-admin
+        c = test_app.test_client()
+        c.post("/login", data={"username": "guest", "password": "pass1234"})
+        resp = c.post("/api/admin/recompute-handicaps")
+        assert resp.status_code == 403
+
+    def test_non_admin_settings_page_hides_button(self, test_app):
+        create_user("owner", "Owner", "pass1234")
+        create_user("guest", "Guest", "pass1234")
+        c = test_app.test_client()
+        c.post("/login", data={"username": "guest", "password": "pass1234"})
+        resp = c.get("/settings")
+        assert resp.status_code == 200
+        assert b'id="btn-recompute-handicaps"' not in resp.data

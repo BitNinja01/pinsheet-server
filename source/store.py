@@ -288,7 +288,7 @@ def _is_incomplete_round(r, course_data) -> bool:
     return scored < expected
 
 
-def recompute_handicaps_for_user(user_id: int) -> int:
+def recompute_handicaps_for_user(user_id: int, force: bool = False) -> int:
     from calc.handicap import calc_handicap_index
 
     courses_data = get_courses()
@@ -304,7 +304,13 @@ def recompute_handicaps_for_user(user_id: int) -> int:
     db = get_db()
 
     for i, r in enumerate(chronological):
-        if (not r.differential or r.differential == "0") and not r.differential_locked:
+        # Normal pass is sticky: only fill an empty/"0" differential. A forced
+        # resync also recomputes rounds that already have a real differential,
+        # so a course slope/rating correction propagates. Both paths still honour
+        # the manual (locked) override and the _is_incomplete_round guard below,
+        # which is what actually keeps genuinely-unratable rounds excluded.
+        needs_diff = force or (not r.differential or r.differential == "0")
+        if needs_diff and not r.differential_locked:
             course_data = courses_data.get(r.course)
             if course_data and not _is_incomplete_round(r, course_data):
                 tee_data = course_data.get("tees", {}).get(r.tees)
@@ -351,13 +357,14 @@ def set_round_excluded(date: str, index: int, excluded: bool, user_id: int) -> N
     db.close()
 
 
-def recompute_all_handicaps() -> None:
+def recompute_all_handicaps(force: bool = False) -> int:
     users = get_users()
     if not users:
         _log.info("No users found — skipping handicap recompute")
-        return
+        return 0
 
-    _log.info("Recomputing handicaps for %d user(s)...", len(users))
+    _log.info("Recomputing handicaps for %d user(s)%s...",
+              len(users), " (forced resync)" if force else "")
     import time
     t0 = time.time()
     total_rounds = 0
@@ -367,7 +374,7 @@ def recompute_all_handicaps() -> None:
         uid = u["id"]
         try:
             all_rounds = get_all_rounds(uid)
-            updated = recompute_handicaps_for_user(uid)
+            updated = recompute_handicaps_for_user(uid, force=force)
             total_rounds += len(all_rounds) if all_rounds else 0
             total_updated += updated
             _log.info(
@@ -383,6 +390,7 @@ def recompute_all_handicaps() -> None:
         "Handicap recompute complete: %d users, %d rounds processed, %d updated, %.3fs",
         len(users), total_rounds, total_updated, elapsed,
     )
+    return total_updated
 
 
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:

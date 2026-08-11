@@ -180,6 +180,27 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 
 (function () {
+    var btn = document.getElementById("btn-recompute-handicaps");
+    if (!btn) return;
+    var status = document.getElementById("recompute-status");
+
+    btn.addEventListener("click", function () {
+        if (!confirm("Recalculate handicap scores for all users? This resyncs every round's differential with current course data (locked/excluded rounds are kept).")) return;
+        btn.disabled = true;
+        if (status) status.textContent = "Recalculating…";
+        fetch("/api/admin/recompute-handicaps", { method: "POST" })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (d) {
+                if (status) status.textContent = "Done — " + (d.updated || 0) + " row(s) updated.";
+            })
+            .catch(function (err) {
+                if (status) status.textContent = "Failed (" + err + ").";
+            })
+            .finally(function () { btn.disabled = false; });
+    });
+})();
+
+(function () {
     var wizard = document.getElementById("course-wizard");
     if (!wizard) return;
 
