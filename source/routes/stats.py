@@ -119,17 +119,32 @@ def register_stats_routes(app):
         ob_stats = calc_ob_stats(b8, courses_dict)
         total_ob_rd = ob_stats.get("total_ob_per_round")
 
-        pen_free = sum(1 for r in b8 if r.holes and sum(h.penalties for h in r.holes.values()) == 0)
-        pen_free_pct = (pen_free / len(b8) * 100) if b8 else None
+        # Only rounds with hole-by-hole data can be classified pen-free; filter both
+        # numerator and denominator so score-only rounds don't deflate the rate
+        # (matches calc_penalties_per_round / calc_penalty_free_rounds convention).
+        scored = [r for r in b8 if r.holes]
+        pen_free = sum(1 for r in scored if sum(h.penalties for h in r.holes.values()) == 0)
+        pen_free_pct = (pen_free / len(scored) * 100) if scored else None
 
         hole_breakdown = calc_penalty_hole_breakdown(b8)
+        pen_vs = pen_stats.get("penalty_avg_vs_par")
+        clean_vs = pen_stats.get("clean_avg_vs_par")
+        penalty_cost = (pen_vs - clean_vs) if pen_vs is not None and clean_vs is not None else None
+
+        worst = pen_stats.get("worst_holes") or []
+        worst_pen_rows = [
+            {"label": f"{course} · #{hole}", "value": _fmt(avg, "", 2), "warn": True}
+            for course, hole, avg in worst[:4]
+        ] or [{"label": "No penalty holes yet", "value": None}]
 
         return render_template("stats/penalties.html", **base_context(
             current_page="stats",
             penalties_per_round=pen_rd_b8, pen_rd_delta=_delta(pen_rd_b8, pen_rd_l20, False),
-            penalty_vs_par=pen_stats.get("penalty_avg_vs_par"),
-            clean_vs_par=pen_stats.get("clean_avg_vs_par"),
+            penalty_vs_par=pen_vs,
+            clean_vs_par=clean_vs,
             pen_free_pct=pen_free_pct,
+            penalty_cost=penalty_cost,
+            worst_pen_rows=worst_pen_rows,
             total_ob_rd=total_ob_rd,
             ob_stats=ob_stats,
             penalty_stats=pen_stats,
