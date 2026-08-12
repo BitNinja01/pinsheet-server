@@ -305,6 +305,29 @@ def register_rounds_routes(app, csrf):
         round_id = save_round(golf_round, date_val, index, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
+        # WHS Rule 5.7/5.8 -- the value written above (`new_hi`) is the raw,
+        # uncapped Handicap Index; only `recompute_handicaps_for_user` knows
+        # the player's Low Handicap Index and applies the soft/hard cap. Run
+        # it now so the row just saved (and any rounds after it) hold the
+        # same capped value recompute would independently produce --
+        # live-save must equal recompute for the capped value.
+        # Tradeoff (accepted): this reruns the full O(n) sequential
+        # recompute over the user's entire round history on every single
+        # POST, rather than only updating the newly-saved row -- required
+        # because Rule 5.7's LHI (and thus the cap applied to THIS round)
+        # depends on the whole prior record, and later rounds may also need
+        # their own cap re-evaluated. Acceptable at per-user round volumes
+        # (hundreds, not millions); revisit with incremental/cached LHI
+        # tracking if per-user round counts grow large enough to matter.
+        recompute_handicaps_for_user(current_user.id)
+        fresh_rounds = get_all_rounds_for_user(force=True)
+        for fr in fresh_rounds:
+            if fr.date == date_val and fr.index == index:
+                if fr.computed_handicap:
+                    golf_round["computed_handicap"] = fr.computed_handicap
+                    golf_round_typed.computed_handicap = fr.computed_handicap
+                break
+
         if match_id and golf_round.get("computed_handicap"):
             try:
                 match_id = int(match_id)

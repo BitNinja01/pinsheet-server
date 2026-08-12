@@ -288,8 +288,17 @@ def _is_incomplete_round(r, course_data) -> bool:
     return scored < expected
 
 
+# WHS Rule 5.7: a Low Handicap Index is only established once the player
+# has accumulated this many acceptable (eligible) scores.
+WHS_LHI_MIN_SCORES = 20
+
+# WHS Rule 5.7: the LHI window -- only prior displayed Handicap Index values
+# within this many days of the round being processed are eligible.
+WHS_LHI_WINDOW_DAYS = 365
+
+
 def recompute_handicaps_for_user(user_id: int) -> int:
-    from calc.handicap import calc_handicap_index
+    from calc.handicap import calc_handicap_index, apply_handicap_cap, _is_eligible_diff_round
 
     courses_data = get_courses()
     settings = load_settings(user_id)
@@ -303,6 +312,18 @@ def recompute_handicaps_for_user(user_id: int) -> int:
     total = len(all_rounds)
     updated = 0
     db = get_db()
+
+    # WHS Rule 5.7 (Low Handicap Index): walked oldest -> newest alongside
+    # the main loop below. `prior_displayed` holds (date, displayed_hi) for
+    # every round that has had a Handicap Index calculated so far -- the
+    # *displayed* (i.e. Rule 5.8 capped) value, since Rule 5.7 defines LHI as
+    # the lowest Handicap Index the player actually HELD. `acceptable_count`
+    # tracks the number of acceptable (eligible) scores seen so far. Both are
+    # evaluated using only rounds strictly BEFORE the round currently being
+    # processed -- "the LHI used to process a given score is the one
+    # determined from the record PRIOR to that score."
+    prior_displayed: list[tuple[str, float]] = []
+    acceptable_count = 0
 
     for i, r in enumerate(chronological):
         if (not r.differential or r.differential == "0") and not r.differential_locked:
@@ -319,6 +340,11 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                             (str_diff, user_id, r.date, r.index),
                         )
                         updated += 1
+                    # Keep the in-memory object in sync with the DB write so
+                    # the handicap window below (and later iterations, since
+                    # `all_rounds[idx:]` shares this same object) sees the
+                    # fresh differential instead of a stale "0".
+                    r.differential = str_diff
 
         # WHS Rule 5.2: calc_handicap_index requires most-recent-first input
         # and does its own recent-20-eligible windowing internally. `r` is
@@ -330,7 +356,26 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         # slice of `chronological` on every iteration.
         idx = total - 1 - i
         history_most_recent_first = all_rounds[idx:]
-        hi = calc_handicap_index(history_most_recent_first, include_9hole)
+        raw_hi = calc_handicap_index(history_most_recent_first, include_9hole)
+
+        # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
+        # this round already has >= 20 acceptable scores; the cap then
+        # applies to this round's freshly-calculated (raw) HI using the
+        # lowest displayed HI held within the 365 days preceding this
+        # round's date (strictly prior rounds only -- see cutoff below).
+        # The 365-day period preceding is a CLOSED interval -- a prior HI
+        # dated exactly 365 days before this round's date is the boundary
+        # day of that period and must be INCLUDED (`>=`, not `>`); using
+        # strict `>` would silently shrink the window to 364 days.
+        low_hi = None
+        if acceptable_count >= WHS_LHI_MIN_SCORES:
+            cutoff = datetime.fromisoformat(r.date).date() - timedelta(days=WHS_LHI_WINDOW_DAYS)
+            candidates = [hi for d, hi in prior_displayed if datetime.fromisoformat(d).date() >= cutoff]
+            if candidates:
+                low_hi = min(candidates)
+
+        hi = apply_handicap_cap(raw_hi, low_hi) if raw_hi is not None else None
+
         if hi is not None:
             new_val = str(hi)
             if r.computed_handicap != new_val:
@@ -339,12 +384,16 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                     (str(hi), user_id, r.date, r.index),
                 )
                 updated += 1
+            prior_displayed.append((r.date, hi))
         elif r.computed_handicap:
             db.execute(
                 "UPDATE rounds SET computed_handicap = '' WHERE user_id = ? AND date = ? AND round_index = ?",
                 (user_id, r.date, r.index),
             )
             updated += 1
+
+        if _is_eligible_diff_round(r, include_9hole):
+            acceptable_count += 1
 
     db.commit()
     db.close()

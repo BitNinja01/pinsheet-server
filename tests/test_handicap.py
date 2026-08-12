@@ -12,6 +12,7 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    apply_handicap_cap,
     WHS_HANDICAP_WINDOW,
 )
 
@@ -155,6 +156,41 @@ def test_get_best_n_rounds_sorted(make_round):
     best = get_best_n_rounds(rounds, n=2)
     diffs = [math.floor(float(r.differential) * 10) / 10 for r in best]
     assert diffs == sorted(diffs)
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.8 -- Soft Cap / Hard Cap (apply_handicap_cap)
+# --------------------------------------------------------------------------
+
+def test_apply_handicap_cap_no_lhi_passes_through():
+    """Rule 5.7: before an LHI is established (low_hi is None), no cap."""
+    assert apply_handicap_cap(12.5, None) == 12.5
+
+
+def test_apply_handicap_cap_small_increase_uncapped():
+    # increase 2.5 <= 3.0 -- no cap.
+    assert apply_handicap_cap(12.5, 10.0) == 12.5
+
+
+def test_apply_handicap_cap_soft_cap_increase_4():
+    # increase 4.0 -- soft cap: 10 + 3 + 0.5*(4-3) = 13.5
+    assert apply_handicap_cap(14.0, 10.0) == 13.5
+
+
+def test_apply_handicap_cap_soft_cap_increase_6():
+    # increase 6.0 -- soft cap: 10 + 3 + 0.5*(6-3) = 14.5
+    assert apply_handicap_cap(16.0, 10.0) == 14.5
+
+
+def test_apply_handicap_cap_hard_cap_kicks_in():
+    # increase 10.0 -- soft cap would give 16.5, but hard cap limits to
+    # low_hi + 5.0 = 15.0.
+    assert apply_handicap_cap(20.0, 10.0) == 15.0
+
+
+def test_apply_handicap_cap_decrease_unchanged():
+    # Decreases are never capped.
+    assert apply_handicap_cap(9.0, 10.0) == 9.0
 
 
 def test_calc_handicap_index_empty():
@@ -836,4 +872,223 @@ def test_dashboard_hi_matches_recompute_with_excluded_round_in_window(tmp_path, 
         "Test fixture did not actually exercise the divergence -- the old "
         "raw-20-pre-truncation path produced the same HI as the fix; "
         "adjust the fixture so the regression is meaningfully covered."
+    )
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.7 -- 365-day LHI window boundary (adversary-gate Defect 1)
+# --------------------------------------------------------------------------
+
+def test_lhi_365_day_boundary_is_inclusive(tmp_data_dir):
+    """WHS Rule 5.7: 'the lowest Handicap Index... over the 365-day period
+    PRECEDING' the round being processed is a CLOSED interval -- a prior
+    displayed HI dated EXACTLY 365 days before the round must be INCLUDED
+    as an LHI candidate. A strict `>` cutoff comparison would silently
+    exclude that boundary day, shrinking the window to 364 days.
+
+    Construction: an anchor round establishes a very low displayed HI
+    (~-1.0). 17 filler rounds bring the acceptable-score count to 20. A
+    probe round posted exactly `gap` days after the anchor then triggers a
+    huge raw spike -- if the anchor is still within the LHI window, the
+    spike is soft/hard-capped down (using the low anchor as LHI); if the
+    anchor has aged out, a much higher (wrong) LHI is used instead,
+    producing a materially different capped result."""
+    from database import set_db_path, init_db
+    from store import create_user, save_round, get_all_rounds, recompute_handicaps_for_user
+    from datetime import date as _date, timedelta as _timedelta
+
+    def mkround(date_str, diff):
+        return {
+            "date": date_str, "course": "X", "tees": "White", "holes_played": "18",
+            "holes_selection": "all", "entry_mode": "score_only", "holes": {},
+            "total_gross": "90", "differential": str(diff), "notes": "",
+            "excluded": False, "computed_handicap": "",
+        }
+
+    def d(base, offset_days):
+        return (_date.fromisoformat(base) + _timedelta(days=offset_days)).isoformat()
+
+    def run_with_gap(gap_days, db_path):
+        set_db_path(db_path)
+        init_db()
+        uid = create_user("atk", "Attacker", "pass1234")["id"]
+        D0 = "2020-01-01"
+        save_round(mkround(D0, 20.0), D0, 0, uid)
+        save_round(mkround(d(D0, 1), 20.0), d(D0, 1), 0, uid)
+        anchor_date = d(D0, 2)
+        save_round(mkround(anchor_date, 1.0), anchor_date, 0, uid)  # very low displayed HI
+        for i in range(17):
+            save_round(mkround(d(D0, 3 + i), 20.0), d(D0, 3 + i), 0, uid)  # count -> 20
+
+        probe_date = d(anchor_date, gap_days)
+        save_round(mkround(probe_date, 200.0), probe_date, 0, uid)  # huge raw spike
+
+        recompute_handicaps_for_user(uid)
+        rounds = {r.date: r for r in get_all_rounds(uid)}
+        return float(rounds[probe_date].computed_handicap)
+
+    probe_364 = run_with_gap(364, str(tmp_data_dir / "gap364.db"))
+    probe_365 = run_with_gap(365, str(tmp_data_dir / "gap365.db"))
+    probe_366 = run_with_gap(366, str(tmp_data_dir / "gap366.db"))
+
+    # Exactly 365 days back is the boundary day of the closed 365-day
+    # window -- it must still be INCLUDED, so gap=365 must behave the same
+    # as gap=364 (anchor still counted as an LHI candidate).
+    assert probe_365 == probe_364, (
+        f"gap=365 days (probe HI {probe_365}) diverged from gap=364 days "
+        f"(probe HI {probe_364}) -- the 365-day boundary day was wrongly "
+        f"excluded from the LHI candidate pool (off-by-one)."
+    )
+    # 366 days back is genuinely outside the window -- the anchor must age
+    # out, producing a different (higher) LHI and thus a different capped
+    # result than the 364/365-day cases.
+    assert probe_366 != probe_365, (
+        "Test fixture did not actually exercise the 365/366-day boundary -- "
+        "gap=366 produced the same result as gap=365, so aging-out isn't "
+        "meaningfully covered by this fixture."
+    )
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.7/5.8 -- dashboard hero / rankings must show the CAPPED,
+# stored HI, not a fresh raw recalculation (adversary-gate Defect 2)
+# --------------------------------------------------------------------------
+
+def _establish_lhi_then_bad_run(user_id=1):
+    """Shared fixture builder: 20 stable rounds (differential 10.0, with one
+    dip to 8.0) establish LHI=8.0, then a run of very-bad rounds (diff
+    100.0) forces the raw HI to spike well past LHI + 5.0 -- guaranteeing
+    Rule 5.8's hard cap is active for the most recent round. No course
+    record is needed since every round's differential is supplied directly
+    (recompute's differential-backfill path only runs for "0"/empty
+    differentials)."""
+    from store import save_round
+
+    def mk(date_str, diff):
+        return {
+            "course": "GC", "tees": "W", "total_gross": "85",
+            "differential": str(diff), "computed_handicap": "",
+            "holes_selection": "all", "entry_mode": "score_only", "holes": {},
+        }
+
+    for i in range(20):
+        diff = 8.0 if i in (17, 18) else 10.0  # a couple of dips -> LHI = 8.0
+        save_round(mk(f"2026-05-{1 + i:02d}", diff), f"2026-05-{1 + i:02d}", 0, user_id)
+
+    bad_dates = [f"2026-05-{21 + i:02d}" for i in range(10)] + [f"2026-06-{1 + i:02d}" for i in range(5)]
+    for dstr in bad_dates:
+        save_round(mk(dstr, 100.0), dstr, 0, user_id)
+
+
+def test_dashboard_hero_hi_matches_recompute_when_cap_active(tmp_path, monkeypatch):
+    """Adversary-gate Defect 2 regression: once WHS Rule 5.7 (LHI) + Rule
+    5.8 (soft/hard cap) are active, the dashboard hero HI panel
+    (`_build_profile_context()["panels"]["handicap"]["value"]`) must equal
+    the stored, capped `computed_handicap` -- NOT a fresh raw
+    `calc_handicap_index(rounds, ...)` recalculation, which would show the
+    much higher pre-cap value and desync from every other HI display
+    (round detail, trend, round list, rankings)."""
+    from main import app, User as UserClass
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, get_user_by_id, get_all_rounds,
+        recompute_handicaps_for_user,
+    )
+    from flask_login import login_user
+    from calc.handicap import calc_handicap_index
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "drafts").mkdir()
+    db_path = str(data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    import store as store_mod
+    monkeypatch.setattr(store_mod, "_DATA_DIR", data_dir)
+
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["DB_PATH"] = db_path
+
+    create_user("q", "Q", "pass1234")
+    save_settings({"welcome_shown": True, "include_9hole": True}, user_id=1)
+
+    _establish_lhi_then_bad_run(user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+
+    all_rounds = get_all_rounds(user_id=1)
+    stored_hi = all_rounds[0].computed_handicap
+    assert stored_hi not in (None, "", "0")
+
+    raw_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert raw_hi is not None
+    # Sanity: prove the cap is genuinely active for this fixture -- the raw
+    # (uncapped) value must differ from the stored (capped) value.
+    assert str(raw_hi) != stored_hi, (
+        "Fixture did not actually trigger Rule 5.8's cap -- raw and stored "
+        "HI coincide, so this test would pass vacuously even with the bug."
+    )
+
+    with app.test_request_context():
+        user_dict = get_user_by_id(1)
+        login_user(UserClass(user_dict))
+
+        from source.routes.dashboard import _build_profile_context
+        ctx = _build_profile_context()
+        assert ctx is not None, "_build_profile_context returned None (welcome_shown?)"
+        dashboard_hi = ctx["panels"]["handicap"]["value"]
+
+    assert dashboard_hi == stored_hi, (
+        f"Dashboard hero HI {dashboard_hi!r} diverged from the stored, "
+        f"capped recompute HI {stored_hi!r} -- the dashboard must not show "
+        f"a fresh raw (uncapped) recalculation once Rule 5.7/5.8 is active."
+    )
+    assert dashboard_hi != f"{raw_hi:.1f}", (
+        f"Dashboard hero HI {dashboard_hi!r} matches the RAW uncapped value "
+        f"{raw_hi:.1f} -- this is exactly the Defect 2 bug (dashboard "
+        f"showing the pre-cap HI)."
+    )
+
+
+def test_rankings_handicap_stat_matches_recompute_when_cap_active(tmp_data_dir):
+    """Adversary-gate Defect 2 regression (rankings.py leaderboard): the
+    "handicap" stat in `compute_rankings()` must reflect the stored, capped
+    HI -- not a fresh raw `calc_handicap_index()` call -- once Rule 5.7/5.8
+    is active, mirroring the dashboard hero fix."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, get_all_rounds, recompute_handicaps_for_user
+    from calc.handicap import calc_handicap_index
+    from calc.rankings import compute_rankings
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("q", "Q", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    _establish_lhi_then_bad_run(user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+
+    all_rounds = get_all_rounds(user_id=1)
+    stored_hi = float(all_rounds[0].computed_handicap)
+    raw_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert raw_hi != stored_hi, (
+        "Fixture did not actually trigger Rule 5.8's cap -- raw and stored "
+        "HI coincide, so this test would pass vacuously even with the bug."
+    )
+
+    rankings = compute_rankings(include_9hole=True)
+    assert len(rankings) == 1
+    board_hi = rankings[0]["stats"]["handicap"]
+
+    assert board_hi == stored_hi, (
+        f"Leaderboard handicap stat {board_hi!r} diverged from the stored, "
+        f"capped recompute HI {stored_hi!r}."
+    )
+    assert board_hi != raw_hi, (
+        f"Leaderboard handicap stat {board_hi!r} matches the RAW uncapped "
+        f"value {raw_hi!r} -- this is the Defect 2 bug in rankings.py."
     )

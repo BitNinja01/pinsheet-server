@@ -158,6 +158,38 @@ def calc_handicap_index(
     return round(avg + count_table_adjustment(len(diffs)), 1)
 
 
+def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
+    """WHS Rule 5.8 (Soft Cap / Hard Cap): once a player's Low Handicap Index
+    (LHI, Rule 5.7) is established, apply the following to a freshly
+    calculated Handicap Index (`raw_hi`):
+
+      increase = raw_hi - low_hi
+      - Soft cap: if increase > 3.0, the amount above 3.0 is reduced to 50%:
+        capped = low_hi + 3.0 + 0.5 * (increase - 3.0)
+      - Hard cap: the (possibly soft-capped) result may never exceed
+        low_hi + 5.0.
+      - No limit on decrease: if increase <= 3.0 (including negative /
+        decreasing HI), `raw_hi` passes through unchanged.
+
+    `low_hi` is None until Rule 5.7 establishes an LHI (the player has not
+    yet accumulated >= 20 acceptable scores) -- in that case there is no cap
+    and `raw_hi` is returned unchanged (rounded to the nearest tenth, per
+    WHS convention).
+    """
+    if low_hi is None:
+        return round(raw_hi, 1)
+
+    increase = raw_hi - low_hi
+    if increase <= 3.0:
+        return round(raw_hi, 1)
+
+    capped = low_hi + 3.0 + 0.5 * (increase - 3.0)  # soft cap
+    hard_cap = low_hi + 5.0
+    if capped > hard_cap:
+        capped = hard_cap  # hard cap
+    return round(capped, 1)
+
+
 def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False) -> list:
     """Rolling WHS Rule 5.2 Handicap Index as of each round, chronologically.
 
