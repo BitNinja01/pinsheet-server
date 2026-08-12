@@ -363,6 +363,8 @@ def register_stats_routes(app):
         else:
             season_rounds = rounds
 
+        # get_all_rounds_for_user() (and this copy of it) is most-recent-first
+        # (WHS ordering contract).
         hi = calc_handicap_index(rounds, include_9hole)
         journey = calc_hi_journey(rounds, season_rounds, hi)
         most_played = calc_most_played_course(season_rounds)

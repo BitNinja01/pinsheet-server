@@ -25,6 +25,7 @@ from calc import (
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
     calc_hole_scores,
+    WHS_HANDICAP_WINDOW,
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
@@ -136,11 +137,14 @@ def register_rounds_routes(app, csrf):
                 "putts": total_putts,
             })
 
-        # The current handicap index uses the best 8 differentials from the
-        # most recent 20 eligible rounds (WHS), so only that window can light up.
-        # all_rounds_for_user is newest-first, so the recent 20 are the first 20.
-        recent_20 = all_rounds_for_user[:20]
-        best_rounds = get_best_n_rounds(recent_20, include_9hole)
+        # WHS Rule 5.2: the current handicap index uses the best-N
+        # differentials from the most recent 20 ELIGIBLE rounds, so only
+        # that window can light up. all_rounds_for_user is most-recent-first
+        # already; pass it in full with an explicit window rather than
+        # pre-truncating to raw [:20], which would under-count (and diverge
+        # from the stored/recompute Handicap Index) when excluded/"0"/
+        # 9-hole-gated rounds sit within the raw most-recent-20.
+        best_rounds = get_best_n_rounds(all_rounds_for_user, include_9hole, window=WHS_HANDICAP_WINDOW)
         best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
@@ -253,6 +257,8 @@ def register_rounds_routes(app, csrf):
         all_rounds_for_user = get_all_rounds_for_user()
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
+            # get_all_rounds_for_user() is most-recent-first -- satisfies
+            # calc_handicap_index's WHS Rule 5.2 ordering contract.
             current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
             if current_hi is not None:
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
@@ -288,6 +294,8 @@ def register_rounds_routes(app, csrf):
 
         golf_round_typed = dict_to_round(golf_round)
         all_rounds_for_user.insert(0, golf_round_typed)
+        # Inserted at index 0 -- list stays most-recent-first (WHS ordering
+        # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
@@ -353,6 +361,8 @@ def register_rounds_routes(app, csrf):
 
         rounds_before = [r for r in all_rounds_for_user
                          if r.date < round_data.date or (r.date == round_data.date and r.index < round_data.index)]
+        # Filter preserves all_rounds_for_user's most-recent-first order
+        # (WHS ordering contract).
         hi_before = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
 
         hole_nums_all = sorted(course_holes.keys(), key=int)
@@ -667,6 +677,8 @@ def register_rounds_routes(app, csrf):
                 r for r in all_rounds_for_user
                 if not (r.date == date and str(r.index) == str(index))
             ]
+            # Filter preserves all_rounds_for_user's most-recent-first order
+            # (WHS ordering contract).
             current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
             if current_hi is not None:
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
@@ -725,6 +737,8 @@ def register_rounds_routes(app, csrf):
             if r.date == date and str(r.index) == str(index):
                 all_rounds_for_user[i] = golf_round_typed
                 break
+        # In-place replacement -- list stays most-recent-first (WHS ordering
+        # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
@@ -751,6 +765,8 @@ def register_rounds_routes(app, csrf):
         set_round_excluded(date, int(index), excluded, current_user.id)
         recompute_handicaps_for_user(current_user.id)
         new_all = get_all_rounds_for_user(force=True)
+        # get_all_rounds_for_user() is most-recent-first (WHS ordering
+        # contract).
         new_hi_obj = calc_handicap_index(new_all, get_settings().get("include_9hole", True))
         new_hi = round(new_hi_obj, 1) if new_hi_obj is not None else None
         return jsonify({"ok": True, "excluded": excluded, "handicap": new_hi})

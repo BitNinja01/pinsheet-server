@@ -12,6 +12,7 @@ from calc.handicap import (
     calc_raw_hi,
     calc_handicap_values_in_range,
     calc_career_low_handicap,
+    WHS_HANDICAP_WINDOW,
 )
 from calc.approach import (
     calc_fir_percent,
