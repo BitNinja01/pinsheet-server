@@ -501,8 +501,9 @@ def test_stats_trends_computes_expected_values(auth_client, capture_render):
     assert ctx["gir_trend"] == [("2026-03-01", 100.0), ("2026-03-08", 0.0), ("2026-03-15", 0.0)]
     assert ctx["putts_trend"] == [("2026-03-01", 36.0), ("2026-03-08", 36.0), ("2026-03-15", 54.0)]
     # only r3 has a computed_handicap that survives to the trend series in
-    # this dataset window (18.0 on the most recent round)
-    assert ctx["handicap_trend"] == [("2026-03-15", 8.0)]
+    # this dataset window (18.0 on the most recent round). WHS Rule 5.2a:
+    # 3 differentials -> -2.0 adjustment (was 8.0).
+    assert ctx["handicap_trend"] == [("2026-03-15", 6.0)]
 
 
 # ---------------------------------------------------------------------------

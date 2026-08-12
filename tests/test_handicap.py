@@ -5,6 +5,7 @@ from calc.handicap import (
     calc_round_dif,
     calc_expected_9hole_dif,
     count_table_n,
+    count_table_adjustment,
     calc_effective_diffs,
     get_best_n_rounds,
     calc_handicap_index,
@@ -32,6 +33,18 @@ def test_count_table_n_all_boundaries():
     assert count_table_n(19) == 7
     assert count_table_n(20) == 8
     assert count_table_n(100) == 8
+
+
+def test_count_table_adjustment_all_cases():
+    """WHS Rule 5.2a: adjustment keyed on the number of differentials in the
+    record. 3 -> -2.0, 4 -> -1.0, 6 -> -1.0, all other counts -> 0.0."""
+    assert count_table_adjustment(3) == -2.0
+    assert count_table_adjustment(4) == -1.0
+    assert count_table_adjustment(5) == 0.0
+    assert count_table_adjustment(6) == -1.0
+    assert count_table_adjustment(7) == 0.0
+    assert count_table_adjustment(19) == 0.0
+    assert count_table_adjustment(20) == 0.0
 
 
 def test_calc_hole_scores_no_strokes():
@@ -167,6 +180,10 @@ def test_calc_handicap_index_bogey(make_round):
 
 
 def test_calc_handicap_index_never_negative(make_round):
+    # NOTE: this invariant only holds here because each dataset has 19-20
+    # effective differentials, where WHS Rule 5.2a's count_table_adjustment
+    # is 0.0. Smaller records (e.g. 3 diffs) CAN legitimately go negative --
+    # see test_calc_handicap_index_negative_not_clamped.
     for gross in (72, 80, 90, 100):
         rounds = [make_round(gross=gross, differential=str(gross - 72 + i))
                   for i in range(20)]
@@ -181,6 +198,50 @@ def test_calc_handicap_index_best8_le_raw(make_round):
         hi = calc_handicap_index(rounds[:20])
         raw_avg = sum(diffs) / len(diffs)
         assert hi <= raw_avg
+
+
+def test_calc_handicap_index_3_diffs_applies_adjustment(make_round):
+    """WHS Rule 5.2a: 3 differentials -> best-1 average minus 2.0 adjustment.
+    diffs sorted: [15.2, 15.3, 16.6], best-1 = 15.2, 15.2 - 2.0 = 13.2."""
+    rounds = [make_round(differential=str(d)) for d in (15.3, 15.2, 16.6)]
+    assert calc_handicap_index(rounds) == 13.2
+
+
+def test_calc_handicap_index_4_diffs_applies_adjustment(make_round):
+    """WHS Rule 5.2a: 4 differentials -> best-1 average minus 1.0 adjustment.
+    diffs sorted: [22.0, 23.1, 24.0, 25.0], best-1 = 22.0, 22.0 - 1.0 = 21.0."""
+    rounds = [make_round(differential=str(d)) for d in (22.0, 23.1, 24.0, 25.0)]
+    assert calc_handicap_index(rounds) == 21.0
+
+
+def test_calc_handicap_index_6_diffs_applies_adjustment(make_round):
+    """WHS Rule 5.2a: 6 differentials -> best-2 average minus 1.0 adjustment.
+    diffs sorted: [18.0..23.0], best-2 = [18.0, 19.0] avg 18.5, 18.5 - 1.0 = 17.5."""
+    rounds = [make_round(differential=str(d))
+              for d in (18.0, 19.0, 20.0, 21.0, 22.0, 23.0)]
+    assert calc_handicap_index(rounds) == 17.5
+
+
+def test_calc_handicap_index_19_diffs_no_adjustment(make_round):
+    """WHS Rule 5.2a: 19 differentials -> adjustment is 0.0 (not in the
+    {3, 4, 6} table), so the result is the plain average of the best-7
+    (count_table_n(19) == 7) with no adjustment subtracted.
+    diffs = 1.0..19.0, best-7 = [1.0..7.0], avg = 4.0."""
+    rounds = [make_round(differential=str(float(d))) for d in range(1, 20)]
+    assert len(rounds) == 19
+    assert count_table_adjustment(19) == 0.0
+    assert calc_handicap_index(rounds) == 4.0
+
+
+def test_calc_handicap_index_negative_not_clamped(make_round):
+    """WHS Rule 5.2a intentionally allows negative (plus) handicap indexes --
+    no clamping is applied here (the 54.0 max is a separate, out-of-scope
+    rule). 3 differentials -> best-1 average minus 2.0 adjustment.
+    diffs sorted: [1.0, 2.0, 3.0], best-1 = 1.0, 1.0 - 2.0 = -1.0."""
+    rounds = [make_round(differential=str(d)) for d in (1.0, 2.0, 3.0)]
+    hi = calc_handicap_index(rounds)
+    assert hi == -1.0
+    assert hi < 0
 
 
 def test_calc_handicap_trend_empty():
