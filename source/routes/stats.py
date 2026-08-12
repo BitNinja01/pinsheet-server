@@ -9,7 +9,7 @@ from calc import (
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
     calc_scoring_avg_by_par_type, calc_one_putt_percent, calc_two_putt_percent,
     calc_three_putt_percent, calc_putts_per_gir, calc_personal_bests,
-    calc_handicap_index, calc_hi_journey, calc_most_played_course,
+    calc_hi_journey, calc_most_played_course,
     calc_golfiest_month, calc_most_common_day, calc_best_single_round,
     calc_best_3round_stretch, calc_biggest_improvement, calc_first_score_milestone,
     calc_first_hi_milestone, calc_score_breakdown, calc_hole_in_ones,
@@ -25,9 +25,11 @@ from calc import (
     calc_scoring_by_gir, calc_scramble_by_miss_direction, calc_scramble_by_par_type,
     calc_ob_stats, calc_penalty_stats, calc_momentum_recovery,
     calc_nemesis_best_holes, calc_scoring_trend, calc_fir_trend, calc_gir_trend,
-    calc_putts_trend, calc_scramble_trend, calc_handicap_trend,
+    calc_putts_trend, calc_scramble_trend,
     calc_playing_to_handicap_rate,
     calc_par_or_better_percent,
+    current_and_previous_handicap_index,
+    handicap_trend_from_stored,
 )
 from calc import stat_delta
 from source.models import dict_to_course
@@ -313,7 +315,11 @@ def register_stats_routes(app):
         gir_t = calc_gir_trend(all_rounds)
         putts_t = calc_putts_trend(all_rounds)
         scramble_t = calc_scramble_trend(all_rounds, courses_dict)
-        hi_t = calc_handicap_trend(all_rounds, include_9hole)
+        # WHS Rule 5.7/5.8/5.9: plot the STORED, displayed per-round
+        # computed_handicap (already capped + ESR-adjusted by
+        # recompute_handicaps_for_user) rather than calc_handicap_trend's
+        # raw recalculation -- see handicap_trend_from_stored's docstring.
+        hi_t = handicap_trend_from_stored(all_rounds)
         pth = calc_playing_to_handicap_rate(all_rounds, include_9hole)
 
         return render_template("stats/trends.html", **base_context(
@@ -364,8 +370,17 @@ def register_stats_routes(app):
             season_rounds = rounds
 
         # get_all_rounds_for_user() (and this copy of it) is most-recent-first
-        # (WHS ordering contract).
-        hi = calc_handicap_index(rounds, include_9hole)
+        # (WHS ordering contract). WHS Rule 5.7/5.8/5.9: the season's "Ended
+        # at" value must be the DISPLAYED Handicap Index (stored
+        # computed_handicap, already Rule-5.8-capped and Rule-5.9-ESR-
+        # adjusted) -- not a fresh raw `calc_handicap_index()` recalculation,
+        # which bypasses both. `current_and_previous_handicap_index` sources
+        # the stored value (falling back to raw only when nothing has been
+        # established yet), mirroring the dashboard/rankings fix for the
+        # same class of bug. The season START value already reads
+        # `computed_handicap` directly inside `calc_hi_journey`; this makes
+        # END consistent with it.
+        hi, _ = current_and_previous_handicap_index(rounds, include_9hole)
         journey = calc_hi_journey(rounds, season_rounds, hi)
         most_played = calc_most_played_course(season_rounds)
         golfiest = calc_golfiest_month(season_rounds)
