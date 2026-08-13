@@ -705,6 +705,40 @@ def test_api_rounds_exclude_sets_flag_and_recomputes_handicap(client):
     assert saved[0].excluded is False
 
 
+def test_api_rounds_exclude_response_handicap_is_stored_value(client):
+    """The exclude response's `handicap` must be the STORED displayed HI
+    (WHS Rule 5.7/5.8 capped + Rule 5.9 ESR-adjusted) that recompute just
+    wrote -- not a fresh raw calc_handicap_index() recalculation, which
+    bypasses both. Under an active Exceptional Score Reduction the two
+    diverge (raw 11.0 vs stored 10.0 below), so this test fails against
+    the old raw-response implementation and passes with the stored value.
+    """
+    _login(client)
+    _make_course(client)
+    # 20 rounds at gross 83 -> diff 12.2, baseline HI 12.2 (LHI 10.2 from
+    # the Rule 5.2a-adjusted rounds 3-4).
+    for i in range(20):
+        _post_round(client, date=f"2026-07-{1 + i:02d}", gross_total="83")
+    # Exceptional round: diff 2.8, gap 9.4 vs HI-in-effect 12.2 -> -1.0 ESR.
+    _post_round(client, date="2026-08-01", gross_total="73")
+
+    resp = client.post("/api/rounds/2026-07-10/0/exclude", json={"excluded": True})
+    assert resp.status_code == 200
+    data = resp.get_json()
+
+    stored_hi = None
+    for r in store.get_all_rounds(1):
+        if r.computed_handicap and r.computed_handicap != "0":
+            stored_hi = float(r.computed_handicap)
+            break
+    assert stored_hi is not None
+    assert data["handicap"] == stored_hi
+
+    from calc.handicap import calc_handicap_index
+    raw = calc_handicap_index(store.get_all_rounds(1), True)
+    assert raw is not None and raw != stored_hi
+
+
 # ---------------------------------------------------------------------------
 # DELETE /api/rounds/<date>/<index>
 # ---------------------------------------------------------------------------
