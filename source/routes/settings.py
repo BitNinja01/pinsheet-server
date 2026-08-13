@@ -75,6 +75,7 @@ def register_settings_routes(app, csrf):
 
             all_imported = get_all_rounds(user_id)
             chronological = list(reversed(all_imported))
+            total = len(all_imported)
             courses_data = get_courses()
             include_9hole = get_settings().get("include_9hole", True)
             for i, r in enumerate(chronological):
@@ -89,8 +90,17 @@ def register_settings_routes(app, csrf):
                             # Keep the in-memory object in sync with the DB write so the
                             # handicap window below sees the fresh differential (not stale "0").
                             r.differential = str(diff)
-                window = chronological[:i + 1]
-                hi = calc_handicap_index(window, include_9hole)
+                # WHS Rule 5.2: calc_handicap_index requires most-recent-first
+                # input and windows to the most recent 20 ELIGIBLE
+                # differentials internally. `r` is chronological[i]
+                # (oldest-first); its position in the original
+                # most-recent-first `all_imported` is `idx`, so
+                # `all_imported[idx:]` is "all rounds up to and including r,
+                # in most-recent-first order" -- the old oldest-first,
+                # unbounded `chronological[:i + 1]` violated the contract.
+                idx = total - 1 - i
+                history_most_recent_first = all_imported[idx:]
+                hi = calc_handicap_index(history_most_recent_first, include_9hole)
                 if hi is not None:
                     update_round_handicap(r.date, r.index, hi, user_id)
 
