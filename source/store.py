@@ -356,6 +356,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         return 0
 
     chronological = list(reversed(all_rounds))
+    total = len(all_rounds)
     updated = 0
     db = get_db()
 
@@ -375,8 +376,17 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                         )
                         updated += 1
 
-        window = chronological[max(0, i + 1 - 20):i + 1]
-        hi = calc_handicap_index(window, include_9hole)
+        # WHS Rule 5.2: calc_handicap_index requires most-recent-first input
+        # and does its own recent-20-eligible windowing internally. `r` is
+        # chronological[i] (oldest-first index i); its position in the
+        # original most-recent-first `all_rounds` is `idx` below, so
+        # `all_rounds[idx:]` is exactly "all rounds up to and including r,
+        # in most-recent-first order" -- built via index arithmetic on the
+        # already most-recent-first list instead of re-reversing a growing
+        # slice of `chronological` on every iteration.
+        idx = total - 1 - i
+        history_most_recent_first = all_rounds[idx:]
+        hi = calc_handicap_index(history_most_recent_first, include_9hole)
         if hi is not None:
             new_val = str(hi)
             if r.computed_handicap != new_val:

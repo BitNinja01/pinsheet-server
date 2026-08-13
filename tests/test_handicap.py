@@ -12,6 +12,7 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    WHS_HANDICAP_WINDOW,
 )
 
 
@@ -313,9 +314,16 @@ def test_calc_course_handicap_near_boundary():
 
 
 def test_handicap_index_last_20_vs_all(make_round):
-    """WHS: best 8 of most recent 20 only. A round outside the last-20 window
-    must never influence the index. This regression test encodes real data
-    where the 21st-round diff 21.7 would wrongly lower the index to 19.7."""
+    """WHS Rule 5.2: best 8 of most recent 20 ELIGIBLE differentials only. A
+    round outside the last-20 window must never influence the index.
+
+    Pre-fix, calc_handicap_index had no internal window, so passing the full
+    30-round list (rounds, unsliced) wrongly produced best-8-of-all-career
+    (19.7, pulled down by the 21st-round diff 21.7). Post-fix (WHS Rule 5.2
+    windowing), calc_handicap_index does its own most-recent-20-eligible
+    windowing internally, so passing the caller-pre-sliced 20 (rounds[:20])
+    and passing the full most-recent-first history (rounds) now agree: both
+    correctly resolve to 19.8."""
     diffs = [17.1, 27.1, 20.8, 21.9, 15.3, 23.8, 18.0, 23.8, 22.6, 25.3,
              21.1, 29.8, 21.5, 23.8, 23.2, 23.2, 31.1, 22.6, 25.7, 24.8,
              21.7, 25.3, 37.1, 25.6, 33.6, 28.4, 29.8, 29.5, 35.7, 29.0]
@@ -325,33 +333,149 @@ def test_handicap_index_last_20_vs_all(make_round):
     hi_all = calc_handicap_index(rounds)
 
     assert hi_20 == 19.8
-    assert hi_all == 19.7
-    assert hi_20 != hi_all
+    assert hi_all == 19.8
+    assert hi_20 == hi_all
 
 
-def test_store_recompute_window_slice(make_round):
-    """recompute_all_handicaps must window to the most recent 20 rounds in
-    chronological order. chronological[max(0,i+1-20):i+1] excludes rounds
-    beyond the last 20."""
+# NOTE: a prior version of this test (test_store_recompute_window_slice) hand-
+# replicated store.py's OLD `chronological[max(0,i+1-20):i+1]` slice and
+# asserted calc_handicap_index behaved correctly on that manually-built
+# window. That implementation no longer exists in store.py (recompute now
+# passes the full most-recent-first history and lets calc_handicap_index's
+# internal eligible-window do the work -- see
+# test_store_recompute_matches_direct_calc_handicap_index below, which
+# exercises the actual store.py code path instead of a hand-rolled stand-in).
+# The manual-window sanity check itself is subsumed by
+# test_handicap_index_last_20_vs_all above, so it was removed rather than
+# left with a stale docstring describing removed production code.
+
+
+# --- WHS Rule 5.2 windowing fix: calc_handicap_index now owns the
+# most-recent-20-eligible window internally (see docstring on
+# calc_handicap_index). Callers must pass most-recent-first order. ---
+
+def test_calc_handicap_index_windows_to_recent_20_internally(make_round):
+    """WHS Rule 5.2: with NO manual slicing by the caller, calc_handicap_index
+    must still use only the 20 most recent acceptable differentials -- not
+    best-8-of-all-career. 25 differentials, most-recent-first (index 0 =
+    newest), constructed so best-8-of-all-25 != best-8-of-recent-20."""
+    # Most-recent-first: the 21st-25th (oldest, indices 20-24) are very LOW
+    # differentials that would pull the index down if wrongly included.
+    recent_20 = [17.1, 27.1, 20.8, 21.9, 15.3, 23.8, 18.0, 23.8, 22.6, 25.3,
+                 21.1, 29.8, 21.5, 23.8, 23.2, 23.2, 31.1, 22.6, 25.7, 24.8]
+    older_5_low = [1.0, 1.1, 1.2, 1.3, 1.4]
+    diffs_most_recent_first = recent_20 + older_5_low
+    rounds = [make_round(differential=str(d)) for d in diffs_most_recent_first]
+
+    hi_full_history = calc_handicap_index(rounds)  # no manual slicing by caller
+    hi_manual_20 = calc_handicap_index(rounds[:20])
+
+    assert hi_full_history == hi_manual_20 == 19.8
+    # Sanity: if the older low diffs (outside the window) had wrongly been
+    # included, best-8-of-all-25 would be lower than 19.8.
+    all_diffs_sorted = sorted(diffs_most_recent_first)
+    naive_best8_of_all = sum(all_diffs_sorted[:8]) / 8
+    assert round(naive_best8_of_all, 1) != hi_full_history
+
+
+def test_calc_handicap_index_excluded_rounds_do_not_consume_window_slots(make_round):
+    """WHS Rule 5.2: the window is 20 ELIGIBLE differentials, not 20 raw
+    rounds. Interleave excluded rounds among >20 rounds and assert the
+    excluded ones are skipped over (not counted toward the 20-slot cap),
+    so a 21st/22nd truly-eligible round still gets pulled into the window."""
+    # 22 eligible diffs, most-recent-first, plus 3 excluded rounds interspersed
+    # near the front. If exclusions wrongly consumed window slots, only
+    # 17 eligible diffs would end up windowed (20 - 3 excluded raw slots),
+    # and diffs_20/diffs_21 (indices 19/20 of the eligible list) would be
+    # dropped from the window.
+    eligible_diffs = [float(10 + i) for i in range(22)]  # 10.0..31.0, ascending order in list
+    rounds = []
+    # interleave: excluded, eligible, excluded, eligible..., excluded, then rest eligible
+    it = iter(eligible_diffs)
+    rounds.append(make_round(differential=str(next(it))))
+    excluded_round = make_round(differential="99.9")
+    excluded_round.excluded = True
+    rounds.append(excluded_round)
+    rounds.append(make_round(differential=str(next(it))))
+    excluded_round2 = make_round(differential="99.9")
+    excluded_round2.excluded = True
+    rounds.append(excluded_round2)
+    rounds.append(make_round(differential=str(next(it))))
+    excluded_round3 = make_round(differential="99.9")
+    excluded_round3.excluded = True
+    rounds.append(excluded_round3)
+    for d in it:
+        rounds.append(make_round(differential=str(d)))
+
+    # Sanity: 25 raw rounds (22 eligible + 3 excluded), most-recent-first.
+    assert len(rounds) == 25
+    assert sum(1 for r in rounds if r.excluded) == 3
+
+    diffs = calc_effective_diffs(rounds)
+    assert len(diffs) == 22  # all 22 eligible differentials exist in the record
+
+    hi = calc_handicap_index(rounds)
+    # The window must contain the FIRST 20 eligible diffs (10.0..29.0), i.e.
+    # the last 2 eligible diffs (30.0, 31.0) must be excluded from the window
+    # -- proving exclusions were skipped over rather than consuming slots.
+    windowed_diffs = eligible_diffs[:20]
+    n = count_table_n(len(windowed_diffs))
+    expected = round(sum(sorted(windowed_diffs)[:n]) / n + count_table_adjustment(len(windowed_diffs)), 1)
+    assert hi == expected
+
+    # If exclusions had wrongly consumed window slots, only the first 17
+    # eligible diffs (10.0..26.0) would be windowed -- verify that's NOT
+    # what happened by checking the 30.0/31.0 diffs are excluded but 29.0 IS
+    # included (proves the window reached the 20th eligible diff, not the
+    # 20th raw round).
+    windowed_diffs_if_bug = eligible_diffs[:17]
+    n_bug = count_table_n(len(windowed_diffs_if_bug))
+    buggy_hi = round(sum(sorted(windowed_diffs_if_bug)[:n_bug]) / n_bug +
+                      count_table_adjustment(len(windowed_diffs_if_bug)), 1)
+    assert hi != buggy_hi
+
+
+def test_store_recompute_matches_direct_calc_handicap_index(tmp_data_dir):
+    """WHS Rule 5.2 consistency: recompute_handicaps_for_user must write, for
+    the latest round, the SAME computed_handicap that a direct
+    calc_handicap_index(most_recent_first_full_list) call produces
+    (recompute == live-save). Guards store.py's per-round windowing."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_round, get_all_rounds,
+        recompute_handicaps_for_user,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("golfer2", "Golfer2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
     diffs = [17.1, 27.1, 20.8, 21.9, 15.3, 23.8, 18.0, 23.8, 22.6, 25.3,
              21.1, 29.8, 21.5, 23.8, 23.2, 23.2, 31.1, 22.6, 25.7, 24.8,
              21.7, 25.3, 37.1, 25.6, 33.6, 28.4, 29.8, 29.5, 35.7, 29.0]
-    rounds = [make_round(differential=str(d)) for d in diffs]
-    chronological = list(reversed(rounds))
 
-    i_last = len(chronological) - 1
-    window = chronological[max(0, i_last + 1 - 20):i_last + 1]
+    for i, d in enumerate(diffs):
+        day = 30 - i
+        r = {"course": "GC", "tees": "W", "total_gross": str(70 + i),
+             "differential": str(d), "computed_handicap": "99.9",
+             "holes_selection": "all", "entry_mode": "score_only", "holes": {}}
+        save_round(r, f"2026-05-{day:02d}", 0, user_id=1)
 
-    assert len(window) == 20
-    window_diffs = [float(r.differential) for r in window]
-    assert 21.7 not in window_diffs
+    recompute_handicaps_for_user(user_id=1)
 
-    old_window = chronological[:i_last + 1]
-    assert len(old_window) == 30
-    assert 21.7 in [float(r.differential) for r in old_window]
+    all_rounds = get_all_rounds(user_id=1)  # most-recent-first (ORDER BY date DESC)
+    most_recent = all_rounds[0]
 
-    hi = calc_handicap_index(window)
-    assert hi == 19.8
+    direct_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert direct_hi is not None
+    assert most_recent.computed_handicap == str(direct_hi), (
+        f"recompute wrote {most_recent.computed_handicap!r} but a direct "
+        f"calc_handicap_index(most-recent-first full list) call gives "
+        f"{direct_hi!r} -- recompute and live-save must agree (WHS Rule 5.2)."
+    )
 
 
 def test_get_best_n_rounds_capped_to_last_20(make_round):
@@ -373,13 +497,147 @@ def test_get_best_n_rounds_capped_to_last_20(make_round):
     assert len(best_uncapped) == 8
 
 
+def test_get_best_n_rounds_window_skips_ineligible_rounds(make_round):
+    """WHS Rule 5.2: get_best_n_rounds(..., window=20) must count 20
+    ELIGIBLE rounds, not 20 raw rounds. An excluded round planted INSIDE the
+    raw most-recent-20 must not stop the window early -- the window must
+    reach into the 21st physical round to keep the pool at 20 eligible.
+
+    Non-vacuous: the naive get_best_n_rounds(rounds[:20], ...) (raw
+    pre-slice, no window param -- the old dashboard.py/rounds.py call
+    pattern this fix replaced) never even considers the pulled-in round,
+    since it falls outside a raw rounds[:20] slice."""
+    rounds = []
+    for i in range(22):
+        if i == 5:
+            # Excluded round planted inside the raw most-recent-20 -- must
+            # vacate a window slot rather than consume one.
+            r = make_round(differential="77.7")
+            r.excluded = True
+        elif i == 20:
+            # The 21st physical round -- must be pulled into the eligible
+            # window because the excluded round at i=5 vacated a slot. Given
+            # a very low differential so it's unambiguously present in
+            # best-8 if (and only if) the window correctly reaches it.
+            r = make_round(differential="1.0")
+        elif i == 21:
+            # The 22nd physical round -- must NEVER enter the 20-eligible
+            # window (only reachable if the window incorrectly extends
+            # beyond 20 eligible slots).
+            r = make_round(differential="999.9")
+        elif i < 5:
+            r = make_round(differential=str(10 + i))
+        else:
+            r = make_round(differential=str(50 + i))
+        rounds.append(r)
+
+    assert len(rounds) == 22
+    assert sum(1 for r in rounds if r.excluded) == 1
+
+    best_windowed = get_best_n_rounds(rounds, window=WHS_HANDICAP_WINDOW)
+    best_diffs = [float(r.differential) for r in best_windowed]
+    assert len(best_windowed) == count_table_n(20) == 8
+    assert 1.0 in best_diffs, (
+        "The 21st physical round (diff 1.0) must be pulled into the "
+        "eligible window when the excluded round at raw index 5 vacates a "
+        "slot -- the window must count 20 ELIGIBLE rounds, not 20 raw "
+        "rounds."
+    )
+    assert 999.9 not in best_diffs  # 22nd physical round stays outside the window
+
+    # Sanity: prove this is non-vacuous -- the naive raw-slice approach
+    # (get_best_n_rounds(rounds[:20]), no window param) never even
+    # considers the round with diff 1.0, since it falls outside rounds[:20].
+    naive_best = get_best_n_rounds(rounds[:20])
+    naive_diffs = [float(r.differential) for r in naive_best]
+    assert 1.0 not in naive_diffs, (
+        "Test fixture did not exercise the divergence -- the naive raw-20 "
+        "slice unexpectedly already included the pulled-in round."
+    )
+
+
+def test_secondary_handicap_value_windows_rounds_1_to_21_correctly(make_round):
+    """WHS Rule 5.2: composite.py's SECONDARY handicap value
+    (calc_handicap_index(rounds[1:], include_9hole)) must apply its OWN
+    fresh most-recent-20-ELIGIBLE window over `rounds[1:]` -- not an
+    off-by-one/raw-20 slice of the sub-list. An excluded round planted
+    inside rounds[1:21] (the raw most-recent-20 of the sub-list) must not
+    stop that window early; it must reach the 21st round of rounds[1:] to
+    keep 20 eligible."""
+    rounds = []
+    for i in range(23):
+        if i == 0:
+            # The "current" round -- dropped entirely by rounds[1:], must
+            # never influence the secondary value.
+            r = make_round(differential="500.0")
+        elif i == 6:
+            # Excluded round inside rounds[1:21] (subslice index 5).
+            r = make_round(differential="77.7")
+            r.excluded = True
+        elif i == 21:
+            # Subslice index 20 -- the 21st round of rounds[1:]. Must be
+            # pulled into the window because the excluded round at i=6
+            # vacated a slot.
+            r = make_round(differential="1.0")
+        elif i == 22:
+            # Subslice index 21 -- the 22nd round of rounds[1:]. Must stay
+            # OUTSIDE the 20-eligible window.
+            r = make_round(differential="999.9")
+        elif 1 <= i <= 5:
+            r = make_round(differential=str(10 + i))
+        else:  # i = 7..20
+            r = make_round(differential=str(50 + i))
+        rounds.append(r)
+
+    assert len(rounds) == 23
+
+    secondary_hi = calc_handicap_index(rounds[1:])
+
+    # Hand-computed expectation: the 20 ELIGIBLE differentials of rounds[1:]
+    # in most-recent-first order, skipping the excluded round and reaching
+    # to subslice index 20 (i=21) to make up for it.
+    expected_windowed_diffs = (
+        [11.0, 12.0, 13.0, 14.0, 15.0] +           # i = 1..5
+        [50.0 + i for i in range(7, 21)] +          # i = 7..20
+        [1.0]                                       # i = 21, pulled in
+    )
+    assert len(expected_windowed_diffs) == 20
+    n = count_table_n(len(expected_windowed_diffs))
+    expected_hi = round(
+        sum(sorted(expected_windowed_diffs)[:n]) / n
+        + count_table_adjustment(len(expected_windowed_diffs)),
+        1,
+    )
+    assert secondary_hi == expected_hi == 22.6
+
+    # Sanity: prove non-vacuous -- a naive off-by-one raw slice
+    # (rounds[1:21], no re-windowing, filtered for exclusions but never
+    # reaching subslice index 20) silently drops the pulled-in round
+    # (i=21, diff 1.0), producing a DIFFERENT (wrong) value.
+    naive_raw_slice_diffs = [
+        float(r.differential) for r in rounds[1:21]
+        if not r.excluded and r.differential not in ("0", "", None)
+    ]
+    assert 1.0 not in naive_raw_slice_diffs
+    naive_n = count_table_n(len(naive_raw_slice_diffs))
+    naive_hi = round(
+        sum(sorted(naive_raw_slice_diffs)[:naive_n]) / naive_n
+        + count_table_adjustment(len(naive_raw_slice_diffs)),
+        1,
+    )
+    assert naive_hi != secondary_hi
+
+
 # --- Guard tests for WHS last-20 windowing fix (call-site verification) ---
 
 def test_recompute_handicaps_uses_last_20_window(tmp_data_dir):
-    """recompute_all_handicaps must window to the most recent 20 rounds.
-    With 30 rounds, the most-recent round must have HI 19.8 (last-20 correct),
-    NOT 19.7 (all-rounds, which wrongly includes diff 21.7 from outside the
-    last 20). Guards store.py: chronological[max(0,i+1-20):i+1]."""
+    """recompute_all_handicaps must window to the most recent 20 ELIGIBLE
+    differentials. With 30 rounds, the most-recent round must have HI 19.8
+    (last-20 correct), NOT 19.7 (all-rounds, which wrongly includes diff 21.7
+    from outside the last 20). Guards the current store.py mechanism: passing
+    the full most-recent-first history per round and letting
+    calc_handicap_index's internal WHS_HANDICAP_WINDOW-eligible window (see
+    calc/handicap.py) do the windowing, rather than store.py pre-slicing."""
     from database import set_db_path, init_db
     from store import create_user, save_settings, save_round, get_all_rounds, recompute_all_handicaps
 
@@ -412,11 +670,18 @@ def test_recompute_handicaps_uses_last_20_window(tmp_data_dir):
 
 def test_profile_hi_insight_eight_of_twenty(tmp_path, monkeypatch):
     """_build_profile_context must report '8 of your last 20' because all
-    best-8 rounds come from within the last 20 (after the dashboard.py fix
-    that caps best_rounds to rounds[:20]). The old uncapped code would report
-    '7' because the round at index 20 (diff 21.7) was in best-8 overall but
-    missed the eligible_20 window. Guards dashboard.py:
-    get_best_n_rounds(rounds[:20], ...)."""
+    best-8 rounds come from within the most recent 20 ELIGIBLE
+    differentials. Guards dashboard.py's current mechanism:
+    get_best_n_rounds(rounds, include_9hole, window=WHS_HANDICAP_WINDOW),
+    which passes the FULL most-recent-first `rounds` and lets the eligible-
+    window cap (20) select the pool internally, rather than pre-truncating
+    to a raw rounds[:20] slice. The round at index 20 (diff 21.7) must stay
+    outside that 20-eligible window (no exclusions in this fixture, so raw
+    and eligible windows coincide here -- see
+    test_get_best_n_rounds_window_skips_ineligible_rounds and
+    test_secondary_handicap_value_windows_rounds_1_to_21_correctly below for
+    fixtures where an excluded/ineligible round forces the eligible window
+    to diverge from a raw slice)."""
     from main import app, User as UserClass
     from database import set_db_path, init_db
     from store import create_user, save_settings, save_course, save_round, get_user_by_id
@@ -471,3 +736,104 @@ def test_profile_hi_insight_eight_of_twenty(tmp_path, monkeypatch):
         assert "8 of your last 20" in hi_insight, (
             f"Expected '8 of your last 20', got: {hi_insight}"
         )
+
+
+def test_dashboard_hi_matches_recompute_with_excluded_round_in_window(tmp_path, monkeypatch):
+    """WHS Rule 5.2 correctness regression (adversary-gate finding): an
+    excluded round sitting within the raw most-recent-20 must NOT desync the
+    dashboard-computed Handicap Index from the authoritative stored/
+    recompute value.
+
+    Pre-fix, compute_stat_bundle (via dashboard.py's `l20 =
+    last_n_rounds(rounds, 20)`) pre-truncated to a raw-20 slice BEFORE
+    calling calc_handicap_index, so an excluded round inside that raw-20
+    silently shrank the eligible pool to 19 differentials (best-7, no Rule
+    5.2a adjustment) instead of reaching one round further back to keep a
+    full 20-eligible window (best-8) -- a real 12.5-vs-13.5-style divergence
+    from the value store.recompute_handicaps_for_user writes. This test
+    proves that divergence is gone by asserting the dashboard's computed
+    value against the recompute-stored value, and separately proves the old
+    raw-20-pre-truncation approach WOULD have produced a different value for
+    this fixture (i.e. the regression is meaningfully covered, not
+    vacuously passing)."""
+    from main import app, User as UserClass
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round, get_user_by_id,
+        set_round_excluded, recompute_handicaps_for_user, get_all_rounds,
+    )
+    from flask_login import login_user
+    from calc.composite import last_n_rounds as _buggy_raw20
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "drafts").mkdir()
+    db_path = str(data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    import store as store_mod
+    monkeypatch.setattr(store_mod, "_DATA_DIR", data_dir)
+
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["DB_PATH"] = db_path
+
+    create_user("q", "Q", "pass1234")
+    save_settings({"welcome_shown": True, "include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "120", "rating": "70.0", "yardage": "6000"}},
+    }
+    save_course(course, "GC")
+
+    # 22 rounds, most-recent-first by descending day. The 6th-most-recent
+    # round (index 5) is excluded, so a correct WHS Rule 5.2 window must
+    # reach back to the 22nd (oldest, index 21) round to keep 20 eligible.
+    diffs = [10.0 + i for i in range(22)]
+    excluded_index = 5
+
+    for i, d in enumerate(diffs):
+        day = 30 - i
+        r = {"course": "GC", "tees": "W", "total_gross": str(70 + i),
+             "differential": str(d), "computed_handicap": "99.9",
+             "holes_selection": "all", "entry_mode": "score_only", "holes": {}}
+        save_round(r, f"2026-05-{day:02d}", 0, user_id=1)
+
+    excluded_date = f"2026-05-{30 - excluded_index:02d}"
+    set_round_excluded(excluded_date, 0, True, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    all_rounds = get_all_rounds(user_id=1)  # most-recent-first (ORDER BY date DESC)
+    stored_hi = all_rounds[0].computed_handicap
+    assert stored_hi not in (None, "", "0")
+
+    with app.test_request_context():
+        user_dict = get_user_by_id(1)
+        login_user(UserClass(user_dict))
+
+        from source.routes.dashboard import _build_profile_context
+        ctx = _build_profile_context()
+        assert ctx is not None, "_build_profile_context returned None (welcome_shown?)"
+        dashboard_hi = ctx["panels"]["handicap"]["value"]
+
+    assert dashboard_hi == stored_hi, (
+        f"Dashboard HI {dashboard_hi!r} diverged from recompute-stored HI "
+        f"{stored_hi!r} -- an excluded round inside the raw most-recent-20 "
+        f"must not desync the two (WHS Rule 5.2)."
+    )
+
+    # Sanity: prove the fix matters -- the OLD raw-20-pre-truncation
+    # approach WOULD have produced a DIFFERENT (wrong) value for this data.
+    buggy_l20 = _buggy_raw20(all_rounds, 20)
+    buggy_hi = calc_handicap_index(buggy_l20, True)
+    assert buggy_hi is not None
+    assert str(buggy_hi) != stored_hi, (
+        "Test fixture did not actually exercise the divergence -- the old "
+        "raw-20-pre-truncation path produced the same HI as the fix; "
+        "adjust the fixture so the regression is meaningfully covered."
+    )

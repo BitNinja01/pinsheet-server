@@ -29,7 +29,15 @@ class StatBundle:
     panels: dict[str, StatPanel] = field(default_factory=dict)
 
 
-def compute_stat_bundle(l20, b8, courses_dict, include_9hole) -> StatBundle:
+def compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole) -> StatBundle:
+    """`rounds` is the FULL most-recent-first round list (unbounded). It is
+    used ONLY for the handicap-index panel: calc_handicap_index owns its own
+    WHS Rule 5.2 most-recent-20-ELIGIBLE window internally, so pre-truncating
+    to a raw-20 slice (like `l20`) before calling it would under-count when
+    ineligible rounds (excluded/"0"/9-hole-gated) sit within the raw-most-
+    recent-20, producing a different (wrong) value than the stored/recompute
+    Handicap Index. `l20`/`b8` remain raw-most-recent-20/best-8 pools for the
+    OTHER panels below, which legitimately want raw-N pools, not eligible-N."""
     from calc import (
         calc_handicap_index,
         calc_scoring_average,
@@ -51,9 +59,11 @@ def compute_stat_bundle(l20, b8, courses_dict, include_9hole) -> StatBundle:
                          blank_text=blank_text, suffix=suffix)
 
     definitions = [
+        # WHS Rule 5.2: pass the full most-recent-first `rounds`, not `l20`
+        # -- see compute_stat_bundle docstring.
         _panel("handicap", "Handicap", "rgb(64,196,255)", False, "Play 3+ rounds to see handicap",
-               calc_handicap_index(l20, include_9hole),
-               calc_handicap_index(l20[1:], include_9hole)),
+               calc_handicap_index(rounds, include_9hole),
+               calc_handicap_index(rounds[1:], include_9hole)),
         _panel("score", "Avg Score", "rgb(64,255,128)", False, "Play a round to see scoring avg",
                calc_scoring_average(b8), calc_scoring_average(l20)),
         _panel("fir", "FIR", "rgb(255,220,64)", True, "Play a round to see FIR %",

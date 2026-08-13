@@ -67,7 +67,12 @@ def _compute_user_stats(rounds, courses_dict, include_9hole: bool, all_rounds: l
     l20 = last_n_rounds(rounds, 20)
     b8 = best_n_rounds(rounds, 8)
     stat_values = {}
-    stat_values["handicap"] = calc_handicap_index(l20, include_9hole)
+    # WHS Rule 5.2: pass the full most-recent-first `rounds` (not the raw-20
+    # `l20`) -- calc_handicap_index owns its own eligible-round window
+    # (default WHS_HANDICAP_WINDOW == 20) internally. Pre-truncating to raw
+    # `l20` would under-count when excluded/"0"/9-hole-gated rounds sit
+    # within the raw most-recent-20, diverging from the stored/recompute HI.
+    stat_values["handicap"] = calc_handicap_index(rounds, include_9hole)
     stat_values["score"] = calc_scoring_average(b8)
     stat_values["fir"] = calc_fir_percent(b8, courses_dict)
     stat_values["gir"] = calc_gir_percent(b8)

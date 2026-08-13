@@ -279,3 +279,60 @@ def test_put_to_incomplete_zeroes_differential(client):
         "holes": _holes(only=set(range(1, 10)))})
     assert resp.status_code == 200
     assert _rounds_on("2026-07-02")[0].differential == "0"
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.2 windowing — live POST /api/rounds, >20 rounds
+# --------------------------------------------------------------------------
+
+def test_more_than_20_rounds_windows_handicap_to_recent_20_live_post(client):
+    """WHS Rule 5.2 windowing regression, exercised end-to-end through the
+    real HTTP POST /api/rounds endpoint (not a unit-level construction).
+
+    5 very-low-differential ("sandbagged") rounds are posted first (oldest),
+    followed by 20 more rounds with a realistic differential spread. Because
+    each POST computes and persists computed_handicap from the full
+    history-so-far via calc_handicap_index (see rounds.py), the most-recent
+    round's LIVE computed_handicap must reflect ONLY the most recent 20
+    rounds -- proving the 5 oldest (suspiciously good) rounds don't leak
+    into the live-computed index once posted-count exceeds 20."""
+    # 5 oldest, very good ("sandbagged") rounds -- must fall OUTSIDE the
+    # most-recent-20 window once 20 more rounds are posted after them.
+    for i in range(5):
+        client.post("/api/rounds", json={
+            "date": f"2026-08-{1 + i:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": "72", "holes": {}})
+
+    # 20 more recent rounds with a realistic differential spread.
+    for i in range(20):
+        client.post("/api/rounds", json={
+            "date": f"2026-08-{6 + i:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": str(80 + i), "holes": {}})
+
+    all_rounds = get_all_rounds(1)  # most-recent-first
+    assert len(all_rounds) == 25
+    latest = all_rounds[0]
+    assert latest.date == "2026-08-25"
+    assert latest.computed_handicap not in (None, "", "0")
+
+    from calc.handicap import calc_handicap_index
+
+    live_hi = float(latest.computed_handicap)
+    correctly_windowed_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert correctly_windowed_hi is not None
+    assert live_hi == correctly_windowed_hi
+
+    # Sanity: prove the fixture actually exercises windowing -- an
+    # unwindowed (pre-fix-style) best-8-of-all-25 calc must give a
+    # DIFFERENT, LOWER value, since it wrongly pulls in the 5 sandbagged
+    # ~0.4 differentials that the correctly-windowed recent-20 excludes.
+    naive_all_25_diffs = sorted(
+        float(r.differential) for r in all_rounds
+        if r.differential not in ("0", "", None)
+    )
+    assert len(naive_all_25_diffs) == 25
+    naive_best8_of_all = round(sum(naive_all_25_diffs[:8]) / 8, 1)
+    assert naive_best8_of_all != live_hi
+    assert naive_best8_of_all < live_hi

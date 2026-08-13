@@ -28,6 +28,13 @@ def calc_expected_9hole_dif(handicap_index: float) -> float:
     return handicap_index * 0.52 + 1.197
 
 
+# WHS Rule 5.2: the Handicap Index is computed from the most recent 20
+# acceptable Score Differentials. Shared by calc_handicap_index's default
+# window and calc_handicap_trend's rolling window so the two windowing
+# implementations can't drift apart.
+WHS_HANDICAP_WINDOW = 20
+
+
 def count_table_n(n: int) -> int:
     if n < 3:  return 0
     if n < 6:  return 1
@@ -54,41 +61,93 @@ def count_table_adjustment(count: int) -> float:
     return 0.0
 
 
+def _is_eligible_diff_round(r: RoundData, include_9hole: bool) -> bool:
+    """WHS Rule 5.2 acceptability: not excluded, has a real (non-sentinel)
+    differential, and -- for 9-hole rounds -- only counts if 9-hole scores
+    are opted into the record and the round already has a computed
+    (non-zero) handicap to combine against."""
+    if r.excluded:
+        return False
+    if not r.differential or r.differential == "0":
+        return False
+    if r.holes_selection != "all":
+        if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
+            return False
+    return True
+
+
 def calc_effective_diffs(rounds: list[RoundData], include_9hole: bool = False) -> list:
     diffs = []
     for r in rounds:
-        if r.excluded:
+        if not _is_eligible_diff_round(r, include_9hole):
             continue
-        if not r.differential or r.differential == "0":
-            continue
-        if r.holes_selection != "all":
-            if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
-                continue
-            diffs.append(math.floor(float(r.differential) * 10) / 10)
-        else:
-            diffs.append(math.floor(float(r.differential) * 10) / 10)
+        diffs.append(math.floor(float(r.differential) * 10) / 10)
     return sorted(diffs)
 
 
-def get_best_n_rounds(rounds: list[RoundData], include_9hole: bool = False, n: int | None = None) -> list[RoundData]:
+def get_best_n_rounds(
+    rounds: list[RoundData],
+    include_9hole: bool = False,
+    n: int | None = None,
+    window: int | None = None,
+) -> list[RoundData]:
+    """Return the best-N eligible rounds by differential.
+
+    By default (`window=None`) this scans ALL of `rounds` for eligible
+    rounds -- it does NOT apply the WHS Rule 5.2 most-recent-20 window on
+    its own; callers that want the current-Handicap-Index best-N must
+    either pre-slice to the recent window themselves, or (preferably) pass
+    `window=WHS_HANDICAP_WINDOW` along with the full most-recent-first
+    `rounds` list so eligible-round counting (not raw-round counting)
+    determines the window, mirroring `calc_handicap_index`.
+    """
     eligible = []
     for r in rounds:
-        if r.excluded:
+        if not _is_eligible_diff_round(r, include_9hole):
             continue
-        if not r.differential or r.differential == "0":
-            continue
-        if r.holes_selection != "all":
-            if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
-                continue
         eligible.append(r)
+        if window is not None and len(eligible) >= window:
+            break
     eligible.sort(key=lambda r: math.floor(float(r.differential) * 10) / 10)
     if n is None:
         n = count_table_n(len(eligible))
     return eligible[:n]
 
 
-def calc_handicap_index(rounds: list[RoundData], include_9hole: bool = False) -> float | None:
-    diffs = calc_effective_diffs(rounds, include_9hole)
+def calc_handicap_index(
+    rounds: list[RoundData],
+    include_9hole: bool = False,
+    window: int | None = WHS_HANDICAP_WINDOW,
+) -> float | None:
+    """WHS Rule 5.2: Handicap Index = (best-N of the) most recent acceptable
+    Score Differentials, N chosen per the WHS count table, then adjusted per
+    Rule 5.2a.
+
+    CONTRACT: `rounds` MUST be sorted most-recent-first (index 0 = the most
+    recently played round). This function walks `rounds` in that order,
+    collecting only ELIGIBLE differentials (non-excluded, scored -- see
+    `_is_eligible_diff_round`, the same rule used by `calc_effective_diffs`)
+    and stops once it has collected `window` of them (default
+    WHS_HANDICAP_WINDOW == 20, the WHS Rule 5.2 window size). An
+    excluded/ineligible round does NOT consume a window slot -- the window
+    is 20 eligible differentials, not 20 raw rounds. Pass `window=None` to
+    disable the cap entirely (e.g. for callers that intentionally want the
+    whole career record). Note: `calc_handicap_trend` does NOT delegate to
+    this function -- it implements its own independent rolling-window
+    accumulator over the same WHS_HANDICAP_WINDOW size.
+
+    Once the (<=window) eligible differentials are collected, the usual
+    Rule 5.2 best-N selection and Rule 5.2a adjustment are applied.
+    """
+    diffs = []
+    for r in rounds:
+        if not _is_eligible_diff_round(r, include_9hole):
+            continue
+        diffs.append(math.floor(float(r.differential) * 10) / 10)
+        if window is not None and len(diffs) >= window:
+            break
+
+    diffs.sort()
     n = count_table_n(len(diffs))
     if n == 0 or not diffs:
         return None
@@ -100,24 +159,27 @@ def calc_handicap_index(rounds: list[RoundData], include_9hole: bool = False) ->
 
 
 def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False) -> list:
+    """Rolling WHS Rule 5.2 Handicap Index as of each round, chronologically.
+
+    NOTE: this is an independent rolling-window accumulator -- it does NOT
+    call/delegate to `calc_handicap_index`; it maintains its own sorted
+    window of the most recent WHS_HANDICAP_WINDOW eligible differentials
+    as it walks the (reconstructed) chronological order."""
     chronological = list(reversed(all_rounds))
     result = []
     window_diffs = []
     window_items = []
 
     for r in chronological:
-        if r.excluded or not r.differential or r.differential == "0":
+        if not _is_eligible_diff_round(r, include_9hole):
             continue
-        if r.holes_selection != "all":
-            if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
-                continue
 
         diff = math.floor(float(r.differential) * 10) / 10
 
         window_items.append((diff, r))
         bisect.insort(window_diffs, diff)
 
-        if len(window_items) > 20:
+        if len(window_items) > WHS_HANDICAP_WINDOW:
             old_diff, _ = window_items.pop(0)
             window_diffs.remove(old_diff)
 
