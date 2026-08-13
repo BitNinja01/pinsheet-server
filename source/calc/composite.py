@@ -12,6 +12,44 @@ def best_n_rounds(rounds, n: int) -> list:
     return eligible[:min(n, len(eligible))]
 
 
+def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
+    """WHS Rule 5.7/5.8: the CURRENT (and next-most-recent, "previous")
+    Handicap Index for DISPLAY purposes must be sourced from the stored,
+    already-capped `computed_handicap` on each round (`rounds` most-recent-
+    first), NOT a fresh raw `calc_handicap_index()` recalculation --
+    `calc_handicap_index` only ever produces the raw, pre-Rule-5.8 value, so
+    once a Low Handicap Index (Rule 5.7) is established and a soft/hard cap
+    (Rule 5.8) is active, a fresh raw recalculation diverges from the capped
+    value shown everywhere else (round detail, trend, round list, sourced
+    via `recompute_handicaps_for_user`). Rounds with no computed HI yet
+    (empty, or the "0" exclusion sentinel) are skipped when scanning for the
+    two most recent held values.
+
+    Falls back to a fresh raw `calc_handicap_index()` call ONLY when NO
+    round in `rounds` has an established HI yet (WHS Rule 5.2
+    pre-establishment, e.g. fewer than 3 eligible scores) -- there is
+    nothing capped/stored to diverge from in that case.
+    """
+    found = []
+    for r in rounds:
+        ch = r.computed_handicap
+        if ch and ch != "0":
+            try:
+                found.append(float(ch))
+            except (ValueError, TypeError):
+                continue
+        if len(found) >= 2:
+            break
+
+    if found:
+        current = found[0]
+        previous = found[1] if len(found) >= 2 else None
+        return current, previous
+
+    from calc.handicap import calc_handicap_index
+    return calc_handicap_index(rounds, include_9hole), calc_handicap_index(rounds[1:], include_9hole)
+
+
 @dataclass
 class StatPanel:
     key: str
@@ -31,15 +69,13 @@ class StatBundle:
 
 def compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole) -> StatBundle:
     """`rounds` is the FULL most-recent-first round list (unbounded). It is
-    used ONLY for the handicap-index panel: calc_handicap_index owns its own
-    WHS Rule 5.2 most-recent-20-ELIGIBLE window internally, so pre-truncating
-    to a raw-20 slice (like `l20`) before calling it would under-count when
-    ineligible rounds (excluded/"0"/9-hole-gated) sit within the raw-most-
-    recent-20, producing a different (wrong) value than the stored/recompute
-    Handicap Index. `l20`/`b8` remain raw-most-recent-20/best-8 pools for the
-    OTHER panels below, which legitimately want raw-N pools, not eligible-N."""
+    used ONLY for the handicap-index panel, via
+    `current_and_previous_handicap_index`, which sources the stored (WHS
+    Rule 5.7/5.8-capped) `computed_handicap` values directly -- see that
+    function's docstring. `l20`/`b8` remain raw-most-recent-20/best-8 pools
+    for the OTHER panels below, which legitimately want raw-N pools, not
+    eligible-N."""
     from calc import (
-        calc_handicap_index,
         calc_scoring_average,
         calc_fir_percent,
         calc_gir_percent,
@@ -58,12 +94,18 @@ def compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole) -> StatBun
                          higher_better=higher_better, color=color,
                          blank_text=blank_text, suffix=suffix)
 
+    # WHS Rule 5.7/5.8: the handicap panel's value/secondary must come from
+    # the stored, capped `computed_handicap` values (see
+    # `current_and_previous_handicap_index`), not a fresh raw
+    # calc_handicap_index() call -- otherwise the dashboard hero HI diverges
+    # from every other display of the HI once a soft/hard cap is active.
+    handicap_value, handicap_secondary = current_and_previous_handicap_index(rounds, include_9hole)
+
     definitions = [
         # WHS Rule 5.2: pass the full most-recent-first `rounds`, not `l20`
         # -- see compute_stat_bundle docstring.
         _panel("handicap", "Handicap", "rgb(64,196,255)", False, "Play 3+ rounds to see handicap",
-               calc_handicap_index(rounds, include_9hole),
-               calc_handicap_index(rounds[1:], include_9hole)),
+               handicap_value, handicap_secondary),
         _panel("score", "Avg Score", "rgb(64,255,128)", False, "Play a round to see scoring avg",
                calc_scoring_average(b8), calc_scoring_average(l20)),
         _panel("fir", "FIR", "rgb(255,220,64)", True, "Play a round to see FIR %",
