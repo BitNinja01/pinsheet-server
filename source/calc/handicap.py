@@ -40,6 +40,20 @@ def count_table_n(n: int) -> int:
     return 8
 
 
+def count_table_adjustment(count: int) -> float:
+    """WHS Rule 5.2a: for scoring records with fewer than 20 differentials,
+    after averaging the lowest-N differentials, subtract an Adjustment keyed
+    on the number of differentials in the record, then round to nearest
+    tenth. 3 -> -2.0, 4 -> -1.0, 6 -> -1.0, all other counts -> 0.0."""
+    if count == 3:
+        return -2.0
+    if count == 4:
+        return -1.0
+    if count == 6:
+        return -1.0
+    return 0.0
+
+
 def calc_effective_diffs(rounds: list[RoundData], include_9hole: bool = False) -> list:
     diffs = []
     for r in rounds:
@@ -79,7 +93,10 @@ def calc_handicap_index(rounds: list[RoundData], include_9hole: bool = False) ->
     if n == 0 or not diffs:
         return None
     best_n = diffs[:n]
-    return round(sum(best_n) / len(best_n), 1)
+    avg = sum(best_n) / len(best_n)
+    # WHS Rule 5.2a: subtract the count-table adjustment (keyed on the number
+    # of differentials in the record) before the final round-to-tenth.
+    return round(avg + count_table_adjustment(len(diffs)), 1)
 
 
 def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False) -> list:
@@ -106,7 +123,10 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
 
         n = count_table_n(len(window_diffs))
         if n > 0:
-            val = round(sum(window_diffs[:n]) / n, 1)
+            avg = sum(window_diffs[:n]) / n
+            # WHS Rule 5.2a: subtract the count-table adjustment (keyed on
+            # the number of differentials in the window) before rounding.
+            val = round(avg + count_table_adjustment(len(window_diffs)), 1)
             result.append((r.date, val))
 
     return result
