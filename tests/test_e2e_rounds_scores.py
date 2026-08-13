@@ -512,9 +512,22 @@ def test_lhi_ignores_prior_hi_older_than_365_days(client):
 
 
 def test_decrease_never_capped_once_lhi_established(client):
-    """WHS Rule 5.8: there is no limit on a DECREASE. Once an LHI is
+    """WHS Rule 5.8: there is no limit on a DECREASE -- the soft/hard cap
+    only ever limits INCREASES above the Low Handicap Index. Once an LHI is
     established, a new Handicap Index that is at or below LHI + 3.0
-    (including a large decrease) must pass through uncapped."""
+    (including a large decrease) must pass through Rule 5.8's cap
+    unchanged.
+
+    NOTE (WHS Rule 5.9): the much-better round below is ALSO an exceptional
+    score in its own right (its differential is markedly lower than the HI
+    in effect when it was played), so Rule 5.9's Exceptional Score
+    Reduction independently fires and further lowers the stored value below
+    the raw (uncapped, un-reduced) `calc_handicap_index` figure. That
+    reduction is expected and is asserted for explicitly below; the point
+    of this test -- that Rule 5.8's cap does not clip a decrease -- still
+    holds and is verified by confirming the ESR-adjusted value passes
+    through unchanged (i.e. equals `raw_hi + reduction`, not something
+    further limited by the cap)."""
     for i in range(20):
         client.post("/api/rounds", json={
             "date": f"2026-09-{1 + i:02d}", "course": "Test GC", "tees": "White",
@@ -529,10 +542,23 @@ def test_decrease_never_capped_once_lhi_established(client):
 
     all_rounds = get_all_rounds(1)
     stored_hi = float(all_rounds[0].computed_handicap)
+    hi_prev = float(all_rounds[1].computed_handicap)  # HI in effect when the round was played
 
-    from calc.handicap import calc_handicap_index
+    from calc.handicap import calc_handicap_index, exceptional_reduction
     raw_hi = calc_handicap_index(all_rounds, include_9hole=True)
-    assert stored_hi == raw_hi  # decrease -- unchanged despite LHI being active
+
+    # WHS Rule 5.9: this round's own differential is markedly lower than
+    # `hi_prev`, so it is itself an exceptional score and its reduction
+    # stacks on top of `raw_hi`.
+    reduction = exceptional_reduction(hi_prev, float(all_rounds[0].differential))
+    assert reduction < 0, (
+        "fixture did not trigger Rule 5.9 -- this regression would pass "
+        "vacuously without exercising the ESR/cap interaction it's meant "
+        "to cover."
+    )
+
+    expected = round(raw_hi + reduction, 1)
+    assert stored_hi == expected  # decrease -- Rule 5.8 cap inactive; only Rule 5.9 ESR applies
 
 
 def test_live_save_consistent_with_recompute_after_cap(client):

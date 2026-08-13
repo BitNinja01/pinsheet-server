@@ -13,6 +13,7 @@ from calc.handicap import (
     calc_playing_to_handicap_rate,
     calc_raw_hi,
     apply_handicap_cap,
+    exceptional_reduction,
     WHS_HANDICAP_WINDOW,
 )
 
@@ -1092,3 +1093,528 @@ def test_rankings_handicap_stat_matches_recompute_when_cap_active(tmp_data_dir):
         f"Leaderboard handicap stat {board_hi!r} matches the RAW uncapped "
         f"value {raw_hi!r} -- this is the Defect 2 bug in rankings.py."
     )
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.9 -- Exceptional Score Reduction (exceptional_reduction)
+# --------------------------------------------------------------------------
+
+def test_exceptional_reduction_gap_below_threshold_no_reduction():
+    """gap < 7.0 -> no reduction."""
+    assert exceptional_reduction(20.0, 13.1) == 0.0  # gap 6.9
+
+
+def test_exceptional_reduction_gap_exactly_7_reduces_1():
+    assert exceptional_reduction(20.0, 13.0) == -1.0  # gap 7.0
+
+
+def test_exceptional_reduction_gap_9_9_reduces_1():
+    assert exceptional_reduction(20.0, 10.1) == -1.0  # gap 9.9
+
+
+def test_exceptional_reduction_gap_exactly_10_reduces_2():
+    assert exceptional_reduction(20.0, 10.0) == -2.0  # gap 10.0
+
+
+def test_exceptional_reduction_large_gap_reduces_2():
+    assert exceptional_reduction(20.0, 5.0) == -2.0  # gap 15.0
+
+
+def test_exceptional_reduction_negative_gap_no_reduction():
+    """differential higher than HI in effect (gap negative) -> no reduction."""
+    assert exceptional_reduction(10.0, 15.0) == 0.0
+
+
+def test_exceptional_reduction_none_hi_no_reduction():
+    """No HI established yet -- the round cannot be exceptional."""
+    assert exceptional_reduction(None, 5.0) == 0.0
+
+
+def test_exceptional_reduction_float_epsilon_at_exactly_7():
+    """Robustness: `8.2 - 1.2` is a REALISTIC pair of tenth-rounded HIs
+    (both are legitimate WHS_HANDICAP display values) whose true gap is
+    exactly 7.0, but IEEE 754 binary floating point represents the raw
+    subtraction as 6.999999999999999 -- one ULP shy of 7.0. Without
+    rounding the gap back to a tenth before the threshold comparison, this
+    would be wrongly bucketed as "no reduction" (gap < 7.0) instead of the
+    correct -1.0."""
+    assert 8.2 - 1.2 != 7.0  # confirms the float representation quirk exists
+    assert exceptional_reduction(8.2, 1.2) == -1.0
+
+
+def test_exceptional_reduction_float_epsilon_at_exactly_10():
+    """Robustness: `16.4 - 6.4` is a realistic tenth-rounded HI pair whose
+    true gap is exactly 10.0, but raw float subtraction yields
+    9.999999999999998 -- which would be wrongly bucketed as -1.0 (gap <
+    10.0) instead of the correct -2.0 without rounding the gap first."""
+    assert 16.4 - 6.4 != 10.0  # confirms the float representation quirk exists
+    assert exceptional_reduction(16.4, 6.4) == -2.0
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.9 -- Exceptional Score Reduction integration (recompute)
+# --------------------------------------------------------------------------
+
+def _save_diff_rounds(save_round, diffs, user_id=1, start_date="2026-05-01"):
+    """Save rounds oldest-first (one per calendar day, starting at
+    `start_date`) so `diffs[0]` is played first. Returns the list of
+    (date, differential) in the same order."""
+    from datetime import date as _date, timedelta as _timedelta
+
+    base = _date.fromisoformat(start_date)
+    saved = []
+    for i, d in enumerate(diffs):
+        date_str = (base + _timedelta(days=i)).isoformat()
+        r = {
+            "course": "GC", "tees": "W", "total_gross": "85",
+            "differential": str(d), "computed_handicap": "",
+            "holes_selection": "all", "entry_mode": "score_only", "holes": {},
+        }
+        save_round(r, date_str, 0, user_id=user_id)
+        saved.append((date_str, d))
+    return saved
+
+
+def test_esr_worked_oracle_single_reduction_and_dilution(tmp_data_dir):
+    """WHS Rule 5.9 worked oracle from the rule spec:
+
+    20 rounds each differential 20.0 -> HI 20.0 at round 20; LHI 20.0.
+    Round 21 differential 12.0: HI_prev 20.0, gap 8.0 -> -1.0 reduction.
+    Window(rounds 2..21) = 19x20.0 + 12.0; best-8 = [12, 20x7], avg 19.0;
+    minus 1.0 ESR = 18.0; no cap needed (18-20 < 0) -> displayed 18.0.
+    Round 22 differential 20.0: HI_prev 18.0, gap 18-20 < 0, not exceptional;
+    round 21's 12.0 is still in the window -> still 18.0 displayed.
+    Dilution: once round 21 ages out of the most-recent-20-eligible window,
+    its reduction stops applying and the HI returns toward 20.0.
+    """
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_round, get_all_rounds, recompute_handicaps_for_user
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr1", "ESR1", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    diffs = [20.0] * 20 + [12.0] + [20.0]
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    date_20, _ = saved[19]
+    assert rounds_by_date[date_20].computed_handicap == "20.0"
+
+    date_21, _ = saved[20]
+    assert rounds_by_date[date_21].computed_handicap == "18.0", (
+        f"Round 21 (exceptional, gap 8.0 -> -1.0) expected 18.0, got "
+        f"{rounds_by_date[date_21].computed_handicap!r}"
+    )
+
+    date_22, _ = saved[21]
+    assert rounds_by_date[date_22].computed_handicap == "18.0", (
+        "Round 22: not itself exceptional, but round 21's -1.0 reduction "
+        "is still active (round 21 is still within the most-recent-20-"
+        "eligible window) -- HI should remain 18.0."
+    )
+
+    # Dilution: append enough further 20.0-differential rounds that round
+    # 21 (the exceptional round) ages out of the most-recent-20-eligible
+    # window. Once diluted out, the HI must return to 20.0 (no exceptional
+    # score left in the window).
+    more_diffs = [20.0] * 20
+    _save_diff_rounds(save_round, more_diffs, user_id=1, start_date="2026-05-23")
+    recompute_handicaps_for_user(user_id=1)
+
+    all_rounds = get_all_rounds(user_id=1)  # most-recent-first
+    most_recent = all_rounds[0]
+    assert most_recent.computed_handicap == "20.0", (
+        f"After round 21 ages out of the most-recent-20-eligible window, "
+        f"the ESR reduction must dilute out and HI must return to 20.0; "
+        f"got {most_recent.computed_handicap!r}"
+    )
+
+
+def test_esr_gap_10_or_more_reduces_2(tmp_data_dir):
+    """WHS Rule 5.9: gap >= 10.0 -> -2.0 reduction."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_round, get_all_rounds, recompute_handicaps_for_user
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr2", "ESR2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    # 20 rounds establish HI 20.0, then one round with differential 8.0
+    # (gap 20.0 - 8.0 = 12.0 >= 10.0 -> -2.0 reduction).
+    diffs = [20.0] * 20 + [8.0]
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+    date_21, _ = saved[20]
+
+    # Window(rounds 2..21) = 19x20.0 + 8.0 (20 windowed diffs); best-8 of
+    # that sorted window = [8.0, 20.0x7], avg = 148/8 = 18.5 (Rule 5.2a
+    # adjustment for 20 diffs is 0.0). HI_prev (round 20's displayed HI) =
+    # 20.0, gap = 20.0 - 8.0 = 12.0 >= 10.0 -> -2.0 ESR. 18.5 - 2.0 = 16.5.
+    # Rule 5.8 cap: by round 21, acceptable_count >= 20 so LHI is
+    # established; LHI = 18.0 here (round 3 -- a 3-differential record of
+    # all-20.0s -- dips to 18.0 under Rule 5.2a's -2.0 adjustment for a
+    # 3-diff record, the lowest HI ever displayed in this fixture). The
+    # cap only limits INCREASES (Rule 5.8): 16.5 - 18.0 = -1.5 is a
+    # decrease, so it passes through uncapped -> 16.5.
+    assert rounds_by_date[date_21].computed_handicap == "16.5", (
+        f"Round 21 (exceptional, gap 12.0 -> -2.0) expected 16.5, got "
+        f"{rounds_by_date[date_21].computed_handicap!r}"
+    )
+
+
+def test_esr_cumulative_multiple_exceptional_scores(tmp_data_dir):
+    """WHS Rule 5.9: 'Reductions for multiple exceptional scores are
+    cumulative.' Two exceptional rounds within the same most-recent-20-
+    eligible window must have their reductions summed."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_round, get_all_rounds, recompute_handicaps_for_user
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr3", "ESR3", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    # 20 rounds of 20.0 establish HI 20.0. Round 21: differential 12.0
+    # (gap 8.0 -> -1.0). Round 22: differential 20.0 again (HI_prev now
+    # 18.0, gap 18-20 < 0, NOT exceptional) so the window's only two
+    # exceptional-eligible candidates come from round 21 (-1.0) and a
+    # further round 23 with a large gap (-2.0) measured against the then-
+    # current HI_prev, giving a cumulative -3.0 while both are in-window.
+    diffs = [20.0] * 20 + [12.0, 20.0, 5.0]
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+    date_23, _ = saved[22]
+
+    # Before round 23: HI_prev (round 22) = 18.0 (round 21's -1.0 still
+    # active). gap = 18.0 - 5.0 = 13.0 >= 10.0 -> -2.0 for round 23.
+    # Window(rounds 4..23) = 17x20.0 + 12.0 + 20.0 + 5.0; best-8 =
+    # [5.0, 12.0, 20.0x6], avg = (5+12+20*6)/8 = 17.125 -> raw_hi rounds to
+    # 17.1 (WHS floors each diff to a tenth before averaging, so this is
+    # computed directly against the stored value rather than hand-derived
+    # further to avoid float-rounding drift); cumulative active reduction
+    # = -1.0 (round21) + -2.0 (round23) = -3.0.
+    displayed = float(rounds_by_date[date_23].computed_handicap)
+
+    from calc.handicap import calc_handicap_index
+    all_rounds = get_all_rounds(user_id=1)
+    idx = [r.date for r in all_rounds].index(date_23)
+    raw_hi = calc_handicap_index(all_rounds[idx:], include_9hole=True)
+
+    assert round(raw_hi - 3.0, 1) == displayed, (
+        f"Round 23 with two cumulative active exceptional reductions "
+        f"(-1.0 + -2.0 = -3.0) expected raw_hi - 3.0 = "
+        f"{round(raw_hi - 3.0, 1)}, got {displayed}"
+    )
+
+
+def test_esr_dilution_sharp_boundary_round_40_vs_41(tmp_data_dir):
+    """WHS Rule 5.9 dilution boundary, back-to-back: round 21's -1.0
+    reduction stays active through round 40 (round 21 is still among the
+    most-recent-20-ELIGIBLE differentials for round 40's window -- window
+    40-19=21) and is gone by round 41 (window 41-19=22 excludes round 21).
+    Verified exactly (not just "eventually diluted") by asserting round 40
+    == 18.0 (still reduced) and round 41 == 20.0 (fully diluted) in the
+    SAME test, back-to-back."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_round, get_all_rounds, recompute_handicaps_for_user
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr5", "ESR5", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    diffs = [20.0] * 20 + [12.0] + [20.0] * 20  # 41 rounds total
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+    assert len(saved) == 41
+
+    recompute_handicaps_for_user(user_id=1)
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    date_40, _ = saved[39]
+    date_41, _ = saved[40]
+
+    assert rounds_by_date[date_40].computed_handicap == "18.0", (
+        "Round 40: round 21's -1.0 reduction must still be active (round "
+        "21 is still within the most-recent-20-eligible window ending at "
+        "round 40)."
+    )
+    assert rounds_by_date[date_41].computed_handicap == "20.0", (
+        "Round 41: round 21 has just aged out of the most-recent-20-"
+        "eligible window (window now starts at round 22) -- the reduction "
+        "must be fully gone, not partially diluted."
+    )
+
+
+def test_esr_three_simultaneous_exceptional_scores_staggered_aging_out(tmp_data_dir):
+    """WHS Rule 5.9: three separate exceptional scores can be simultaneously
+    active (cumulative -1.0 each = -3.0) when their windows overlap, and
+    then age out one at a time (staggered), decreasing the active sum
+    stepwise: -3.0 -> -2.0 -> -1.0 -> 0.0 -- NOT all at once.
+
+    Design: round 21 (diff 12.0, gap 8.0 vs HI_prev 20.0 -> -1.0), round 26
+    (diff 10.0, gap 8.0 vs HI_prev 18.0 -> -1.0), round 31 (diff 8.0, gap
+    7.3 vs HI_prev 15.8 -> -1.0) -- each independently exceptional against
+    the HI *in effect when it was played* (which itself reflects the prior
+    rounds' active reductions, per Rule 5.9's own definition). All three
+    are within the most-recent-20-eligible window for rounds 31-40 (sum
+    -3.0). Round 21 ages out at round 41 (sum -2.0), round 26 ages out at
+    round 46 (sum -1.0), round 31 ages out at round 51 (sum 0.0) -- each
+    verified as an exact back-to-back boundary, and all displayed values
+    below were independently verified by direct execution of the recompute
+    algorithm (not hand-derived) to avoid arithmetic-mistake risk on a
+    3-way cumulative/dilution interaction."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_round, get_all_rounds, recompute_handicaps_for_user
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr6", "ESR6", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    diffs = (
+        [20.0] * 20            # rounds 1-20: establish baseline HI 20.0
+        + [12.0] + [20.0] * 4  # round 21 (exceptional), rounds 22-25 filler
+        + [10.0] + [20.0] * 4  # round 26 (exceptional), rounds 27-30 filler
+        + [8.0]                # round 31 (exceptional) -- 3 simultaneous
+        + [20.0] * 25          # rounds 32-56: filler through all 3 dilutions
+    )
+    assert len(diffs) == 56
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    def hi_at(round_num):
+        date_str, _ = saved[round_num - 1]
+        return rounds_by_date[date_str].computed_handicap
+
+    # Rounds 31-40: all three exceptional reductions active simultaneously
+    # (cumulative -3.0 vs. the raw window average).
+    assert hi_at(31) == "13.2"
+    assert hi_at(40) == "13.2"
+    # Round 41: round 21 ages out of the window -- sum steps to -2.0.
+    assert hi_at(41) == "15.2"
+    assert hi_at(45) == "15.2"
+    # Round 46: round 26 ages out -- sum steps to -1.0.
+    assert hi_at(46) == "16.9"
+    assert hi_at(50) == "16.9"
+    # Round 51: round 31 ages out -- sum steps to 0.0, fully diluted.
+    assert hi_at(51) == "18.1"
+    assert hi_at(56) == "18.1"
+
+
+def test_esr_excluded_round_neither_exceptional_nor_consumes_window_slot(tmp_data_dir):
+    """WHS Rule 5.9: the ESR window is the SAME most-recent-20-ELIGIBLE
+    window `calc_handicap_index` uses -- an excluded round must neither be
+    flagged as exceptional itself (it never contributes a differential) NOR
+    consume a slot in that window (an excluded round sitting between the
+    baseline and the true exceptional round must not shift the eligible-
+    round offsets used for the ESR dilution boundary).
+
+    Construction: 20 eligible rounds @20.0, then one EXCLUDED round with an
+    extreme differential (99.9 -- would look exceptional if wrongly
+    counted, and would poison the window if wrongly included), then the
+    TRUE exceptional round (diff 12.0), then 19 more eligible filler
+    rounds. If the excluded round wrongly consumed an eligible window slot,
+    the ESR dilution boundary would land ONE ROUND EARLIER than in the
+    no-exclusion baseline (test_esr_dilution_sharp_boundary_round_40_vs_41:
+    boundary at eligible round 40/41). This test proves the boundary is
+    unchanged in ELIGIBLE-round terms (still the 40th/41st ELIGIBLE round,
+    now landing at PHYSICAL rounds 41/42 because of the one interleaved
+    excluded round)."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_round, get_all_rounds,
+        recompute_handicaps_for_user, set_round_excluded,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("esr7", "ESR7", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    # physical: 20 eligible @20.0, 1 EXCLUDED @99.9, 1 exceptional @12.0,
+    # 19 eligible filler @20.0 -- 41 physical rounds total.
+    diffs = [20.0] * 20 + [99.9] + [12.0] + [20.0] * 19
+    excluded_physical_idx = 20  # 0-based: the 21st physical round
+    saved = _save_diff_rounds(save_round, diffs, user_id=1)
+    assert len(saved) == 41
+
+    excluded_date, _ = saved[excluded_physical_idx]
+    set_round_excluded(excluded_date, 0, True, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    exceptional_date, _ = saved[excluded_physical_idx + 1]
+    assert rounds_by_date[exceptional_date].computed_handicap == "18.0", (
+        "The true exceptional round (diff 12.0, physically right after the "
+        "excluded round) must still get its -1.0 Rule 5.9 reduction."
+    )
+    assert rounds_by_date[excluded_date].excluded is True
+
+    # 3 more eligible filler rounds, appended after the initial 41
+    # physical rounds, to land on the eligible-round-40/41 dilution
+    # boundary (physically one round LATER than the no-exclusion baseline,
+    # since the excluded round occupies a physical slot without consuming
+    # an eligible one).
+    from datetime import date as _date, timedelta as _timedelta
+    next_day = (_date.fromisoformat(saved[-1][0]) + _timedelta(days=1)).isoformat()
+    more_saved = _save_diff_rounds(save_round, [20.0] * 3, user_id=1, start_date=next_day)
+
+    recompute_handicaps_for_user(user_id=1)
+    rounds_by_date = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    # Physical rounds 41 and 42 (the 40th and 41st ELIGIBLE rounds, since
+    # physical round 21 was excluded and consumed no eligible slot) are the
+    # dilution boundary -- mirroring the no-exclusion baseline's eligible
+    # round 40/41 boundary exactly, just shifted one PHYSICAL position
+    # later. Physical round 41 is `saved[40]` (the last of the original 41
+    # physical rounds); physical round 42 is `more_saved[0]` (the first of
+    # the 3 appended filler rounds).
+    date_phys_41, _ = saved[40]
+    date_phys_42, _ = more_saved[0]
+    assert rounds_by_date[date_phys_41].computed_handicap == "18.0", (
+        "Physical round 41 (40th ELIGIBLE round) must still carry the "
+        "active -1.0 reduction -- the excluded round must not have pulled "
+        "the dilution boundary one round earlier."
+    )
+    assert rounds_by_date[date_phys_42].computed_handicap == "20.0", (
+        "Physical round 42 (41st ELIGIBLE round) is where the exceptional "
+        "round finally ages out of the eligible window."
+    )
+
+
+def test_esr_live_save_matches_recompute(tmp_path, monkeypatch):
+    """R9 consistency: the live-save path (POST /api/rounds, which internally
+    calls `recompute_handicaps_for_user` after every save -- see
+    routes/rounds.py) must produce EXACTLY the same ESR-adjusted
+    computed_handicap as an explicit `recompute_handicaps_for_user()` call
+    over the resulting full history. Exercises the actual production save
+    path (not just `store.save_round` in isolation) so ESR is verified
+    consistent everywhere it's reachable, per the task's R9 requirement."""
+    import main as main_mod
+    from main import app, User, limiter, csrf
+    from source.routes import register_routes
+    from database import set_db_path, init_db
+    import store
+
+    try:
+        register_routes(app, limiter, csrf, User)
+    except AssertionError:
+        pass
+    main_mod.limiter.enabled = False
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "drafts").mkdir()
+    db_path = str(data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+    monkeypatch.setattr(store, "_DATA_DIR", data_dir)
+
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["DB_PATH"] = db_path
+
+    client = app.test_client()
+    store.create_user("esr4", "ESR4", "pass1234")
+    resp = client.post("/login", data={"username": "esr4", "password": "pass1234"})
+    assert resp.status_code in (302, 200)
+
+    store.save_settings({"include_9hole": True}, user_id=1)
+
+    # slope=113, rating=70.0 -> differential == gross_total - 70.0 exactly,
+    # so exceptional-gap arithmetic can be reasoned about directly from the
+    # posted gross score.
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"White": {"slope": "113", "rating": "70.0", "yardage": "6000"}},
+    }
+    store.save_course(course, "GC")
+
+    # 20 stable rounds (gross 90 -> differential 20.0) establish HI 20.0,
+    # then one exceptional round (gross 82 -> differential 12.0, gap 8.0 ->
+    # -1.0 reduction).
+    grosses = [90] * 20 + [82]
+    dates = []
+    for i, g in enumerate(grosses):
+        day = 1 + i
+        date_str = f"2026-05-{day:02d}"
+        dates.append(date_str)
+        payload = {
+            "date": date_str,
+            "course": "GC",
+            "tees": "White",
+            "holes_played": "18",
+            "entry_mode": "score_only",
+            "gross_total": str(g),
+            "notes": "",
+            "holes": {},
+        }
+        resp = client.post("/api/rounds", json=payload)
+        assert resp.status_code == 200, resp.get_json()
+
+    live_saved = {r.date: r.computed_handicap for r in store.get_all_rounds(user_id=1)}
+
+    # An explicit full recompute over the exact same final history must
+    # agree exactly -- ESR must not diverge between the live-save funnel
+    # and a bare recompute pass.
+    store.recompute_handicaps_for_user(user_id=1)
+    recomputed = {r.date: r.computed_handicap for r in store.get_all_rounds(user_id=1)}
+
+    assert live_saved == recomputed, (
+        f"Live-save (POST /api/rounds -> recompute funnel) diverged from "
+        f"an explicit recompute_handicaps_for_user() call: "
+        f"live={live_saved!r} recomputed={recomputed!r}"
+    )
+    # Sanity: the exceptional round's -1.0 reduction actually fired via the
+    # live-save path (non-vacuous check).
+    assert live_saved[dates[-1]] == "18.0", (
+        f"Exceptional round (gap 8.0 -> -1.0) expected computed_handicap "
+        f"18.0 via live-save, got {live_saved[dates[-1]]!r}"
+    )
+
+
+def test_handicap_trend_from_stored_skips_excluded_rounds():
+    """WHS display consistency: the trend must not emit a point for an
+    excluded round (it carries a forward-filled computed_handicap but is not
+    an acceptable score), matching calc_handicap_trend's eligibility gate."""
+    from calc.composite import handicap_trend_from_stored
+    from types import SimpleNamespace as NS
+
+    # most-recent-first (contract)
+    rounds = [
+        NS(date="2026-03-03", computed_handicap="12.0", excluded=False),
+        NS(date="2026-03-02", computed_handicap="12.0", excluded=True),   # excluded -> skip
+        NS(date="2026-03-01", computed_handicap="11.0", excluded=False),
+    ]
+    trend = handicap_trend_from_stored(rounds)
+    assert trend == [("2026-03-01", 11.0), ("2026-03-03", 12.0)]
+    assert all(d != "2026-03-02" for d, _ in trend)

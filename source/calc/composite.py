@@ -50,6 +50,47 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
     return calc_handicap_index(rounds, include_9hole), calc_handicap_index(rounds[1:], include_9hole)
 
 
+def handicap_trend_from_stored(all_rounds) -> list:
+    """WHS Rule 5.7/5.8/5.9: the Handicap Index TREND line must plot the
+    DISPLAYED Handicap Index actually held over time -- the stored,
+    already-Rule-5.8-capped and Rule-5.9-ESR-adjusted `computed_handicap`
+    written per round by `recompute_handicaps_for_user` -- NOT a fresh raw
+    recalculation. `calc_handicap_trend` (calc/handicap.py) is an
+    independent rolling-window accumulator over raw differentials; it
+    applies NEITHER the Rule 5.8 cap NOR Rule 5.9's Exceptional Score
+    Reduction, so once either is active it diverges from the per-round HI
+    shown everywhere else (round detail, dashboard hero, rankings, season
+    summary -- all of which source `computed_handicap`/
+    `current_and_previous_handicap_index` for exactly this reason). This
+    is the non-duplicative fix: read the already-correct stored value
+    instead of re-deriving cap/ESR/LHI logic a second time in a rolling
+    accumulator.
+
+    `all_rounds` must be most-recent-first (the standard ordering
+    contract). Returns (date, hi) pairs walked chronologically (oldest ->
+    newest), skipping rounds that don't yet have an established
+    `computed_handicap` (empty, or the "0" exclusion sentinel) -- mirroring
+    `calc_handicap_trend`'s own behavior of not emitting a point until WHS
+    Rule 5.2's minimum acceptable-score threshold is met.
+    """
+    chronological = list(reversed(all_rounds))
+    result = []
+    for r in chronological:
+        # Excluded rounds carry a carried-forward `computed_handicap` but must
+        # not emit a (duplicate) trend point -- matches calc_handicap_trend,
+        # which gates on _is_eligible_diff_round (excluded -> skipped).
+        if r.excluded:
+            continue
+        ch = r.computed_handicap
+        if not ch or ch == "0":
+            continue
+        try:
+            result.append((r.date, float(ch)))
+        except (ValueError, TypeError):
+            continue
+    return result
+
+
 @dataclass
 class StatPanel:
     key: str

@@ -354,7 +354,13 @@ WHS_LHI_WINDOW_DAYS = 365
 
 
 def recompute_handicaps_for_user(user_id: int) -> int:
-    from calc.handicap import calc_handicap_index, apply_handicap_cap, _is_eligible_diff_round
+    from calc.handicap import (
+        calc_handicap_index,
+        apply_handicap_cap,
+        _is_eligible_diff_round,
+        exceptional_reduction,
+        WHS_HANDICAP_WINDOW,
+    )
 
     courses_data = get_courses()
     settings = load_settings(user_id)
@@ -380,6 +386,22 @@ def recompute_handicaps_for_user(user_id: int) -> int:
     # determined from the record PRIOR to that score."
     prior_displayed: list[tuple[str, float]] = []
     acceptable_count = 0
+
+    # WHS Rule 5.9 (Exceptional Score Reduction): `exceptional_reductions`
+    # holds the per-round reduction (0.0 / -1.0 / -2.0) for every ELIGIBLE
+    # round processed so far, oldest -> newest, appended ONLY for eligible
+    # rounds -- i.e. this list is parallel to the same "most recent 20
+    # eligible differentials" window that calc_handicap_index itself walks,
+    # not to raw round count. That means `exceptional_reductions[-window:]`
+    # always mirrors exactly the eligible differentials currently inside a
+    # given round's Handicap Index window, so a reduction naturally dilutes
+    # out once its exceptional round ages past the most-recent-20-eligible
+    # boundary. The reduction is recomputed deterministically each pass
+    # (not persisted to a column) since it's a pure function of the HI in
+    # effect when the round was played (the prior DISPLAYED HI, already
+    # tracked via `prior_displayed`) and that round's own differential --
+    # both already available sequentially at this point in the loop.
+    exceptional_reductions: list[float] = []
 
     for i, r in enumerate(chronological):
         if (not r.differential or r.differential == "0") and not r.differential_locked:
@@ -414,6 +436,32 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         history_most_recent_first = all_rounds[idx:]
         raw_hi = calc_handicap_index(history_most_recent_first, include_9hole)
 
+        # WHS Rule 5.9 (Exceptional Score Reduction): the HI "in effect when
+        # the round was played" is the most recent prior DISPLAYED HI
+        # (`prior_displayed[-1]`, i.e. the post-ESR, post-Rule-5.8-cap value
+        # -- `prior_displayed` has not yet had this round appended to it).
+        # If no HI has been established yet, the round cannot be
+        # exceptional. Only ELIGIBLE rounds consume a slot in the tracked
+        # window (mirrors calc_handicap_index's own windowing -- excluded/
+        # ineligible rounds never contribute a differential, so they must
+        # not contribute a reduction slot either).
+        hi_in_effect = prior_displayed[-1][1] if prior_displayed else None
+        if _is_eligible_diff_round(r, include_9hole):
+            exceptional_reductions.append(
+                exceptional_reduction(hi_in_effect, float(r.differential))
+            )
+
+        # Sum of active reductions = every exceptional round's reduction
+        # still within the most-recent-20-ELIGIBLE window ending at (and
+        # including) this round -- exactly the same window
+        # calc_handicap_index used to compute `raw_hi` above. Reductions are
+        # already negative/zero, so ADDING the sum lowers the HI (this is
+        # the mathematically-equivalent shortcut to applying the reduction
+        # to each of the 20 windowed differentials individually and
+        # re-averaging, since the reduction is uniform across the window).
+        active_reduction_sum = sum(exceptional_reductions[-WHS_HANDICAP_WINDOW:])
+        hi_after_esr = round(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
+
         # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
         # this round already has >= 20 acceptable scores; the cap then
         # applies to this round's freshly-calculated (raw) HI using the
@@ -430,7 +478,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
             if candidates:
                 low_hi = min(candidates)
 
-        hi = apply_handicap_cap(raw_hi, low_hi) if raw_hi is not None else None
+        hi = apply_handicap_cap(hi_after_esr, low_hi) if hi_after_esr is not None else None
 
         if hi is not None:
             new_val = str(hi)

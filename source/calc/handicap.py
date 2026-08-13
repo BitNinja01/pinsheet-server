@@ -190,6 +190,49 @@ def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
     return round(capped, 1)
 
 
+def exceptional_reduction(hi_in_effect: float | None, differential: float) -> float:
+    """WHS Rule 5.9 (Exceptional Score Reduction): when a posted Score
+    Differential is markedly LOWER than the Handicap Index in effect when
+    the round was played, the Handicap Index is reduced:
+
+      gap = hi_in_effect - differential
+      -  7.0 <= gap < 10.0  -> -1.0
+      - 10.0 <= gap         -> -2.0
+      - otherwise (gap < 7.0, including a negative gap)  ->  0.0
+
+    `hi_in_effect` is the DISPLAYED Handicap Index the player held
+    immediately before this round was played (i.e. the prior round's
+    post-ESR, post-Rule-5.8-cap value) -- not this round's own freshly
+    calculated index. If no Handicap Index has been established yet
+    (`hi_in_effect is None`), the round cannot be exceptional and this
+    returns 0.0 (there is nothing to compare the score against).
+
+    The returned value is the (negative or zero) adjustment itself, ready
+    to be summed with other active reductions and added to a raw Handicap
+    Index (see `store.recompute_handicaps_for_user`'s WHS Rule 5.9 wiring
+    for how the per-round reductions accumulate over the most-recent-20
+    eligible window).
+    """
+    if hi_in_effect is None:
+        return 0.0
+    # Both `hi_in_effect` and `differential` are values rounded to a tenth
+    # (WHS convention -- computed_handicap and Score Differential are both
+    # display/stored to 1 decimal place), but subtracting two floats each
+    # already rounded to a tenth can still land a hair off an exact tenth
+    # (e.g. 20.0 - 13.0 == 6.999999999999998 in IEEE 754 binary floating
+    # point for some tenth pairs) due to binary floating-point
+    # representation error -- NOT because either input was imprecise. Round
+    # the gap itself back to a tenth before the threshold comparisons so a
+    # true gap of exactly 7.0/10.0 is never misclassified one bucket low by
+    # a sub-cent epsilon.
+    gap = round(hi_in_effect - differential, 1)
+    if gap >= 10.0:
+        return -2.0
+    if gap >= 7.0:
+        return -1.0
+    return 0.0
+
+
 def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False) -> list:
     """Rolling WHS Rule 5.2 Handicap Index as of each round, chronologically.
 

@@ -110,6 +110,8 @@ from calc.composite import (
     StatBundle,
     last_n_rounds,
     best_n_rounds,
+    current_and_previous_handicap_index,
+    handicap_trend_from_stored,
 )
 from calc.rankings import (
     compute_rankings,
