@@ -93,6 +93,9 @@ def _build_app():
             "plugin_info": {p.plugin_info["name"]: p.plugin_info for p in _plugins if hasattr(p, "plugin_info")},
         }
 
+    # mirror production jinja globals (main.py registers _fmt for stats templates)
+    app.jinja_env.globals["_fmt"] = main_mod._fmt
+
     register_routes(app, limiter, csrf, _TestUser)
     return app
 
@@ -333,6 +336,55 @@ def test_stats_penalties_computes_expected_values(auth_client, capture_render):
     # 2 of the 3 rounds (r1, r2) recorded zero penalties on every hole
     assert ctx["pen_free_pct"] == pytest.approx(66.6666, rel=1e-4)
     assert ctx["total_ob_rd"] == 0.0
+
+    # hole breakdown is data-driven: 54 holes, only r3's 18 carry penalties, no OB
+    hb = ctx["hole_breakdown"]
+    assert hb["total_holes"] == 54
+    assert hb["clean_pct"] == pytest.approx(66.6666, rel=1e-4)
+    assert hb["penalty_pct"] == pytest.approx(33.3333, rel=1e-4)
+    assert hb["ob_pct"] == pytest.approx(0.0)
+    assert hb["clean_pct"] + hb["penalty_pct"] + hb["ob_pct"] == pytest.approx(100.0)
+
+    # penalty_cost = penalty_vs_par - clean_vs_par (extra strokes a penalty hole costs)
+    assert ctx["penalty_cost"] == pytest.approx(ctx["penalty_vs_par"] - ctx["clean_vs_par"])
+
+
+def test_stats_penalties_pen_free_excludes_score_only_rounds(auth_client, capture_render):
+    """Score-only rounds (no hole data) must not deflate Pen-Free % — they
+    can't be classified pen-free, so they belong in neither numerator nor
+    denominator (regression: denominator previously used len(b8))."""
+    _seed_course()
+    # two detailed, genuinely penalty-free rounds
+    _save("2026-03-01", 0, _uniform_holes(delta=0, penalties=0), "8.0", "9.0")
+    _save("2026-03-08", 0, _uniform_holes(delta=1, penalties=0), "10.0", "11.0")
+    # one score-only round: no per-hole data
+    save_round({
+        "course": COURSE_NAME, "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {},
+        "total_gross": "82", "differential": "9.0",
+        "notes": "", "excluded": False, "computed_handicap": "10.0",
+        "differential_locked": False,
+    }, "2026-03-15", 0, user_id=1)
+
+    resp = auth_client.get("/stats/penalties")
+    assert resp.status_code == 200
+    ctx = capture_render["ctx"]
+    # 2 of 2 *scored* rounds are pen-free -> 100%, not 66.7% (would be 2/3)
+    assert ctx["pen_free_pct"] == pytest.approx(100.0)
+
+
+def test_stats_penalties_template_renders(auth_client):
+    """Full Jinja render (no capture_render stub): the redesigned page compiles
+    and shows the new unique sections rather than the removed duplicate panels."""
+    _seed_three_rounds()
+    resp = auth_client.get("/stats/penalties")
+    assert resp.status_code == 200
+    body = resp.data
+    assert b"Worst Penalty Holes" in body
+    assert b"Approach (GIR) OB / Round" in body
+    # removed redundant panels
+    assert b"Penalty Impact" not in body
+    assert b"Clean vs Dirty" not in body
 
 
 # ---------------------------------------------------------------------------
