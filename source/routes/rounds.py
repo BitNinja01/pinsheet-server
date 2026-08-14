@@ -9,7 +9,7 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_slope_rating, save_round, update_round, delete_round,
-    get_matches_for_user, link_round,
+    get_matches_for_user, link_round, get_match,
     recompute_all_handicaps,
     recompute_handicaps_for_user,
     set_round_excluded,
@@ -25,6 +25,7 @@ from calc import (
     calc_scoring_average,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
+    calc_playing_handicap,
     calc_hole_scores,
     WHS_HANDICAP_WINDOW,
     current_and_previous_handicap_index,
@@ -356,7 +357,14 @@ def register_rounds_routes(app, csrf):
                 else:
                     played_par = int(course.get("par", 0))
                 ch = calc_course_handicap(adj_hi, played_par, slope, rating)
-                net = total_gross - ch
+                # WHS Rule 6.2 / Appendix C: reduce to a Playing Handicap
+                # using the match's allowance percent (default 100 -- same
+                # as the pre-Rule-6.2 full-Course-Handicap net) before
+                # subtracting from gross.
+                match = get_match(match_id)
+                allowance = match.get("allowance_percent", 100) if match else 100
+                ph = calc_playing_handicap(ch, allowance)
+                net = total_gross - ph
                 link_round(match_id, current_user.id, round_id, float(net))
             except (ValueError, TypeError, Exception) as exc:
                 _log.warning("match linking failed — %s", exc)

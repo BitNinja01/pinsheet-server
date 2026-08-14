@@ -2,6 +2,8 @@ import math
 from calc.handicap import (
     calc_hole_scores,
     calc_course_handicap,
+    calc_playing_handicap,
+    WHS_HANDICAP_ALLOWANCES,
     calc_round_dif,
     calc_expected_9hole_dif,
     count_table_n,
@@ -82,6 +84,65 @@ def test_calc_course_handicap_harder_course():
     # Oracle is a hand-computed literal, NOT round() (which is banker's and
     # would silently validate the wrong rounding on a future tie fixture).
     assert result == 14
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 6.2 / Appendix C -- calc_playing_handicap
+# --------------------------------------------------------------------------
+
+def test_calc_playing_handicap_default_allowance_is_unchanged():
+    """Default allowance (100%) leaves the Course Handicap unchanged --
+    non-breaking behavior for existing (pre-Rule-6.2) callers."""
+    assert calc_playing_handicap(20) == 20
+    assert calc_playing_handicap(20, 100) == 20
+
+
+def test_calc_playing_handicap_individual_stroke_95_percent():
+    # 20 * 0.95 = 19.0 -> 19 (exact, no rounding tie).
+    assert calc_playing_handicap(20, 95) == 19
+
+
+def test_calc_playing_handicap_fourball_stroke_85_percent():
+    # 20 * 0.85 = 17.0 -> 17 (exact, no rounding tie).
+    assert calc_playing_handicap(20, 85) == 17
+
+
+def test_calc_playing_handicap_half_up_tie_rounds_up():
+    # WHS Rule 6.2: ".5 rounded upwards" -- 10 * 0.95 = 9.5 -> 10 (half-up).
+    assert calc_playing_handicap(10, 95) == 10
+
+
+def test_calc_playing_handicap_half_up_tie_rounds_up_second_case():
+    # 30 * 0.85 = 25.5 -> 26 (half-up).
+    assert calc_playing_handicap(30, 85) == 26
+
+
+def test_calc_playing_handicap_half_up_tie_disagrees_with_banker_rounding():
+    # 10 * 0.85 = 8.5. Python's banker's-rounding round(8.5) == 8 (rounds to
+    # the nearest EVEN integer), which would be WRONG under WHS Rule 6.2's
+    # "rounded upwards" tie-breaking -- calc_playing_handicap must give 9.
+    assert round(8.5) == 8  # documents the banker's-rounding pitfall being avoided
+    assert calc_playing_handicap(10, 85) == 9
+
+
+def test_calc_playing_handicap_negative_course_handicap_away_from_zero():
+    """A plus (negative) Course Handicap must round consistent with
+    round_half_up's documented away-from-zero tie-breaking (see
+    round_half_up's NEGATIVE-TIE DECISION docstring) -- Rule 6.2 doesn't
+    special-case sign, and calc_playing_handicap delegates straight to
+    round_half_up, so a plus handicap's Playing Handicap must follow the
+    same convention. -10 * 0.85 = -8.5 -> -9 (away from zero), not -8."""
+    assert calc_playing_handicap(-10, 85) == -9
+
+
+def test_whs_handicap_allowances_appendix_c_reference_values():
+    """Appendix C recommended allowances by format -- reference constant
+    only; not auto-applied, callers pass an explicit allowance_percent."""
+    assert WHS_HANDICAP_ALLOWANCES["individual_match"] == 100
+    assert WHS_HANDICAP_ALLOWANCES["individual_stroke"] == 95
+    assert WHS_HANDICAP_ALLOWANCES["fourball_stroke"] == 85
+    assert WHS_HANDICAP_ALLOWANCES["fourball_match"] == 90
+    assert WHS_HANDICAP_ALLOWANCES["stableford_individual"] == 95
 
 
 def test_calc_round_dif_scratch():

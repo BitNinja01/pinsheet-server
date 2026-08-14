@@ -62,6 +62,32 @@ def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> i
     return int(round_half_up(handicap * (course_slope / 113) + (course_rating - course_par), 0))
 
 
+# WHS Appendix C: recommended Handicap Allowances by play format. These are
+# the *recommended* percentages a committee may apply to the Course Handicap
+# to derive the Playing Handicap for a given format -- they are reference
+# defaults, not mandated values (a committee/club may choose otherwise), so
+# callers pass an explicit `allowance_percent` to `calc_playing_handicap`
+# rather than this dict being consulted automatically.
+WHS_HANDICAP_ALLOWANCES = {
+    "individual_match": 100,
+    "individual_stroke": 95,
+    "fourball_match": 90,
+    "fourball_stroke": 85,
+    "stableford_individual": 95,
+}
+
+
+def calc_playing_handicap(course_handicap: int, allowance_percent: float = 100) -> int:
+    # WHS Rule 6.2: Playing Handicap = Course Handicap x Handicap Allowance,
+    # rounded to the nearest whole number with .5 rounded UP (same
+    # round_half_up convention as Rule 6.1a's Course Handicap rounding --
+    # NOT Python's banker's-rounding round()). Appendix C recommends
+    # allowance percentages by format (see WHS_HANDICAP_ALLOWANCES); the
+    # default of 100 leaves the Course Handicap unchanged, matching prior
+    # (pre-Rule-6.2) behavior for callers that don't specify an allowance.
+    return int(round_half_up(course_handicap * allowance_percent / 100.0, 0))
+
+
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
     # WHS Rule 5.1a: "...rounded to the nearest tenth, with .5 rounded
     # upwards" -- use round_half_up, not banker's-rounding round().

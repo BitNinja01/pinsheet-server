@@ -7,7 +7,77 @@ from store import (
     get_slope_rating, link_round,
 )
 from source.request_data import base_context, get_courses
-from calc import per_round_hole_stats, calc_course_handicap
+from calc import per_round_hole_stats, calc_course_handicap, calc_playing_handicap
+from calc import WHS_HANDICAP_ALLOWANCES
+
+# WHS Appendix C: human-readable labels for the WHS_HANDICAP_ALLOWANCES keys,
+# in display order for the match-format selector on /matches/new. The
+# dict/select order intentionally mirrors WHS_HANDICAP_ALLOWANCES's insertion
+# order so the constant stays the single source of truth for both the
+# percentage AND (via this label map) the option set -- adding a new format
+# to WHS_HANDICAP_ALLOWANCES only requires adding its label here too.
+MATCH_FORMAT_LABELS = {
+    "individual_match": "Individual match play (100%)",
+    "individual_stroke": "Individual stroke play (95%)",
+    "fourball_match": "Four-ball match (90%)",
+    "fourball_stroke": "Four-ball stroke play (85%)",
+    "stableford_individual": "Individual Stableford (95%)",
+}
+
+# Default format/allowance for /matches/new -- 100% (Individual match play),
+# which is the pre-Rule-6.2 behavior (Playing Handicap == Course Handicap).
+DEFAULT_MATCH_FORMAT = "individual_match"
+
+
+def _match_format_options():
+    """List of (key, label) tuples for the /matches/new format selector, in
+    WHS_HANDICAP_ALLOWANCES's insertion order. Only keys present in BOTH
+    WHS_HANDICAP_ALLOWANCES and MATCH_FORMAT_LABELS are offered, so a label
+    can never be shown for a format the allowance table doesn't recognize
+    (and vice versa)."""
+    return [
+        (key, MATCH_FORMAT_LABELS[key])
+        for key in WHS_HANDICAP_ALLOWANCES
+        if key in MATCH_FORMAT_LABELS
+    ]
+
+
+def _resolve_match_allowance(format_key: str) -> tuple[str, int]:
+    """Map a submitted match-format key to (normalized_key, allowance_percent)
+    via WHS_HANDICAP_ALLOWANCES (Appendix C). An unrecognized/missing format
+    key is untrusted user input (POST body) -- rather than trust a raw
+    percentage from the client, only the fixed, known Appendix C format keys
+    are ever accepted, and anything else silently falls back to
+    DEFAULT_MATCH_FORMAT (100%, non-breaking/current behavior). This means
+    allowance_percent is always one of WHS_HANDICAP_ALLOWANCES's values
+    (85/90/95/100) -- inherently within a sane 1..100 range."""
+    key = (format_key or "").strip()
+    if key not in WHS_HANDICAP_ALLOWANCES:
+        key = DEFAULT_MATCH_FORMAT
+    return key, WHS_HANDICAP_ALLOWANCES[key]
+
+
+def _format_label(match: dict) -> str:
+    """Human-readable Appendix C format label for a stored match, e.g.
+    'Four-ball stroke play (85%)'. Reads `match['format_key']` (the
+    display/source-of-truth for the label -- see create_match's docstring)
+    rather than reverse-mapping `allowance_percent`, since the percent alone
+    is ambiguous (95% is shared by individual_stroke and
+    stableford_individual). Falls back to the default label for a missing/
+    unrecognized format_key (e.g. a pre-migration match row, or a stray
+    value that predates a future format addition/removal)."""
+    key = match.get("format_key") or DEFAULT_MATCH_FORMAT
+    allowance = match.get("allowance_percent", 100)
+    # Cross-check the format label against the ACTUAL applied allowance. A
+    # legacy row created after the allowance feature but before format_key
+    # existed backfills to individual_match yet may carry allowance 85/90/95 --
+    # trusting format_key alone would mislabel it "Individual match play
+    # (100%)". If the key's canonical allowance disagrees with the stored one
+    # (net math always uses allowance_percent), show a percent-only label so
+    # the displayed % never contradicts the % actually applied to the net.
+    if key in WHS_HANDICAP_ALLOWANCES and WHS_HANDICAP_ALLOWANCES[key] != allowance:
+        return f"Custom allowance ({allowance}%)"
+    return MATCH_FORMAT_LABELS.get(key, MATCH_FORMAT_LABELS[DEFAULT_MATCH_FORMAT])
 
 
 def _build_round_details(match_rounds):
@@ -60,28 +130,34 @@ def register_matches_routes(app):
             course_name = request.form.get("course", "").strip()
             match_date = request.form.get("date", "").strip()
             participant_ids = request.form.getlist("participants")
+            format_key, allowance_percent = _resolve_match_allowance(request.form.get("format", ""))
             if not course_name:
                 return render_template("match_new.html", **base_context(
                     current_page="matches", courses=get_courses(),
                     users=get_users(), today=date.today().isoformat(),
+                    formats=_match_format_options(), selected_format=format_key,
                     error="Course is required.",
                 ))
             if not match_date:
                 return render_template("match_new.html", **base_context(
                     current_page="matches", courses=get_courses(),
                     users=get_users(), today=date.today().isoformat(),
+                    formats=_match_format_options(), selected_format=format_key,
                     error="Date is required.",
                 ))
             if len(participant_ids) < 2:
                 return render_template("match_new.html", **base_context(
                     current_page="matches", courses=get_courses(),
                     users=get_users(), today=date.today().isoformat(),
+                    formats=_match_format_options(), selected_format=format_key,
                     error="At least 2 participants are required.",
                 ))
             match_id = create_match(
                 created_by=current_user.id,
                 course_name=course_name,
                 date=match_date,
+                allowance_percent=allowance_percent,
+                format_key=format_key,
             )
             for uid_str in participant_ids:
                 add_match_player(match_id, int(uid_str))
@@ -89,6 +165,7 @@ def register_matches_routes(app):
         return render_template("match_new.html", **base_context(
             current_page="matches", courses=get_courses(),
             users=get_users(), today=date.today().isoformat(),
+            formats=_match_format_options(), selected_format=DEFAULT_MATCH_FORMAT,
         ))
 
     @app.route("/matches/<int:match_id>")
@@ -117,7 +194,7 @@ def register_matches_routes(app):
             current_page="matches", match=match, players=players,
             round_details=round_details, player_rounds=player_rounds,
             podium_players=podium_players, podium_top=podium_top,
-            is_participant=is_participant,
+            is_participant=is_participant, format_label=_format_label(match),
         ))
 
     @app.route("/matches/<int:match_id>/link-round", methods=["GET", "POST"])
@@ -138,24 +215,24 @@ def register_matches_routes(app):
             round_id = request.form.get("round_id")
             if not round_id:
                 return render_template("match_link_round.html", **base_context(
-                    current_page="matches", match=match,
+                    current_page="matches", match=match, format_label=_format_label(match),
                     unlinked=[], error="Please select a round.",
                 ))
             round_id = int(round_id)
             if round_id in linked_ids:
                 return render_template("match_link_round.html", **base_context(
-                    current_page="matches", match=match,
+                    current_page="matches", match=match, format_label=_format_label(match),
                     unlinked=[], error="This round is already linked.",
                 ))
             round_data = get_round_by_id(round_id)
             if not round_data or round_data.user_id != current_user.id:
                 return render_template("match_link_round.html", **base_context(
-                    current_page="matches", match=match,
+                    current_page="matches", match=match, format_label=_format_label(match),
                     unlinked=[], error="Round not found.",
                 ))
             if not round_data.computed_handicap:
                 return render_template("match_link_round.html", **base_context(
-                    current_page="matches", match=match,
+                    current_page="matches", match=match, format_label=_format_label(match),
                     unlinked=[], error="Cannot link a round without a handicap index.",
                 ))
 
@@ -167,7 +244,12 @@ def register_matches_routes(app):
             slope, rating = get_slope_rating(tee_data, round_data.holes_selection)
             played_par = _played_par_for_round(round_data, course_data)
             ch = calc_course_handicap(adj_hi, played_par, slope, rating)
-            net = gross - ch
+            # WHS Rule 6.2 / Appendix C: reduce the Course Handicap to a
+            # Playing Handicap using this match's allowance percent (default
+            # 100 -- unchanged from the pre-Rule-6.2 full-Course-Handicap net).
+            allowance = match.get("allowance_percent", 100)
+            ph = calc_playing_handicap(ch, allowance)
+            net = gross - ph
 
             link_round(match_id, current_user.id, round_id, float(net))
             return redirect(url_for("match_detail", match_id=match_id))
@@ -187,7 +269,11 @@ def register_matches_routes(app):
             hi = float(rd.computed_handicap)
             adj_hi = hi / 2 if rd.holes_selection != "all" else hi
             ch = calc_course_handicap(adj_hi, played_par, slope, rating)
-            net = gross - ch
+            # WHS Rule 6.2 / Appendix C: same allowance-adjusted Playing
+            # Handicap used at link time, so the preview net matches what
+            # will actually be stored on link.
+            ph = calc_playing_handicap(ch, match.get("allowance_percent", 100))
+            net = gross - ph
 
             unlinked.append({
                 "round_id": rd.id,
@@ -201,4 +287,5 @@ def register_matches_routes(app):
 
         return render_template("match_link_round.html", **base_context(
             current_page="matches", match=match, unlinked=unlinked,
+            format_label=_format_label(match),
         ))

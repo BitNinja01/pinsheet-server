@@ -241,6 +241,15 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
 
     Returns the number of rows updated (0 if the round no longer exists or is
     owned by another user), so callers can detect a lost-row race.
+
+    PRE-EXISTING CAVEAT (not fixed here): if this round is already linked to
+    a match (a match_rounds row references it), editing the round's gross
+    score / handicap here does NOT recompute or refresh that match_rounds
+    row's stored `net` -- `net` is a snapshot computed once at link_round()
+    time (see link_round / calc_playing_handicap call sites in
+    routes/matches.py and routes/rounds.py) and there is no re-link/refresh
+    path. A stale net can therefore persist after a round edit until the
+    round is unlinked and re-linked.
     """
     db = get_db()
     total_putts = None
@@ -833,11 +842,34 @@ def get_invite_codes() -> list:
     return result
 
 
-def create_match(created_by: int, course_name: str, date: str) -> int:
+def create_match(
+    created_by: int,
+    course_name: str,
+    date: str,
+    allowance_percent: int = 100,
+    format_key: str = "individual_match",
+) -> int:
+    # NOTE (WHS Rule 6.2 / Appendix C): `allowance_percent` and `format_key`
+    # are effectively IMMUTABLE after match creation -- there is no
+    # update_match()/edit path that changes either. `match_rounds.net` is
+    # computed once, at link_round() time, from
+    # calc_playing_handicap(course_handicap, allowance_percent) as it stood
+    # at that moment; it is never recomputed. If an allowance/format-editing
+    # path is ever added, it MUST also re-link (recompute net for) every
+    # round already linked to the match, or those stored nets will silently
+    # go stale relative to the new allowance.
+    #
+    # `format_key` is the display/source-of-truth for "which Appendix C
+    # format produced this allowance" (see MATCH_FORMAT_LABELS in
+    # routes/matches.py) -- `allowance_percent` alone is ambiguous for
+    # display purposes (e.g. 95% is shared by both individual_stroke and
+    # stableford_individual). `allowance_percent`, NOT `format_key`, remains
+    # the value actually used in net math.
     db = get_db()
     cur = db.execute(
-        "INSERT INTO matches (created_by, course_name, date) VALUES (?, ?, ?)",
-        (created_by, course_name, date),
+        "INSERT INTO matches (created_by, course_name, date, allowance_percent, format_key) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (created_by, course_name, date, allowance_percent, format_key),
     )
     db.commit()
     match_id = cur.lastrowid
