@@ -1,6 +1,7 @@
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
+from auth_keys import require_permission
 from store import save_course, delete_course, rename_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.plugin import fire_hook
@@ -184,6 +185,7 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses", methods=["POST"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_post():
         data = request.get_json()
@@ -216,6 +218,7 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["DELETE"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_delete(name):
         for r in get_all_rounds_for_user():
@@ -226,6 +229,7 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["PUT"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_put(name):
         if not get_courses().get(name):

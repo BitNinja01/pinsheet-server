@@ -5,6 +5,7 @@ from datetime import date
 from flask import render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 
+from auth_keys import require_permission
 from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
@@ -69,6 +70,7 @@ def _expected_hole_count(course, holes_sel):
 def register_rounds_routes(app, csrf):
     @app.route("/rounds/new")
     @login_required
+    @require_permission("rounds:read")
     def round_entry():
         today = date.today().isoformat()
         no_courses = len(get_courses()) == 0
@@ -81,6 +83,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/rounds")
     @login_required
+    @require_permission("rounds:read")
     def rounds_list():
         settings = get_settings()
         all_rounds_for_user = get_all_rounds_for_user()
@@ -169,12 +172,14 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["GET"])
     @login_required
+    @require_permission("rounds:read")
     def api_draft_round_get():
         draft = load_round_draft(current_user.id)
         return jsonify(draft or {})
 
     @app.route("/api/drafts/round", methods=["PUT"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_draft_round_put():
         save_round_draft(request.get_json(), current_user.id)
@@ -182,19 +187,25 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/round", methods=["DELETE"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_draft_round_delete():
         clear_round_draft(current_user.id)
         return jsonify({"ok": True})
 
+    # Course drafts are course-authoring working state. There is no `courses:read`
+    # scope, so all three gate on `courses:write` — a read-only key has no business
+    # touching another workflow's draft.
     @app.route("/api/drafts/course", methods=["GET"])
     @login_required
+    @require_permission("courses:write")
     def api_draft_course_get():
         draft = load_course_draft(current_user.id)
         return jsonify(draft or {})
 
     @app.route("/api/drafts/course", methods=["PUT"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_draft_course_put():
         save_course_draft(request.get_json(), current_user.id)
@@ -202,6 +213,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/drafts/course", methods=["DELETE"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_draft_course_delete():
         clear_course_draft(current_user.id)
@@ -209,6 +221,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds", methods=["POST"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_rounds_post():
         data = request.get_json()
@@ -377,6 +390,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/rounds/<date>/<index>")
     @login_required
+    @require_permission("rounds:read")
     def round_detail(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
         round_data = None
@@ -600,6 +614,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/rounds/<date>/<index>/report")
     @login_required
+    @require_permission("rounds:read")
     def report_card(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
         this_round = None
@@ -649,6 +664,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["PUT"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_rounds_put(date, index):
         all_rounds_for_user = get_all_rounds_for_user()
@@ -803,6 +819,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>/exclude", methods=["POST"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_rounds_exclude(date, index):
         all_rounds = get_all_rounds_for_user()
@@ -827,6 +844,7 @@ def register_rounds_routes(app, csrf):
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])
     @login_required
+    @require_permission("rounds:write")
     @csrf.exempt
     def api_rounds_delete(date, index):
         delete_round(date, index, current_user.id)

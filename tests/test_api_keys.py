@@ -395,3 +395,129 @@ def test_init_db_is_idempotent(test_app):
     ).fetchone()
     db.close()
     assert row is not None
+
+
+# --------------------------------------------------------------------------- #
+# Scope enforcement — @require_permission wired onto routes (issue #41)
+#
+# Deny-by-default function-level authZ (OWASP A01 / CWE-862): a key reaches only
+# the endpoints matching its granted scopes; anything else is 403
+# insufficient_scope. Session users bypass the check entirely.
+# --------------------------------------------------------------------------- #
+
+def _keyed_client(test_app, scopes, username="scoped", display="Scoped"):
+    """A user + a client that sends a bearer key carrying `scopes`."""
+    user = create_user(username, display, "pass1234")
+    plaintext, _ = create_api_key(user["id"], "k", scopes)
+    return test_app.test_client(), plaintext, user
+
+
+def test_scope_read_key_reaches_matching_read_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.get("/api/drafts/round", headers=_bearer(key))
+    assert resp.status_code == 200
+
+
+def test_scope_read_only_key_denied_on_round_write(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.post("/api/rounds", headers=_bearer(key), json={})
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body == {"error": "insufficient_scope", "required": "rounds:write"}
+
+
+def test_scope_write_key_reaches_matching_write_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:write"])
+    resp = client.put("/api/drafts/round", headers=_bearer(key), json={"hole": 1})
+    assert resp.status_code == 200
+
+
+def test_scope_write_only_key_denied_on_round_read(test_app):
+    # Scopes are directional: rounds:write does NOT grant rounds:read.
+    client, key, _ = _keyed_client(test_app, ["rounds:write"])
+    resp = client.get("/api/drafts/round", headers=_bearer(key))
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "rounds:read"
+
+
+def test_scope_read_key_denied_on_stats(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.get("/stats/scoring", headers=_bearer(key))
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "stats:read"
+
+
+def test_scope_stats_key_reaches_stats(test_app):
+    client, key, _ = _keyed_client(test_app, ["stats:read"])
+    resp = client.get("/stats/scoring", headers=_bearer(key))
+    assert resp.status_code == 200
+
+
+def test_scope_key_without_courses_write_denied_on_course_mutation(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.post("/api/courses", headers=_bearer(key), json={"name": "X"})
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "courses:write"
+
+
+def test_scope_courses_write_key_reaches_course_mutation(test_app):
+    client, key, _ = _keyed_client(test_app, ["courses:write"])
+    resp = client.post("/api/courses", headers=_bearer(key), json={
+        "name": "Pebble Beach",
+        "location": {"city": "Pebble Beach", "state/province": "CA", "country": "USA"},
+        "holes": {},
+        "par": 72,
+    })
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "Pebble Beach"
+
+
+def test_scope_empty_key_denied_on_any_scoped_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, [])
+    assert client.get("/api/drafts/round", headers=_bearer(key)).status_code == 403
+    assert client.get("/stats/scoring", headers=_bearer(key)).status_code == 403
+    assert client.post("/api/rounds", headers=_bearer(key), json={}).status_code == 403
+
+
+def test_scope_course_draft_gated_on_courses_write(test_app):
+    # Course drafts are course-authoring state — no `courses:read` scope exists,
+    # so a rounds-only key cannot read/write them.
+    denied, dkey, _ = _keyed_client(test_app, ["rounds:read", "rounds:write"], username="a", display="A")
+    assert denied.get("/api/drafts/course", headers=_bearer(dkey)).status_code == 403
+    allowed, akey, _ = _keyed_client(test_app, ["courses:write"], username="b", display="B")
+    assert allowed.get("/api/drafts/course", headers=_bearer(akey)).status_code == 200
+
+
+def test_session_user_unaffected_by_scope_gate(test_app):
+    # A session (cookie) user has no scopes but keeps full account access.
+    client, _ = _login(test_app)
+    assert client.get("/stats/scoring").status_code == 200
+    assert client.put("/api/drafts/round", json={"hole": 1}).status_code == 200
+    assert client.get("/api/drafts/course").status_code == 200
+
+
+def test_unauthenticated_scoped_route_is_not_scope_403(test_app):
+    # login_required runs before the scope gate: no auth -> 401 (bearer path)
+    # or 302 (web path), never a misleading 403 insufficient_scope.
+    client = test_app.test_client()
+    assert client.get("/stats/scoring", headers=_bearer("psk_bogus")).status_code == 401
+    assert client.get("/stats/scoring").status_code == 302
+
+
+def test_csrf_exemption_survives_scope_decorator(test_app):
+    """Inserting @require_permission between @login_required and @csrf.exempt must
+    not break CSRF exemption. flask_wtf matches exemptions by
+    f"{view.__module__}.{view.__name__}"; @wraps preserves both, so the exemption
+    still resolves. Verified here with CSRF actually enabled (the rest of the
+    suite runs with it off)."""
+    client, _ = _login(test_app)                      # session established (CSRF off)
+    test_app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        # Exempt write route still passes tokenless with CSRF on.
+        assert client.put("/api/drafts/round", json={"hole": 1}).status_code == 200
+        # Negative control: a CSRF-protected route rejects a tokenless POST,
+        # proving CSRF is genuinely active in this block.
+        resp = client.post("/settings/api-keys", data={"label": "x", "permissions": ""})
+        assert resp.status_code == 400
+    finally:
+        test_app.config["WTF_CSRF_ENABLED"] = False

@@ -1,14 +1,18 @@
-"""API-key permission scaffold (UC-APIKEY-001).
+"""API-key permission enforcement (UC-APIKEY-001 / GAP-029).
 
-This module ships the ``@require_permission`` decorator as a *functional scaffold*
-only. Per the locked v1 scope, it is intentionally NOT applied to any endpoint —
-per-endpoint enforcement is deferred to GAP-029. v1 runtime authZ remains
-authenticated + ownership-scoped (existing ``WHERE user_id = ?``) + non-admin.
+This module ships the ``@require_permission`` decorator and, as of issue #41, it
+is wired onto the rounds / stats / courses API routes so a key is limited to the
+scopes it was granted (deny-by-default function-level authZ — OWASP A01 / CWE-862).
 
-When (and only when) it is wired to a route in a future iteration, the behaviour is:
+Behaviour:
   - Session-authenticated users bypass the scope check (they have full account access).
   - API-key identities (``current_user.via_api_key is True``) must carry the required
     permission in their granted scopes, or the request is rejected with 403.
+
+Runtime authZ layers, outermost-in: authenticated (``@login_required`` runs first, so
+an unauthenticated caller gets 401/302 before any scope is evaluated) -> scoped (this
+decorator) -> ownership-scoped (existing ``WHERE user_id = ?``) -> non-admin (keys are
+forced ``is_admin=False`` in ``main.request_loader``).
 """
 
 from functools import wraps
@@ -21,9 +25,10 @@ VALID_PERMISSIONS = ("rounds:read", "rounds:write", "stats:read", "courses:write
 
 
 def require_permission(permission):
-    """Decorator scaffold gating a route on an API-key permission.
+    """Decorator gating a route on an API-key permission.
 
-    NOTE: deferred (GAP-029) — not wired to any endpoint in v1.
+    Apply *below* ``@login_required`` (and above ``@csrf.exempt``) so an
+    unauthenticated caller is rejected before the scope is evaluated.
     """
     def decorator(f):
         @wraps(f)
