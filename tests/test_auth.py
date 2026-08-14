@@ -151,6 +151,30 @@ def test_duplicate_username_rejected(fresh_db):
     assert b"already taken" in resp.data
 
 
+def test_login_runs_bcrypt_for_unknown_user(fresh_db, monkeypatch):
+    """Issue #77 (CWE-208): verify_user must run bcrypt.checkpw even when the
+    username is unknown, so an attacker can't distinguish "no such user" (fast)
+    from "wrong password" (slow) by timing."""
+    import store as store_mod
+
+    calls = []
+    real_checkpw = store_mod.bcrypt.checkpw
+
+    def _counting_checkpw(pw, h):
+        calls.append(1)
+        return real_checkpw(pw, h)
+
+    monkeypatch.setattr(store_mod.bcrypt, "checkpw", _counting_checkpw)
+
+    assert store_mod.verify_user("no_such_user", "whatever12345") is None
+    assert calls, "bcrypt.checkpw must run for an unknown username too"
+
+    # And a real user with the wrong password still fails (unchanged behavior).
+    store_mod.create_user("realuser", "Real", "correctpass1")
+    assert store_mod.verify_user("realuser", "wrongpass1") is None
+    assert store_mod.verify_user("realuser", "correctpass1") is not None
+
+
 def test_logged_in_user_redirected_from_login(fresh_db):
     """Logged in user should be redirected away from login page."""
     import main as main_mod
