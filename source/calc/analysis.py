@@ -47,6 +47,41 @@ def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) 
     }
 
 
+_OB_CODES = {"OBL", "OBR", "OBS", "OBLO"}
+
+
+def calc_penalty_hole_breakdown(rounds: list[RoundData]) -> dict:
+    """Classify every played hole as clean, penalty, or OB (mutually exclusive).
+
+    OB takes precedence over penalty: a hole with an OB fairway/gir code counts
+    as OB even if it also carries penalty strokes. Percentages sum to ~100%.
+    """
+    clean = 0
+    penalty = 0
+    ob = 0
+    for r in rounds:
+        if not r.holes:
+            continue
+        for h in r.holes.values():
+            if not h.gross:
+                continue
+            if h.fairway in _OB_CODES or h.gir in _OB_CODES:
+                ob += 1
+            elif h.penalties > 0:
+                penalty += 1
+            else:
+                clean += 1
+    total = clean + penalty + ob
+    if not total:
+        return {"clean_pct": None, "penalty_pct": None, "ob_pct": None, "total_holes": 0}
+    return {
+        "clean_pct": clean / total * 100,
+        "penalty_pct": penalty / total * 100,
+        "ob_pct": ob / total * 100,
+        "total_holes": total,
+    }
+
+
 def calc_momentum_recovery(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
     after_bogey = []
     after_double = []

@@ -189,6 +189,15 @@ body {
     gap: 22px;
 }
 
+.ps-sidebar-version {
+    margin-top: auto;
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+}
+
 .ps-mobile-header {
     display: none;
 }

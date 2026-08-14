@@ -106,7 +106,15 @@ PinSheet records five per-hole stats from a physical scorecard using a record-by
 
 ## Plugins
 
-The server is extensible via drop-in Python plugins (custom pages, hooks, database tables, sidebar navigation). See the **[Plugin Developer Guide](docs/PLUGINS.md)**.
+The server is extensible via drop-in Python plugins (custom pages, hooks, database tables, sidebar navigation) — drop a plugin package into `plugins/` and it loads at startup. See the **[Plugin Developer Guide](docs/PLUGINS.md)** to build your own.
+
+Available plugins (each in its own repository):
+
+- [**pinsheet-balls**](https://github.com/BitNinja01/pinsheet-balls) — ball performance tracking with filtering and aggregation
+- [**pinsheet-cartographer**](https://github.com/BitNinja01/pinsheet-cartographer) — scoring map visualization
+- [**pinsheet-minigames**](https://github.com/BitNinja01/pinsheet-minigames) — on-course practice games
+- [**pinsheet-printables**](https://github.com/BitNinja01/pinsheet-printables) — printable scorecard and stat report PDFs
+- [**pinsheet-leaderboard-mascots**](https://github.com/malcolm-x-evo/pinsheet-leaderboard-mascots) — custom mascot images for leaderboard identities
 
 ## Tech Stack
 

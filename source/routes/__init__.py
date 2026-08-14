@@ -13,7 +13,7 @@ def register_routes(app, limiter, csrf, User):
     register_dashboard_routes(app, limiter, csrf)
     register_rounds_routes(app, csrf)
     register_courses_routes(app, csrf)
-    register_settings_routes(app, csrf)
+    register_settings_routes(app, limiter, csrf)
     register_stats_routes(app)
     register_admin_routes(app, csrf)
     register_matches_routes(app)

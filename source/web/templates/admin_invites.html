@@ -63,7 +63,7 @@
         {% set pname = plugin.plugin_info["name"] %}
         {% set pver = plugin.plugin_info.get("version", "?") %}
         {% set pdesc = plugin.plugin_info.get("description", "") %}
-        {% set enabled = plugin_states.get(pname, true) %}
+        {% set enabled = plugin_states.get(pname, false) %}
         {% set needs_restart = plugin_states_at_startup.get(pname) != enabled %}
         <div class="plugin-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: var(--ps-rule) solid var(--ps-rule-c);">
             <div>

@@ -389,3 +389,35 @@ class TestCourseEntry:
     def test_course_entry_page_loads(self, logged_in_client):
         resp = logged_in_client.get("/courses/new")
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Stored-XSS regression (finding U1 / GH#68): course_detail.html must never
+# render a stored tee/hole numeric field as raw HTML.
+# ---------------------------------------------------------------------------
+
+class TestCourseDetailStoredXss:
+    def test_html_payload_in_tee_yardage_rejected_at_write_path(self, logged_in_client):
+        payload = dict(VALID_COURSE)
+        payload["tees"] = {"White": {"yardage": "<img src=x onerror=alert(1)>", "rating": "70.5", "slope": "125"}}
+        resp = logged_in_client.post("/api/courses", json=payload)
+        assert resp.status_code == 400
+        assert get_courses() == {}
+
+    def test_stored_html_is_escaped_not_executed_on_detail_page(self, logged_in_client):
+        # Bypass the API validation to simulate pre-existing/legacy stored
+        # HTML (e.g. imported data), and confirm the template renders it
+        # inert regardless of the write-path guard.
+        course = {
+            "location": {"city": "C", "state/province": "S", "country": "Ctry"},
+            "tees": {"White": {"yardage": "<img src=x onerror=alert(1)>", "rating": "70.5", "slope": "125"}},
+            "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+            "par": 72,
+        }
+        save_course(course, "XssGC")
+
+        resp = logged_in_client.get("/courses/XssGC")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "&lt;img" in html
+        assert "<img src=x onerror" not in html

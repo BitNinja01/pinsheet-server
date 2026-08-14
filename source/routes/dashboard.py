@@ -11,6 +11,7 @@ from calc import (
     compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
     calc_course_handicap,
     compute_rankings, compute_board_meta, STAT_META, BOARD_STATS,
+    WHS_HANDICAP_WINDOW,
 )
 
 from source.web.charts import sparkline_svg, make_chart_data
@@ -130,7 +131,11 @@ def _build_profile_context():
     l20 = last_n_rounds(rounds, 20)
     b8 = best_n_rounds(rounds, 8)
 
-    bundle = compute_stat_bundle(l20, b8, courses_dict, include_9hole)
+    # WHS Rule 5.2: compute_stat_bundle needs the full most-recent-first
+    # `rounds` (not the raw-20 `l20`) for the handicap-index panel so its
+    # internal eligible-window is counted correctly -- see
+    # compute_stat_bundle's docstring. l20/b8 still drive the other panels.
+    bundle = compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole)
 
     panels_list = ["handicap", "score", "fir", "gir", "putts", "scramble"]
     panels = {}
@@ -210,7 +215,12 @@ def _build_profile_context():
             "putts": total_putts,
         })
 
-    best_rounds = get_best_n_rounds(rounds[:20], include_9hole)
+    # WHS Rule 5.2: pass the full most-recent-first `rounds` with an explicit
+    # window=WHS_HANDICAP_WINDOW rather than pre-truncating to rounds[:20] --
+    # the eligible-round window must be 20 ELIGIBLE rounds, not 20 raw rounds
+    # (a raw-20 slice under-counts when excluded/"0"/9-hole-gated rounds sit
+    # within it, diverging from the stored/recompute Handicap Index).
+    best_rounds = get_best_n_rounds(rounds, include_9hole, window=WHS_HANDICAP_WINDOW)
     best_keys = {(r.date, r.index) for r in best_rounds}
     for rd in rounds_data:
         if (rd["date"], rd["index"]) in best_keys:
@@ -285,7 +295,9 @@ def _build_profile_context():
     if handicap_panel_val and handicap_panel_val != "--":
         try:
             curr = float(handicap_panel_val)
-            eligible_20 = [r for r in all_rounds[:20] if not r.excluded and r.differential and r.differential != "0"]
+            # Same eligible-window pool as best_rounds above: the 20 most
+            # recent ELIGIBLE rounds, not a raw all_rounds[:20] slice.
+            eligible_20 = get_best_n_rounds(rounds, include_9hole, n=WHS_HANDICAP_WINDOW, window=WHS_HANDICAP_WINDOW)
             eligible_count = len(eligible_20)
             best_ids = {(r.date, r.index) for r in best_rounds}
             counting = sum(1 for r in eligible_20 if (r.date, r.index) in best_ids)
