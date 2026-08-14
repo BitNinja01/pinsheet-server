@@ -1,0 +1,177 @@
+{
+  "experiment": "graphify-uplift-issue-102",
+  "repo": "pinsheet-server (kathmandu working copy)",
+  "graph_source": "graphify-out/graph.json",
+  "generated": "2026-08-14",
+  "generation_method": "Ground truth for every task was derived independently of graphify: via `grep -rn`/`grep -rl` over source/ and tests/, and via a standalone Python `ast`-based caller-finder script (walks FunctionDef/ClassDef nodes, matches Call nodes by name) that does not read graph.json. graph.json was consulted only AFTER independent derivation, to cross-check edge counts (see verification_note per task). This satisfies the requirement that ground truth not be graphify-derived.",
+  "conditions": {
+    "baseline": "Agent may use ONLY Grep, Glob, Read tools.",
+    "treatment": "Agent may use Grep, Glob, Read, PLUS Bash restricted to invoking the `graphify` CLI against graphify-out/graph.json (`graphify query`, `graphify affected`, `graphify path`, `graphify explain`, `graphify god-nodes`).",
+    "model": "claude-sonnet-5, pinned, fresh session per run, identical prompt wording across arms.",
+    "prompt_note": "No task prompt below mentions graphify, graphs, nodes, edges, 'blast radius', or any graph-specific vocabulary. All prompts use plain engineering language a developer would use in a ticket."
+  },
+  "tasks": [
+    {
+      "id": "T1-NAV-DB",
+      "category": "codebase_navigation",
+      "prompt": "Where does this application open its SQLite database connection, and which single function contains the CREATE TABLE statements that define the full schema? Give exact file path(s) and function name(s).",
+      "ground_truth_files": ["source/database.py"],
+      "ground_truth_symbols": ["get_db", "init_db"],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent's final answer names source/database.py as the file AND correctly identifies get_db() as the connection-opening function AND init_db() as the schema-defining function. Partial credit not applicable for binary metric; use precision/recall for the file-set sub-metric.",
+        "precision_recall": "files_returned ∩ ground_truth_files / files_returned (precision); files_returned ∩ ground_truth_files / ground_truth_files (recall). Ground truth file set size = 1."
+      },
+      "difficulty": "easy",
+      "target_subsystem": "database.py / get_db() god-node (rank 5, fan-in 72)",
+      "verification_note": "Verified by direct Read of source/database.py lines 1-46 (get_db, _open_db_normal, _open_db_nolock) and lines 49-210 (init_db schema DDL). Single-file, unambiguous. Included as a calibration/easy task to avoid floor effects in either arm."
+    },
+    {
+      "id": "T2-NAV-PLUGIN",
+      "category": "codebase_navigation",
+      "prompt": "This application supports third-party plugins that live in folders under a plugins/ directory and get loaded into the running app at startup. Which file(s) implement the plugin discovery-and-loading logic, and where exactly (file + line) does the code dynamically import a plugin's Python module by name at runtime?",
+      "ground_truth_files": ["source/plugin_loader.py", "source/main.py"],
+      "ground_truth_symbols": ["discover_plugins", "_load_plugin", "importlib.import_module (source/plugin_loader.py:63)"],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent identifies source/plugin_loader.py as the file implementing discovery/loading AND cites line 63 (±2 lines) `importlib.import_module(folder_name)` inside _load_plugin() as the dynamic-import site AND identifies source/main.py:242 `discover_plugins(app)` as (or is aware of) the startup call site.",
+        "precision_recall": "Ground truth file set = {source/plugin_loader.py, source/main.py}. Score precision/recall over files cited in the final answer. A partial-credit variant: award recall credit for plugin_loader.py alone (primary) and treat main.py citation as a bonus/optional (secondary) file, noted separately in results."
+      },
+      "difficulty": "medium",
+      "target_subsystem": "plugin_loader.py dynamic-import boundary (the one confirmed non-test dynamic import in the repo, per .context/graphify-spike/MEASUREMENTS.md)",
+      "verification_note": "Verified by Read of source/plugin_loader.py (importlib.import_module at line 63 inside _load_plugin(), called from discover_plugins()) and by `grep -n 'discover_plugins' source/main.py` -> line 30 (import) and line 242 (call). Confirmed exactly one non-test dynamic import via grep -rn 'import_module' source/ tests/ returning only plugin_loader.py:63."
+    },
+    {
+      "id": "T3-IMPACT-GETDB",
+      "category": "impact_analysis",
+      "prompt": "The get_db() function is going to be changed so that it no longer returns a connection with sqlite3.Row row_factory set (callers that access result columns by name, e.g. row['username'], would break). List every function in the codebase's source/ directory that calls get_db() directly and would be at risk of breaking.",
+      "ground_truth_files": ["source/database.py", "source/store.py"],
+      "ground_truth_symbols": [
+        "database.py: init_db",
+        "store.py: load_settings, save_settings, get_courses, save_course, delete_course, rename_course, get_all_rounds, get_round_by_id, next_round_index, save_round, delete_round, update_round_handicap, update_round_differential, recompute_handicaps_for_user, set_round_excluded, get_users, get_user, get_user_by_id, create_user, verify_user, user_count, real_user_count, generate_password_reset_token, verify_password_reset_token, consume_password_reset_token, update_password, create_invite_code, is_invite_code_valid, consume_invite_code, seed_plugin_state, get_plugin_states, set_plugin_state, get_invite_codes, create_match, get_match, get_all_matches, get_matches_for_user, complete_match, add_match_player, remove_match_player, link_round, unlink_round, get_match_rounds, get_match_players, create_challenge, get_challenge, get_all_challenges, add_challenge_participant, remove_challenge_participant, get_challenge_participants, complete_challenge, get_clubs, save_club, delete_club, get_bag_slots, save_bag_slots, get_distinct_club_field_values, create_api_key, list_api_keys, revoke_api_key, get_user_by_api_key"
+      ],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent's file-level answer is exactly {source/database.py, source/store.py} (no production file outside these two directly calls get_db()); a response is considered functionally correct at the file level even without every one of the 62 function names, but a HIGH-QUALITY pass requires >=80% recall on the 62-function symbol set.",
+        "precision_recall": "Primary metric is symbol-level (function-name) precision/recall against the 62-item ground_truth_symbols list (61 in store.py + 1 in database.py). File-level precision/recall against the 2-item ground_truth_files list is a secondary/coarse metric."
+      },
+      "difficulty": "hard (large fan-in enumeration)",
+      "target_subsystem": "get_db() god-node (rank 5 by graph fan-in, 72 total edges; 62 of these are direct 'calls' edges from named functions, matching this task's ground truth)",
+      "verification_note": "Ground truth generated by an AST-based script (not graphify) that parses source/database.py and source/store.py, walks every FunctionDef, and records any function whose body contains a Call node named get_db. Result: 62 functions (61 in store.py, 1 in database.py). Cross-checked with `grep -c \"get_db()\" source/store.py` = 61 and `grep -c \"get_db()\" source/database.py` = 2 (1 def line + 1 call site in init_db), and `grep -rl \"get_db(\" source` = exactly {source/database.py, source/store.py}, confirming no other production file calls get_db directly. Graph.json cross-check (informational only): get_db node has 69 in-edges (68 'calls' + 1 'contains'); the 6-edge gap vs our 62 is graphify counting per-call-site inferred edges for a handful of functions with duplicate/inferred call representations -- our AST method dedupes to distinct calling functions, which is the correct unit for this task's ground truth. IMPORTANT for treatment-arm scoring: the live CLI command `graphify affected get_db --depth 2` (verified executable against graphify 0.9.42 / graphify-out/graph.json) returns 255 [calls] entries because depth=2 includes transitive (caller-of-caller) results, not just direct callers -- this task's ground truth is DIRECT callers only (depth=1 equivalent). A treatment-arm agent must either use `--depth 1` or post-filter the depth-2 result to direct calls to match this task's ground truth; using the raw --depth 2 default output unfiltered should be scored as low precision (many false positives: routes/*.py functions that call store.py functions that call get_db, but do not call get_db themselves)."
+    },
+    {
+      "id": "T4-IMPACT-DIFFERENTIAL",
+      "category": "impact_analysis",
+      "prompt": "The `differential` field on a round is going to change type from a string (with \"0\" used as a sentinel for 'no differential yet') to a proper float (with None as the sentinel instead). Which .py files under source/ read or compare a round's `differential` attribute (e.g. `r.differential`) and would need to be updated for this type change?",
+      "ground_truth_files": [
+        "source/store.py",
+        "source/calc/composite.py",
+        "source/calc/handicap.py",
+        "source/calc/milestones.py",
+        "source/routes/rounds.py",
+        "source/routes/dashboard.py",
+        "source/routes/settings.py"
+      ],
+      "ground_truth_symbols": [
+        "store.py:307,315 (recompute_handicaps_for_user)",
+        "calc/composite.py:10-11 (best_n_rounds or equivalent eligibility filter)",
+        "calc/handicap.py:48,53,55,64,70,92,98,121,126 (calc_effective_diffs, get_best_n_rounds, calc_handicap_trend, calc_playing_to_handicap_rate)",
+        "calc/milestones.py:15-16,77,91,100,116,305 (calc_personal_bests and related milestone functions)",
+        "routes/rounds.py:127,711 (round listing/detail serialization and round-edit differential re-parse)",
+        "routes/dashboard.py:201,288 (dashboard round summaries)",
+        "routes/settings.py:76,86 (recompute-on-settings-change path)"
+      ],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the returned file set exactly matches (or is a superset that still includes all 7) the ground_truth_files list, restricted to source/**/*.py (HTML template files that also interpolate r.differential, e.g. web/templates/*.html, are informational/out-of-scope for this task and should not be penalized if omitted, but citing them is not an error).",
+        "precision_recall": "precision = |returned ∩ ground_truth_files| / |returned|; recall = |returned ∩ ground_truth_files| / 7. Templates (web/templates/*.html) are excluded from both the numerator and denominator by task definition (task explicitly scopes to .py files)."
+      },
+      "difficulty": "medium-hard (7-file multi-hop fan-out across routes/ and calc/)",
+      "target_subsystem": "RoundData dataclass god-node (rank 3 by graph fan-in, 96 total edges, mostly 'references' from calc/*.py)",
+      "verification_note": "Verified via `grep -rln '\\.differential\\b' source/` (returns 7 .py files plus 4 .html templates, templates excluded per task scope) followed by `grep -n '\\.differential\\b'` per file to confirm every hit is a genuine RoundData attribute read/compare (not e.g. a function-parameter named differential in update_round_differential/update_round_handicap, which were manually excluded). All 7 files independently read and line numbers confirmed."
+    },
+    {
+      "id": "T5-CROSSCUT-REGISTER",
+      "category": "cross_cutting_modification",
+      "prompt": "We want every route-registration function to receive a new shared `feature_flags` dict at startup so individual routes can check flags. This means the top-level function that wires up all the route modules, and every one of the per-module registration functions it calls, need their signatures updated to accept and (where needed) forward this new parameter. Without making any edits, describe exactly which files and functions would need to change to thread this new parameter through end-to-end, starting from application startup.",
+      "ground_truth_files": [
+        "source/main.py",
+        "source/routes/__init__.py",
+        "source/routes/auth.py",
+        "source/routes/dashboard.py",
+        "source/routes/rounds.py",
+        "source/routes/courses.py",
+        "source/routes/settings.py",
+        "source/routes/stats.py",
+        "source/routes/admin.py",
+        "source/routes/matches.py",
+        "source/routes/bag.py"
+      ],
+      "ground_truth_symbols": [
+        "main.py: register_routes(app, limiter, csrf, User) call site (line 244)",
+        "routes/__init__.py: register_routes(app, limiter, csrf, User) (line 1) fans out to 9 sub-registrars",
+        "routes/auth.py: register_auth_routes(app, limiter, User)",
+        "routes/dashboard.py: register_dashboard_routes(app, limiter, csrf)",
+        "routes/rounds.py: register_rounds_routes(app, csrf)",
+        "routes/courses.py: register_courses_routes(app, csrf)",
+        "routes/settings.py: register_settings_routes(app, csrf)",
+        "routes/stats.py: register_stats_routes(app)",
+        "routes/admin.py: register_admin_routes(app, csrf)",
+        "routes/matches.py: register_matches_routes(app)",
+        "routes/bag.py: register_bag_routes(app, csrf)"
+      ],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent's file list exactly matches the 11-file ground_truth_files set (the fan-out from register_routes() to its 9 sub-registrars, plus the top-level definition file routes/__init__.py, plus the call site main.py).",
+        "precision_recall": "precision = |returned ∩ ground_truth_files| / |returned|; recall = |returned ∩ ground_truth_files| / 11."
+      },
+      "difficulty": "hard (wide but shallow fan-out -- exactly 1 hop from register_routes, but 11 files, easy to under- or over-count)",
+      "target_subsystem": "register_routes() god-node (rank 8 by graph fan-in, 35 total edges: 11 direct 'calls' + 14 'imports' + 10 test 'calls')",
+      "verification_note": "Verified via `grep -n '^def register_' source/routes/*.py` (returns exactly 10 register_* function defs: __init__.py + 9 module files) and `grep -n 'register_routes' source/main.py` (import at line 31, call at line 244). Cross-checked routes/__init__.py source directly -- it imports and calls exactly 9 register_*_routes functions, one per listed file, confirming the fan-out count."
+    },
+    {
+      "id": "T6-CROSSCUT-GIMME",
+      "category": "cross_cutting_modification",
+      "prompt": "Product wants to add a new per-hole boolean field called `gimme` (marks a conceded putt that was not physically holed) to the round-entry data model. It must: (a) be a defined field on the per-hole data structure, (b) be correctly populated when a round is loaded from its raw dict/JSON representation, and (c) be excluded from the putts-per-round and putt-percentage statistics calculations. Without making any edits, describe every file that would need to change to fully support this feature end-to-end.",
+      "ground_truth_files": ["source/models.py", "source/calc/putting.py"],
+      "ground_truth_symbols": [
+        "models.py: HoleData dataclass (line 5-10), dict_to_hole() (line 108-115)",
+        "calc/putting.py: calc_putts_per_round (line 4-10), calc_putts_per_gir (line 13-20), _putt_threshold_percent (line 25-34), calc_putts_by_par_type (line 52-64)"
+      ],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent identifies BOTH source/models.py (for the dataclass field + dict-to-object conversion) AND source/calc/putting.py (for the putt-count calculations that must skip gimme holes) as required changes. Naming source/routes/rounds.py or source/store.py as REQUIRED is a false positive for this specific task, because holes are persisted as an opaque JSON blob (source/store.py:save_round line 215 `json.dumps(golf_round.get('holes', {}))`) and forwarded generically by the API route (source/routes/rounds.py:228 `data.get('holes', {})`) -- neither needs code changes for a new hole-level key to survive the round-trip, only to be interpreted as a typed field.",
+        "precision_recall": "precision = |returned ∩ {models.py, calc/putting.py}| / |returned|; recall = |returned ∩ {models.py, calc/putting.py}| / 2. Because this task has an intentionally SMALL correct footprint, over-inclusion (naming store.py/routes/rounds.py/templates as mandatory) is penalized in precision to test whether the agent correctly recognizes the JSON-blob pass-through and does not over-scope the change."
+      },
+      "difficulty": "medium (small correct answer set; the trap is over-scoping to store.py/routes/rounds.py)",
+      "target_subsystem": "models.py HoleData/RoundData family (RoundData is graph rank-3 god-node, 96 fan-in) and calc/putting.py",
+      "verification_note": "Verified by Read of source/models.py (HoleData dataclass explicitly enumerates gross/putts/penalties/fairway/gir; dict_to_hole() explicitly maps only those 5 keys) and source/calc/putting.py (`grep -n 'h\\.putts' source/calc/putting.py` -> exactly 4 functions: calc_putts_per_round, calc_putts_per_gir, _putt_threshold_percent, calc_putts_by_par_type). Verified the JSON pass-through claim by Read of source/store.py:190-229 (save_round does `json.dumps(golf_round.get('holes', {}))`, no per-field enumeration) and source/routes/rounds.py:228 (`'holes': data.get('holes', {})`, generic passthrough)."
+    },
+    {
+      "id": "T7-BUG-USERNAME",
+      "category": "bug_fix_localization",
+      "prompt": "A user reports they were able to register an account with the username \"___\" (three underscores, no letters or digits at all), which should not be a valid username. Find the exact file, function, and line where the username validation logic that allows this lives.",
+      "ground_truth_files": ["source/routes/auth.py"],
+      "ground_truth_symbols": ["register_page (source/routes/auth.py, function starting line 36; validation condition at line 51)"],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent cites source/routes/auth.py, the register_page() function (inside register_auth_routes), and specifically the condition `len(username) < 3 or len(username) > 30 or not all(c.isalnum() or c == '_' for c in username)` (line 51) as the faulty check -- it accepts any username of allowed length made entirely of underscores because the predicate is `c.isalnum() OR c == '_'` per character rather than requiring at least one alphanumeric character overall.",
+        "precision_recall": "Single-file, single-function ground truth (set size = 1 file). Binary pass/fail is the primary metric; precision/recall degenerates to 1.0/1.0 or 0/0 for this task."
+      },
+      "difficulty": "easy (single file, single function, root cause is one boolean expression)",
+      "target_subsystem": "auth.py register_page(), adjacent to the create_user() god-node (rank 2 by graph fan-in, 114 edges) which register_page() calls immediately after this validation",
+      "verification_note": "Reproduced directly: `python3 -c \"username='___'; print(len(username)<3 or len(username)>30 or not all(c.isalnum() or c=='_' for c in username))\"` prints False, confirming no validation error is raised for an all-underscore username of valid length. Confirmed by Read of source/routes/auth.py lines 36-77 (register_page)."
+    },
+    {
+      "id": "T8-BUG-COURSEDELETE",
+      "category": "bug_fix_localization",
+      "prompt": "In a deployment with multiple user accounts, an admin was able to delete a golf course from the system even though a DIFFERENT user (not the admin) still had rounds recorded against that course. Those rounds are now left pointing at a course that no longer exists. Find the file and function where the course-deletion safety check incorrectly scopes its 'does anyone still use this course' check, and the underlying data-layer function that performs the actual (unscoped, global) deletion.",
+      "ground_truth_files": ["source/routes/courses.py", "source/request_data.py", "source/store.py"],
+      "ground_truth_symbols": [
+        "routes/courses.py: api_courses_delete (line 158-163) -- pre-delete check only inspects get_all_rounds_for_user(), i.e. the CURRENT logged-in user's rounds",
+        "request_data.py: get_all_rounds_for_user (line 18-20) -- calls store.get_all_rounds(current_user.id), scoped to a single user by design",
+        "store.py: delete_course (line 93-98) -- deletes globally by course name; the courses table (database.py lines 69-73) has no user_id column, so a course is shared across all users"
+      ],
+      "scoring_rule": {
+        "binary_correctness": "PASS iff the agent identifies source/routes/courses.py's api_courses_delete route (the flawed existence check that only queries the current user's own rounds via get_all_rounds_for_user) AND source/store.py's delete_course (the actual global/unscoped deletion) as the two code locations that jointly cause the bug. Citing source/request_data.py's get_all_rounds_for_user as the root of the scoping issue is correct supporting evidence but not strictly required for a pass; citing it is a precision bonus.",
+        "precision_recall": "precision = |returned ∩ ground_truth_files| / |returned|; recall = |returned ∩ ground_truth_files| / 3 (routes/courses.py and store.py are mandatory / weight 1.0 each for recall purposes; request_data.py is supporting evidence / weight 0.5)."
+      },
+      "difficulty": "hard (cross-file root-cause reasoning: the bug is not a crash or an obviously wrong line, it's a scoping mismatch between a per-user check and a global delete, spanning 3 files)",
+      "target_subsystem": "courses/rounds multi-tenancy boundary -- adjacent to get_db() (courses table has no user_id, database.py lines 69-73) and to the rounds table (has user_id, database.py lines 75-93)",
+      "verification_note": "Verified by Read of source/routes/courses.py lines 158-163 (api_courses_delete loops over get_all_rounds_for_user() only, returns 409 if the CURRENT user has a round on that course, else calls delete_course(name) unconditionally), source/request_data.py lines 18-20 (get_all_rounds_for_user delegates to store.get_all_rounds(current_user.id), confirmed single-user scope), source/store.py lines 93-98 (delete_course takes only course_name, no user_id parameter, deletes the single global row), and source/database.py lines 69-73 (courses table schema: id, name UNIQUE, data -- no user_id column, confirming courses are global/shared across all users while rounds.user_id scopes rounds per-user)."
+    }
+  ]
+}
