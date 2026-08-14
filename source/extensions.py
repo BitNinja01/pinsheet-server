@@ -4,6 +4,6 @@ from flask_wtf.csrf import CSRFProtect
 
 
 def init_app(app):
-    limiter = Limiter(get_remote_address, app=app, default_limits=[])
+    limiter = Limiter(get_remote_address, app=app, default_limits=["200 per minute"])
     csrf = CSRFProtect(app)
     return limiter, csrf

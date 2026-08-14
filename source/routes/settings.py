@@ -19,7 +19,7 @@ from source.request_data import get_settings, get_courses, base_context
 _log = logging.getLogger("pinsheet")
 
 
-def register_settings_routes(app, csrf):
+def register_settings_routes(app, limiter, csrf):
     @app.route("/settings")
     @login_required
     def settings_page():
@@ -30,6 +30,7 @@ def register_settings_routes(app, csrf):
         ))
 
     @app.route("/settings/import", methods=["GET", "POST"])
+    @limiter.limit("10 per minute", methods=["POST"])
     @login_required
     def settings_import():
         if request.method == "POST":
@@ -121,6 +122,7 @@ def register_settings_routes(app, csrf):
         ))
 
     @app.route("/settings/api-keys", methods=["POST"])
+    @limiter.limit("10 per minute")
     @login_required
     def api_keys_create():
         label = request.form.get("label", "").strip() or "Unnamed key"

@@ -8,9 +8,10 @@ from store import set_plugin_state
 _log = logging.getLogger("pinsheet")
 
 
-def register_admin_routes(app, csrf):
+def register_admin_routes(app, limiter, csrf):
     @csrf.exempt
     @app.route("/api/admin/plugin-state", methods=["POST"])
+    @limiter.limit("30 per minute")
     @login_required
     def api_admin_plugin_state():
         if not current_user.is_admin:
