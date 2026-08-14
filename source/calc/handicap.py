@@ -1,7 +1,45 @@
 import bisect
 import math
+from decimal import Decimal, ROUND_HALF_UP
 
 from source.models import RoundData
+
+
+def round_half_up(value: float, ndigits: int = 1) -> float:
+    """WHS-compliant nearest-tenth rounding: rounds .5 ties UP (away from
+    zero), NOT Python's built-in `round()`, which uses banker's rounding
+    (round-half-to-even) and would silently misround exact ties -- e.g.
+    `round(18.25, 1) == 18.2` (wrong) instead of `18.3` (correct).
+
+    WHS Rule 5.1a: "An 18-hole Score Differential is calculated as follows
+    and rounded to the nearest tenth, with .5 rounded upwards..." Rule 5.2a
+    applies the same "round to the nearest tenth" convention to the
+    Handicap Index. Both rules are implemented via this helper so every WHS
+    nearest-tenth rounding site behaves identically.
+
+    Uses `Decimal(str(value))` (not `Decimal(value)`) to avoid re-surfacing
+    the binary floating-point representation error of `value` itself before
+    rounding -- `str(value)` gives Python's shortest round-tripping decimal
+    representation, which is what a human (and the WHS rule text) means by
+    "the value".
+
+    NEGATIVE-TIE DECISION: `Decimal.quantize(..., rounding=ROUND_HALF_UP)`
+    rounds ties AWAY FROM ZERO (e.g. -2.25 -> -2.3), not toward positive
+    infinity. WHS Rule 5.1a's "rounded upwards" is written for the
+    (always non-negative) Score Differential calculation, where "upwards"
+    and "away from zero" coincide -- there is no ambiguity in the rule text
+    for that case. For a negative (plus) Handicap Index, "rounded upwards"
+    read literally would mean toward +infinity (-2.25 -> -2.2), but
+    away-from-zero is the standard, unambiguous interpretation of "round
+    half up" used by virtually every rounding-mode implementation
+    (including Python's `decimal.ROUND_HALF_UP`) and by common golf/WHS
+    software implementations, so it is adopted here uniformly for both
+    differentials and Handicap Index values rather than special-casing sign.
+    A negative .x5 boundary is asserted against this (away-from-zero)
+    behavior in tests -- see `test_round_half_up_negative_tie_away_from_zero`.
+    """
+    quantum = Decimal(1).scaleb(-ndigits)
+    return float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
 def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
@@ -21,7 +59,9 @@ def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> i
 
 
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
-    return round((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
+    # WHS Rule 5.1a: "...rounded to the nearest tenth, with .5 rounded
+    # upwards" -- use round_half_up, not banker's-rounding round().
+    return round_half_up((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
 
 
 def calc_expected_9hole_dif(handicap_index: float) -> float:
@@ -154,8 +194,9 @@ def calc_handicap_index(
     best_n = diffs[:n]
     avg = sum(best_n) / len(best_n)
     # WHS Rule 5.2a: subtract the count-table adjustment (keyed on the number
-    # of differentials in the record) before the final round-to-tenth.
-    return round(avg + count_table_adjustment(len(diffs)), 1)
+    # of differentials in the record) before the final round-to-tenth (half
+    # up, per Rule 5.1a's rounding convention -- see round_half_up).
+    return round_half_up(avg + count_table_adjustment(len(diffs)), 1)
 
 
 def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
@@ -177,17 +218,17 @@ def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
     WHS convention).
     """
     if low_hi is None:
-        return round(raw_hi, 1)
+        return round_half_up(raw_hi, 1)
 
     increase = raw_hi - low_hi
     if increase <= 3.0:
-        return round(raw_hi, 1)
+        return round_half_up(raw_hi, 1)
 
     capped = low_hi + 3.0 + 0.5 * (increase - 3.0)  # soft cap
     hard_cap = low_hi + 5.0
     if capped > hard_cap:
         capped = hard_cap  # hard cap
-    return round(capped, 1)
+    return round_half_up(capped, 1)
 
 
 def exceptional_reduction(hi_in_effect: float | None, differential: float) -> float:
@@ -262,8 +303,11 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
         if n > 0:
             avg = sum(window_diffs[:n]) / n
             # WHS Rule 5.2a: subtract the count-table adjustment (keyed on
-            # the number of differentials in the window) before rounding.
-            val = round(avg + count_table_adjustment(len(window_diffs)), 1)
+            # the number of differentials in the window) before rounding
+            # (half up, mirroring calc_handicap_index -- same rule, same
+            # rounding convention, so the trend series and the live
+            # Handicap Index never disagree on the same window of diffs).
+            val = round_half_up(avg + count_table_adjustment(len(window_diffs)), 1)
             result.append((r.date, val))
 
     return result
@@ -321,4 +365,6 @@ def calc_career_low_handicap(all_rounds: list[RoundData]) -> str | None:
                     best_hi = v
             except (ValueError, TypeError):
                 pass
-    return str(round(best_hi, 1)) if best_hi < 999.0 else None
+    # WHS nearest-tenth, .5 UP (round_half_up) for consistency; best_hi is a
+    # min of already-tenths-precision stored HIs so no new tie arises today.
+    return str(round_half_up(best_hi, 1)) if best_hi < 999.0 else None

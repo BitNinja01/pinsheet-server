@@ -2,6 +2,7 @@ from calc.handicap import (
     calc_hole_scores,
     calc_course_handicap,
     calc_round_dif,
+    round_half_up,
     calc_expected_9hole_dif,
     count_table_n,
     calc_effective_diffs,

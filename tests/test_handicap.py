@@ -14,6 +14,7 @@ from calc.handicap import (
     calc_raw_hi,
     apply_handicap_cap,
     exceptional_reduction,
+    round_half_up,
     WHS_HANDICAP_WINDOW,
 )
 
@@ -87,6 +88,177 @@ def test_calc_round_dif_scratch():
 def test_calc_round_dif_above_rating():
     result = calc_round_dif(128, 85, 71.5)
     assert result == round((113 / 128) * (85 - 71.5), 1)
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.1a / 5.2a -- round_half_up (differential-round-half-up fix,
+# GH#R1). Rule 5.1a: "...rounded to the nearest tenth, with .5 rounded
+# upwards" -- Python's built-in round() is banker's rounding (round-half-
+# to-even), which silently misrounds exact .5 ties (e.g. round(18.25, 1)
+# == 18.2, not the WHS-mandated 18.3). round_half_up fixes every WHS
+# nearest-tenth rounding site (Score Differential AND Handicap Index).
+# --------------------------------------------------------------------------
+
+def test_round_half_up_ties_round_up_not_to_even():
+    """Direct ties: round_half_up always rounds .5 UP, unlike round()'s
+    round-half-to-even, which would bounce 18.25 down to 18.2 (wrong) and
+    10.05 down to 10.0 (wrong) -- exactly the two examples from WHS Rule
+    5.1a's bug report."""
+    assert round_half_up(18.25, 1) == 18.3
+    assert round(18.25, 1) == 18.2  # banker's rounding: the bug being fixed
+    assert round_half_up(10.05, 1) == 10.1
+
+
+def test_round_half_up_non_tie_values_unchanged():
+    """Non-.5 values must round exactly as round() already did -- the fix
+    only changes tie-breaking, not ordinary rounding."""
+    assert round_half_up(18.24, 1) == 18.2
+    assert round_half_up(18.26, 1) == 18.3
+    assert round_half_up(0.04, 1) == 0.0
+    assert round_half_up(0.06, 1) == 0.1
+
+
+def test_round_half_up_negative_tie_away_from_zero():
+    """NEGATIVE-TIE DECISION (documented in round_half_up's docstring):
+    WHS Rule 5.1a's "rounded upwards" is written for the always-nonnegative
+    Score Differential, where "upwards" and "away from zero" coincide. This
+    implementation adopts away-from-zero for negative ties too (rather than
+    toward-positive-infinity), matching Decimal's ROUND_HALF_UP and the
+    standard cross-language meaning of "round half up". A negative (plus)
+    Handicap Index differential of -2.25 must therefore round to -2.3, NOT
+    -2.2 (which is what toward-+infinity rounding would give)."""
+    assert round_half_up(-2.25, 1) == -2.3
+    assert round_half_up(-2.15, 1) == -2.2
+    assert round_half_up(-0.05, 1) == -0.1
+
+
+def test_calc_round_dif_real_data_tie_18_25_rounds_up():
+    """Real-data validation (WHS Rule 5.1a): (113/113)*(90.25-72.0) == 18.25
+    exactly -- the round() banker's-rounding bug this fix addresses rounds
+    this DOWN to 18.2 (wrong); WHS Rule 5.1a's ".5 rounded upwards" requires
+    18.3."""
+    raw = (113 / 113) * (90.25 - 72.0)
+    assert raw == 18.25
+    assert calc_round_dif(113, 90.25, 72.0) == 18.3
+    assert round(raw, 1) == 18.2  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_calc_round_dif_real_data_tie_16_95_rounds_up():
+    """Real-data validation (WHS Rule 5.1a), a second exact-tie differential
+    computed from realistic slope/AGS/rating inputs (no synthetic decimal
+    inputs required): tee slope 120, Adjusted Gross Score 89, Course Rating
+    71.0 -> (113/120)*(89-71.0) == 16.95 exactly. Pre-fix, round()'s
+    banker's rounding gives 16.9 (wrong, rounds a "5" DOWN to the even
+    digit); WHS Rule 5.1a requires 17.0."""
+    raw = (113 / 120) * (89 - 71.0)
+    assert raw == 16.95
+    assert calc_round_dif(120, 89, 71.0) == 17.0
+    assert round(raw, 1) == 16.9  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_calc_handicap_index_real_data_avg_plus_adjustment_tie_rounds_up(make_round):
+    """Real-data validation (WHS Rule 5.2a): 6 differentials -> best-2
+    average minus the Rule 5.2a count-table adjustment (-1.0 for count==6)
+    lands EXACTLY on a tenth-tie. diffs sorted: [5.0, 11.5, 30.0, 30.0,
+    30.0, 30.0], best-2 = [5.0, 11.5], avg = 8.25, 8.25 - 1.0 = 7.25 exactly
+    -- a genuine "avg + adjustment == x.x5" tie. Pre-fix, round()'s banker's
+    rounding gives 7.2 (wrong); WHS Rule 5.2a (via round_half_up) requires
+    7.3."""
+    rounds = [make_round(differential=str(d))
+              for d in (5.0, 11.5, 30.0, 30.0, 30.0, 30.0)]
+    avg = (5.0 + 11.5) / 2
+    val = avg + count_table_adjustment(6)
+    assert val == 7.25
+    hi = calc_handicap_index(rounds)
+    assert hi == 7.3
+    assert round(val, 1) == 7.2  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_differential_rounding_consistent_across_calc_store_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.1a): the SAME (slope, AGS, rating) tie input
+    must produce the IDENTICAL rounded differential on every code path that
+    computes it -- calc_round_dif (the pure helper), store.py's
+    recompute_handicaps_for_user (inline round site), and
+    routes/settings.py's zip-import backfill (inline round site). All three
+    must round the exact 18.25 tie UP to 18.3, never down to 18.2."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, recompute_handicaps_for_user,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("tie1", "Tie1", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "TieCourse")
+
+    # Direct pure-helper path.
+    assert calc_round_dif(113, 90.25, 72.0) == 18.3
+
+    # store.py inline-round path: save a round with total_gross = 90.25 and
+    # NO differential yet, so recompute_handicaps_for_user's differential
+    # backfill (the inline `round_half_up((113/slope)*(...), 1)` site) computes
+    # it fresh.
+    r = {"course": "TieCourse", "tees": "W", "total_gross": "90.25",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.differential == "18.3", (
+        f"store.py inline differential round produced {stored.differential!r}, "
+        "expected the half-up-rounded '18.3' (WHS Rule 5.1a)."
+    )
+
+
+def test_zip_import_differential_rounding_matches_calc_round_dif(tmp_data_dir):
+    """Consistency (WHS Rule 5.1a): routes/settings.py's zip-import
+    differential backfill loop must round the same 18.25 tie the same way
+    (half up -> 18.3) as calc_round_dif and store.py's recompute."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_course, save_round, get_all_rounds, get_courses
+    from calc.handicap import round_half_up as _rhu
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("tie2", "Tie2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "TieCourse")
+
+    r = {"course": "TieCourse", "tees": "W", "total_gross": "90.25",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    # Reproduce routes/settings.py's zip-import inline round site directly
+    # (importing/exercising the Flask route itself requires a full app/auth
+    # fixture; this asserts the exact inline computation the route performs
+    # against the same tee data, matching the site-by-site audit).
+    all_rounds = get_all_rounds(user_id=1)
+    courses_data = get_courses()
+    r0 = all_rounds[0]
+    tee_data = courses_data[r0.course]["tees"][r0.tees]
+    slope = float(tee_data["slope"])
+    rating = float(tee_data["rating"])
+    diff = _rhu((113 / slope) * (float(r0.total_gross) - rating), 1)
+    assert diff == 18.3 == calc_round_dif(113, 90.25, 72.0)
 
 
 def test_calc_expected_9hole_dif():
@@ -1411,18 +1583,28 @@ def test_esr_three_simultaneous_exceptional_scores_staggered_aging_out(tmp_data_
         return rounds_by_date[date_str].computed_handicap
 
     # Rounds 31-40: all three exceptional reductions active simultaneously
-    # (cumulative -3.0 vs. the raw window average).
-    assert hi_at(31) == "13.2"
-    assert hi_at(40) == "13.2"
-    # Round 41: round 21 ages out of the window -- sum steps to -2.0.
-    assert hi_at(41) == "15.2"
-    assert hi_at(45) == "15.2"
-    # Round 46: round 26 ages out -- sum steps to -1.0.
+    # (cumulative -3.0 vs. the raw window average). The window-31 raw
+    # best-8 average lands exactly on a tenth-tie (16.25); WHS Rule 5.1a's
+    # "rounded to the nearest tenth, with .5 rounded upwards" (applied via
+    # round_half_up to Rule 5.2a's Handicap Index rounding too) resolves
+    # this UP to 16.3, not banker's-rounding's 16.2 -- so 16.3 - 3.0 = 13.3
+    # (was "13.2" pre-fix, when round() banker-rounded the 16.25 tie down).
+    assert hi_at(31) == "13.3"
+    assert hi_at(40) == "13.3"
+    # Round 41: round 21 ages out of the window -- sum steps to -2.0. The
+    # window-41 raw best-8 average also lands on a tie (17.25 -> 17.3 half
+    # up, not 17.2), so 17.3 - 2.0 = 15.3 (was "15.2" pre-fix).
+    assert hi_at(41) == "15.3"
+    assert hi_at(45) == "15.3"
+    # Round 46: round 26 ages out -- sum steps to -1.0. No tie in this
+    # window's raw average, so the half-up fix does not change this value.
     assert hi_at(46) == "16.9"
     assert hi_at(50) == "16.9"
-    # Round 51: round 31 ages out -- sum steps to 0.0, fully diluted.
-    assert hi_at(51) == "18.1"
-    assert hi_at(56) == "18.1"
+    # Round 51: round 31 ages out -- sum steps to 0.0, fully diluted. The
+    # window-51 raw best-8 average lands on a tie (18.15 -> 18.2 half up,
+    # not 18.1), so this is 18.2 (was "18.1" pre-fix).
+    assert hi_at(51) == "18.2"
+    assert hi_at(56) == "18.2"
 
 
 def test_esr_excluded_round_neither_exceptional_nor_consumes_window_slot(tmp_data_dir):
@@ -1618,3 +1800,13 @@ def test_handicap_trend_from_stored_skips_excluded_rounds():
     trend = handicap_trend_from_stored(rounds)
     assert trend == [("2026-03-01", 11.0), ("2026-03-03", 12.0)]
     assert all(d != "2026-03-02" for d, _ in trend)
+
+
+def test_apply_handicap_cap_soft_cap_tie_rounds_half_up():
+    """WHS Rule 5.1a half-up applies to the soft-cap output too: the
+    0.5*(increase-3.0) term can create a genuine .x5 tie. LHI 10.0, raw 13.1
+    -> increase 3.1 -> capped = 10+3+0.5*0.1 = 13.05 -> half-up 13.1 (banker's
+    round() would give 13.0)."""
+    assert apply_handicap_cap(13.1, 10.0) == 13.1
+    # sanity: a non-tie soft-cap still correct
+    assert apply_handicap_cap(14.0, 10.0) == 13.5

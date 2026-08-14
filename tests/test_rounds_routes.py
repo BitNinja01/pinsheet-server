@@ -804,3 +804,18 @@ def test_rounds_list_handicap_highlight_uses_recent_20_window(client, capture_re
     counted = [r for r in rounds if r["in_handicap"]]
     assert len(counted) == 8  # count_table_n(20) == 8
     assert all(r["date"].startswith("2026-03") for r in counted)
+
+
+def test_api_rounds_put_manual_override_rounds_half_up(client):
+    """WHS Rule 5.1a: a user-entered manual differential of 18.25 must be
+    stored as 18.3 (.5 rounded UP), not banker's-rounded 18.2."""
+    _login(client)
+    _make_course(client)
+    _post_round(client, gross_total="85")
+
+    resp = _put_round(client, "2026-06-01", "0", differential_override=18.25)
+    assert resp.status_code == 200
+    assert resp.get_json()["differential"] == 18.3
+    saved = store.get_all_rounds(1)
+    assert saved[0].differential == "18.3"
+    assert saved[0].differential_locked is True

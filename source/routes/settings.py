@@ -13,6 +13,7 @@ from store import (
     create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
 from calc import calc_handicap_index
+from calc.handicap import round_half_up
 from source.request_data import get_settings, get_courses, base_context
 from source.routes.courses import _coerce_course_numerics
 
@@ -118,7 +119,13 @@ def register_settings_routes(app, limiter, csrf):
                         tee_data = course_data.get("tees", {}).get(r.tees)
                         if tee_data and r.total_gross and r.total_gross != "0":
                             slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                            diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                            # WHS Rule 5.1a: nearest tenth, .5 rounded
+                            # upwards -- see round_half_up (not banker's-
+                            # rounding round()), matching store.py's
+                            # recompute_handicaps_for_user and
+                            # calc_round_dif for path-consistent
+                            # differentials.
+                            diff = round_half_up((113 / slope) * (float(r.total_gross) - rating), 1)
                             update_round_differential(r.date, r.index, diff, user_id)
                             # Keep the in-memory object in sync with the DB write so the
                             # handicap window below sees the fresh differential (not stale "0").

@@ -359,6 +359,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         apply_handicap_cap,
         _is_eligible_diff_round,
         exceptional_reduction,
+        round_half_up,
         WHS_HANDICAP_WINDOW,
     )
 
@@ -410,7 +411,9 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 tee_data = course_data.get("tees", {}).get(r.tees)
                 if tee_data and r.total_gross and r.total_gross != "0":
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                    diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                    # WHS Rule 5.1a: nearest tenth, .5 rounded upwards -- see
+                    # round_half_up (not banker's-rounding round()).
+                    diff = round_half_up((113 / slope) * (float(r.total_gross) - rating), 1)
                     str_diff = str(diff)
                     if r.differential != str_diff:
                         db.execute(
@@ -460,7 +463,11 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         # to each of the 20 windowed differentials individually and
         # re-averaging, since the reduction is uniform across the window).
         active_reduction_sum = sum(exceptional_reductions[-WHS_HANDICAP_WINDOW:])
-        hi_after_esr = round(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
+        # WHS Rule 5.1a/5.2a nearest-tenth, .5 UP (round_half_up, not banker's
+        # round()). raw_hi is already tenths-precision and the reduction sum is
+        # whole strokes, so no new .x5 tie can arise here today -- use the WHS
+        # rounder anyway for consistency and to stay correct if that changes.
+        hi_after_esr = round_half_up(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
 
         # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
         # this round already has >= 20 acceptable scores; the cap then

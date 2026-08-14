@@ -16,7 +16,7 @@ from store import (
     next_round_index,
 )
 from calc import (
-    calc_round_dif, calc_handicap_index, calc_round_vs_par,
+    calc_round_dif, round_half_up, calc_handicap_index, calc_round_vs_par,
     calc_avg_vs_par, calc_round_vs_rating, calc_avg_vs_rating,
     calc_par_or_better_percent, calc_big_number_rate, calc_fir_percent,
     calc_gir_percent, calc_putts_per_round, calc_one_putt_percent,
@@ -747,8 +747,11 @@ def register_rounds_routes(app, csrf):
         client_locked = data.get("differential_locked", False)
 
         if send_override and diff_override is not None:
-            # User explicitly provided a new manual value — lock it
-            differential = round(float(diff_override), 1)
+            # User explicitly provided a new manual value — lock it.
+            # WHS Rule 5.1a: round the Score Differential to the nearest tenth
+            # with .5 UP (round_half_up), matching every other differential
+            # site -- a user-entered 18.25 must store as 18.3, not 18.2.
+            differential = round_half_up(float(diff_override), 1)
             golf_round["differential_locked"] = True
             golf_round["differential"] = str(differential)
         elif send_override and diff_override is None:
