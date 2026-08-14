@@ -1,0 +1,152 @@
+name: graphify-impact-report
+
+# Pattern 3 (non-blocking, informational only) per Issue #101 /
+# .context/graphify-spike/PS_ANALYSIS.md (decision: GO-WITH-CONDITIONS,
+# Pattern 2 primary).
+#
+# STATUS: staged artifact. PS_ANALYSIS.md condition 6 (sequencing) says
+# Pattern 3 should be deferred until Pattern 2 (scripts/graphify-setup.sh,
+# local per-developer opt-in) has produced measurable agent-uplift evidence
+# via the companion metrics issue. Do NOT add this job as a required status
+# check in branch protection until that condition is met -- it is designed
+# to be safe to merge even if it fails (continue-on-error throughout), but
+# "safe to merge" is not the same as "validated as valuable yet."
+#
+# This workflow:
+#   - NEVER runs `graphify claude install` (that command generates a
+#     gitignored, per-developer CLAUDE.md section + .claude/ hook and only
+#     makes sense run locally by a human; it must never run in CI).
+#   - NEVER installs graphify from a bare/unpinned package name. The
+#     official package is `graphifyy`; the single-y `graphify` name is an
+#     open, unresolved typosquat risk (Graphify-Labs/graphify#280,
+#     pypi/support#10098 -- both open as of this writing). Always installs
+#     from the exact pinned VCS commit below, matching
+#     scripts/graphify-setup.sh.
+#   - Is entirely informational: continue-on-error at the job level, minimal
+#     `contents: read` permissions, no PR-commenting bot identity, output
+#     posted only to the run's own job summary + a downloadable artifact.
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  graphify-impact-report:
+    name: graphify impact report (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true # informational only -- must never block merge
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Guard against unpinned/typo graphify install
+        run: |
+          set -euo pipefail
+          # Fails this step (job still non-blocking, per continue-on-error
+          # above) if a bare, unpinned `graphify`/`graphifyy` install command
+          # has been introduced anywhere in tracked files. See
+          # .context/graphify-spike/PS_ANALYSIS.md Section 2a: the single-y
+          # `graphify` PyPI name is unclaimed and an open typosquat risk.
+          # This file's own pinned install line and scripts/graphify-setup.sh
+          # are intentionally excluded (they contain the pinned VCS form on
+          # purpose).
+          if git grep -nE '(uv[[:space:]]+tool[[:space:]]+install|pipx[[:space:]]+install|pip[[:space:]]+install)[^#]*\bgraphifyy?\b' \
+              -- . \
+              ':!.github/workflows/graphify-ci.yml' \
+              ':!scripts/graphify-setup.sh' \
+              ':!scripts/graphify-claude-section.md'; then
+            echo "::error::Found an unpinned graphify/graphifyy install command outside the approved pinned-install locations. Always install from the pinned VCS commit (see scripts/graphify-setup.sh)."
+            exit 1
+          fi
+          echo "OK: no unpinned graphify/graphifyy install command found in tracked files."
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
+
+      - name: Install graphify (pinned VCS commit, isolated)
+        run: |
+          set -euo pipefail
+          uv tool install "git+https://github.com/Graphify-Labs/graphify@7fe58b0b0f3873be9a21c30106b8b8527c353aa6"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Extract knowledge graph (no LLM, local AST only)
+        run: |
+          set -euo pipefail
+          graphify extract . --code-only
+          test -f graphify-out/graph.json || { echo "::error::graphify-out/graph.json was not produced"; exit 1; }
+
+      - name: Build impact report (GRAPH_REPORT.md)
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import json
+          import pathlib
+          import subprocess
+
+          graph = json.load(open("graphify-out/graph.json"))
+          links = graph.get("links", [])
+          nodes = graph.get("nodes", [])
+          built_at = graph.get("built_at_commit", "unknown")
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+
+          extracted = sum(1 for l in links if l.get("confidence") == "EXTRACTED")
+          inferred = sum(1 for l in links if l.get("confidence") == "INFERRED")
+          low_confidence = sum(
+              1
+              for l in links
+              if l.get("confidence") == "INFERRED" and l.get("confidence_score", 1.0) < 0.8
+          )
+          stale = built_at != head
+
+          lines = [
+              "# graphify Impact Report (informational, non-blocking)",
+              "",
+              f"- Nodes: {len(nodes)}",
+              f"- Edges: {len(links)}",
+              f"- EXTRACTED edges: {extracted}",
+              f"- INFERRED edges: {inferred} (of which low-confidence <0.8 score: {low_confidence})",
+              f"- graph built_at_commit: `{built_at}`",
+              f"- workflow HEAD: `{head}`",
+              (
+                  "- staleness: **STALE** -- graph does not match this PR's HEAD; "
+                  "treat the counts above as informational only, not authoritative "
+                  "for this diff."
+                  if stale
+                  else "- staleness: OK (graph matches this PR's HEAD)"
+              ),
+              "",
+              (
+                  "This report is generated by a non-blocking, informational-only "
+                  "CI job (Pattern 3, deferred per PS_ANALYSIS.md condition 6 "
+                  "pending Pattern 2 uplift evidence). It does not gate merge and "
+                  "is not a substitute for local `scripts/graphify-setup.sh` use "
+                  "or manual review -- especially for changes touching "
+                  "`source/plugin_loader.py` (confirmed dynamic-import blind spot; "
+                  "see the CLAUDE.md graphify guidance section, generated locally "
+                  "by scripts/graphify-setup.sh)."
+              ),
+          ]
+          report = "\n".join(lines) + "\n"
+          pathlib.Path("GRAPH_REPORT.md").write_text(report)
+          print(report)
+          PYEOF
+
+      - name: Post impact summary
+        if: always()
+        run: |
+          if [ -f GRAPH_REPORT.md ]; then
+            cat GRAPH_REPORT.md >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload graph + report artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: graphify-impact-${{ github.event.pull_request.number || github.sha }}
+          path: |
+            graphify-out/graph.json
+            GRAPH_REPORT.md
+          retention-days: 14
+          if-no-files-found: warn

@@ -214,3 +214,8 @@ fonts/
 # Standalone social feature demos (source of truth for EPIC_001)
 PinSheet Social - Matches (Standalone).html
 PinSheet Social - The Board (Standalone).html
+
+# graphify knowledge-graph output (derived artifact, do not commit)
+graphify-out/
+.graphify*
+raw/
