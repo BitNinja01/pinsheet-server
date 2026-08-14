@@ -87,6 +87,22 @@ class TestBagPage:
         resp = client.get("/bag", follow_redirects=True)
         assert b"login" in resp.data.lower() or b"Login" in resp.data
 
+    def test_club_field_cannot_break_out_of_script_block(self, logged_in_client):
+        # Regression for issue #71 (CWE-79): club free-text fields are embedded
+        # into a <script> block as JSON. Serializing with json.dumps + |safe left
+        # </script> unescaped, allowing script-context breakout. |tojson escapes
+        # </ to <\/ (\u003c), so the payload can never terminate the element.
+        evil = dict(DRIVER)
+        evil["brand"] = "</script><script>window.__xss=1</script>"
+        logged_in_client.post("/bag/club", json=evil)
+
+        html = logged_in_client.get("/bag").get_data(as_text=True)
+
+        # The literal breakout sequence must not survive into the response.
+        assert "</script><script>" not in html
+        # The payload is still present, but neutralized via unicode escaping.
+        assert "\\u003c/script\\u003e" in html or "<\\/script>" in html
+
 
 class TestBagSaveClub:
     def test_save_new_club_generates_id_and_persists(self, logged_in_client):
