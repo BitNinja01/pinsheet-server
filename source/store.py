@@ -360,6 +360,9 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         _is_eligible_diff_round,
         exceptional_reduction,
         WHS_HANDICAP_WINDOW,
+        calc_round_dif,
+        calc_course_handicap,
+        compute_adjusted_gross,
     )
 
     courses_data = get_courses()
@@ -410,7 +413,35 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 tee_data = course_data.get("tees", {}).get(r.tees)
                 if tee_data and r.total_gross and r.total_gross != "0":
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                    diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                    # WHS Rule 3 (Net Double Bogey) / Rule 12: the Score
+                    # Differential must be computed from the ESC-adjusted
+                    # gross (each hole capped to Net Double Bogey), not the
+                    # raw total_gross, whenever per-hole data is available --
+                    # otherwise a detailed round with a blow-up hole is
+                    # over-counted relative to the SAME round entered live
+                    # (rounds.py applies this cap inline via
+                    # compute_adjusted_gross). Score-only rounds have no
+                    # per-hole data to cap, so they correctly keep raw
+                    # total_gross as the Adjusted Gross Score (AGS).
+                    course_holes = course_data.get("holes", {})
+                    if r.holes and course_holes:
+                        # Course Handicap for the ESC cap uses the HI in
+                        # effect when the round was played -- the prior
+                        # DISPLAYED HI (same value Rule 5.9/ESR calls
+                        # `hi_in_effect`, tracked via `prior_displayed`,
+                        # which has not yet had this round appended). 0.0 is
+                        # used when no HI has been established yet (the ESC
+                        # cap then collapses to par+2 for every hole).
+                        hi_before = prior_displayed[-1][1] if prior_displayed else 0.0
+                        adj_hi = hi_before / 2 if r.holes_selection != "all" else hi_before
+                        played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
+                        course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                        adjusted_gross = compute_adjusted_gross(
+                            {hn: h.gross for hn, h in r.holes.items()}, course_holes, course_handicap,
+                        )
+                    else:
+                        adjusted_gross = float(r.total_gross)
+                    diff = calc_round_dif(slope, adjusted_gross, rating)
                     str_diff = str(diff)
                     if r.differential != str_diff:
                         db.execute(

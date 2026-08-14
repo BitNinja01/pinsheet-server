@@ -20,6 +20,35 @@ def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> i
     return round(handicap * (course_slope / 113) + (course_rating - course_par))
 
 
+def compute_adjusted_gross(hole_gross: dict, course_holes: dict, course_handicap: int) -> int:
+    """WHS Rule 3 (Net Double Bogey) / Rule 12: sum each hole's ESC-capped
+    gross score to produce the Adjusted Gross Score (AGS) used for the Score
+    Differential -- (113/Slope)*(AGS - Rating). Each hole's gross is capped
+    to Net Double Bogey (par + strokes-received + 2) via `calc_hole_scores`,
+    the SAME per-hole logic the live round-save path (source/routes/rounds.py)
+    uses -- this is the single shared implementation both the live path and
+    the backfill/recompute/import paths (source/store.py,
+    source/routes/settings.py) must call, so the same detailed round can
+    never yield different differentials depending on entry path.
+
+    `hole_gross` maps hole-number-string -> raw gross (int). Holes missing
+    from `course_holes` (no par/stroke-index on record) fall back to their
+    raw gross uncapped -- there's no Net Double Bogey to compute without a
+    par, mirroring the live path's fallback.
+    """
+    total = 0
+    for hole_num, gross in hole_gross.items():
+        hc_hole = course_holes.get(hole_num, {})
+        if hc_hole:
+            par = int(hc_hole.get("par", 0))
+            stroke_index = int(hc_hole.get("hole_index", 999))
+            _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, int(gross))
+            total += esc_gross
+        else:
+            total += int(gross)
+    return total
+
+
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
     return round((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
 

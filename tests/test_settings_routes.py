@@ -389,3 +389,69 @@ class TestSettingsImport:
         # (19.7 best-8-of-all-25 vs 19.8 windowed best-8-of-recent-20).
         unwindowed_hi = calc_handicap_index(rounds, include_9hole=True, window=None)
         assert unwindowed_hi != expected_hi
+
+    def test_import_recomputes_esc_adjusted_differential_for_blowup_hole(self, logged_in_client):
+        """WHS Rule 3 (Net Double Bogey) / Rule 12: a zip-imported detailed
+        round with a blow-up hole (par 4, gross 10, no stroke received) must
+        have its Score Differential recomputed from the ESC-adjusted gross
+        (that hole capped to par+2 == 6), NOT raw total_gross. Before the
+        fix, /settings/import wrote the raw-total_gross differential (23.5);
+        after the fix it writes the ESC-adjusted differential (19.8), using
+        the course_handicap==0 "no prior HI established yet" fallback since
+        this is the only (first) round in the import. See
+        tests/test_e2e_rounds_scores.py::
+        test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole
+        for the live-vs-recompute equality check once a real prior Handicap
+        Index exists."""
+        course_payload = {
+            "ImportGC": {
+                "par": "72",
+                "holes": {str(n): {"par": 4, "hole_index": n} for n in range(1, 19)},
+                "tees": {"White": {"slope": 120, "rating": 70.0, "yardage": "6000"}},
+            }
+        }
+        holes = {str(n): {"gross": "5", "putts": "2"} for n in range(1, 19)}
+        holes["1"] = {"gross": "10", "putts": "2"}  # blow-up hole, no stroke received
+        raw_total = sum(int(h["gross"]) for h in holes.values())
+        assert raw_total == 95  # bogey-all-18 (90) minus hole-1 bogey (5) plus blowup (10)
+
+        rounds_payload = {
+            "2026-06-01": {
+                "0": {
+                    "course": "ImportGC", "tees": "White", "holes_selection": "all",
+                    "total_gross": str(raw_total), "differential": "0",
+                    "computed_handicap": "", "holes": holes,
+                },
+            }
+        }
+        zip_bytes = _make_zip({
+            "courses.json": json.dumps(course_payload),
+            "rounds/2026.json": json.dumps(rounds_payload),
+        })
+
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "export.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"Imported 1 courses and 1 rounds." in resp.data
+
+        rounds = get_all_rounds(1)
+        assert len(rounds) == 1
+        imported_round = rounds[0]
+
+        raw_differential = round((113 / 120) * (raw_total - 70.0), 1)
+        esc_total = raw_total - 10 + 6  # hole 1 blowup (10) capped to par+2 (6)
+        esc_differential = round((113 / 120) * (esc_total - 70.0), 1)
+
+        assert raw_differential == 23.5
+        assert esc_differential == 19.8
+        assert imported_round.differential == str(esc_differential), (
+            f"import wrote raw-total_gross differential "
+            f"{imported_round.differential!r} (raw would be "
+            f"{raw_differential!r}) instead of the ESC-adjusted "
+            f"{esc_differential!r} -- WHS Rule 3 (Net Double Bogey) / "
+            f"Rule 12 violation."
+        )
+        assert imported_round.differential != str(raw_differential)
