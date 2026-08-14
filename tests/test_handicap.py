@@ -78,7 +78,10 @@ def test_calc_course_handicap_standard():
 
 def test_calc_course_handicap_harder_course():
     result = calc_course_handicap(10.0, 72, 140, 74)
-    assert result == round(10 * (140 / 113) + (74 - 72))
+    # WHS Rule 6.1a: nearest whole, .5 UP. 10*(140/113)+(74-72) = 14.39 -> 14.
+    # Oracle is a hand-computed literal, NOT round() (which is banker's and
+    # would silently validate the wrong rounding on a future tie fixture).
+    assert result == 14
 
 
 def test_calc_round_dif_scratch():
@@ -1810,3 +1813,15 @@ def test_apply_handicap_cap_soft_cap_tie_rounds_half_up():
     assert apply_handicap_cap(13.1, 10.0) == 13.1
     # sanity: a non-tie soft-cap still correct
     assert apply_handicap_cap(14.0, 10.0) == 13.5
+
+
+def test_calc_course_handicap_rounds_half_up_not_bankers():
+    """WHS Rule 6.1a: Course Handicap rounds to the nearest whole with .5 UP.
+    slope 113 + rating==par makes CH == HI exactly, so a .5 HI is an exact tie."""
+    # 10.5 -> 11 (banker's round() gives 10), 2.5 -> 3 (banker's gives 2)
+    assert calc_course_handicap(10.5, 72, 113, 72.0) == 11
+    assert calc_course_handicap(2.5, 72, 113, 72.0) == 3
+    # non-tie unaffected: HI 10, slope 128, CR 71.5, par 72 -> 10*128/113-0.5 = 10.84 -> 11
+    assert calc_course_handicap(10.0, 72, 128, 71.5) == 11
+    # negative (plus handicap) tie: -0.5 -> -1 (away from zero)
+    assert calc_course_handicap(-0.5, 72, 113, 72.0) == -1

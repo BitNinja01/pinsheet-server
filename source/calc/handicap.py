@@ -55,7 +55,11 @@ def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -
 
 
 def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> int:
-    return round(handicap * (course_slope / 113) + (course_rating - course_par))
+    # WHS Rule 6.1a (2024): Course Handicap = HI x (Slope/113) + (CR - Par),
+    # rounded to the nearest whole number with .5 rounded UP. Python's built-in
+    # round() is banker's (half-to-even), so 10.5 -> 10 and 2.5 -> 2 (both
+    # should be 11 and 3). round_half_up(x, 0) gives the WHS-correct integer.
+    return int(round_half_up(handicap * (course_slope / 113) + (course_rating - course_par), 0))
 
 
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
