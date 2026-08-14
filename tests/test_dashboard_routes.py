@@ -727,3 +727,30 @@ def test_profile_last_year_handicap_subtitle_when_round_near_one_year_old(auth_c
     assert resp.status_code == 200
     ctx = capture_render["ctx"]
     assert ctx["panels"]["handicap"].get("subtitle") == "1y 16.0"
+
+
+# ---------------------------------------------------------------------------
+# Regression: issue #47 — the "Recent rounds" round-type filter chips were
+# unwired static <span>s that did nothing on click. They were removed until a
+# per-round round-type dimension exists (blocked on #46). This test renders the
+# real profile HTML (no capture_render stub) and locks in that the dead chips
+# stay gone while the separately-wired chart-card range chips remain.
+# ---------------------------------------------------------------------------
+
+def test_profile_has_no_unwired_roundtype_filter_chips(auth_client):
+    _mark_welcome_shown()
+    _seed_three_rounds()
+    resp = auth_client.get("/profile")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # The dead round-type chips must not be reintroduced (#47). Covers the full
+    # original 5-chip set: the "All" active chip plus all four type labels.
+    for label in ("Normal", "Tournament", "Qualifying", "Practice"):
+        assert f'<span class="ps-chip">{label}</span>' not in html
+    assert '<span class="ps-chip is-on">All</span>' not in html
+
+    # The chart-card range chips (a different, wired .ps-filters block) must
+    # remain — guards against an over-broad removal of all chips.
+    assert 'data-range="12M"' in html
+    assert 'class="ps-chart-card"' in html
