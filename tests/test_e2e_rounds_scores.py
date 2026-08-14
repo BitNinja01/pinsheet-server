@@ -18,6 +18,7 @@ from main import app, User, limiter, csrf
 from source.routes import register_routes
 from database import set_db_path, init_db
 from store import create_user, get_all_rounds, next_round_index, recompute_handicaps_for_user
+from calc.handicap import WHS_MAX_HANDICAP_INDEX
 
 # The Flask `app` is a shared singleton across test modules; register once.
 if "rounds_list" not in app.view_functions:
@@ -559,6 +560,105 @@ def test_decrease_never_capped_once_lhi_established(client):
 
     expected = round(raw_hi + reduction, 1)
     assert stored_hi == expected  # decrease -- Rule 5.8 cap inactive; only Rule 5.9 ESR applies
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.3 — maximum issuable Handicap Index (54.0)
+# --------------------------------------------------------------------------
+
+def test_beginner_run_of_very_high_scores_clamps_to_max_54(client):
+    """WHS Rule 5.3: 'The maximum Handicap Index that can be issued to a
+    player is 54.0.' A beginner's first 3 rounds are so high that the raw
+    Rule 5.2/5.2a calculation (best-1 average minus the 3-diff -2.0
+    adjustment) lands at 67.3 -- `calc_handicap_index` itself deliberately
+    returns that RAW, unclamped value (see its docstring: the 54.0 max is
+    applied downstream, AFTER any Rule 5.8 cap, to preserve the cap's true
+    `increase = raw - low_hi` computation). The DISPLAYED/STORED value must
+    still be clamped down to 54.0, both in `computed_handicap` (live-save +
+    recompute) and on the rendered round-detail page ("HI After")."""
+    for i in range(3):
+        resp = client.post("/api/rounds", json={
+            "date": f"2026-11-{1 + i:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": "150", "holes": {}})
+        assert resp.status_code == 200
+
+    all_rounds = get_all_rounds(1)  # most-recent-first
+    assert len(all_rounds) == 3
+    latest = all_rounds[0]
+
+    from calc.handicap import calc_handicap_index
+    raw_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert raw_hi == 67.3  # calc_handicap_index returns the RAW, unclamped value
+
+    # Live-save (POST) persisted the clamped (54.0), not raw (67.3), value.
+    assert latest.computed_handicap == "54.0"
+
+    # Explicit recompute pass agrees with the live-save value.
+    recompute_handicaps_for_user(1)
+    recomputed = get_all_rounds(1)
+    assert recomputed[0].computed_handicap == "54.0"
+
+    # The value is reflected on the rendered round-detail page.
+    page = client.get(f"/rounds/{latest.date}/{latest.index}")
+    assert page.status_code == 200
+    assert b"54.0" in page.data
+    assert b"67.3" not in page.data
+
+
+def test_narrow_low_hi_band_clamp_applied_after_cap_not_before(client):
+    """WHS Rule 5.3/5.8 ordering regression, exercised through the real
+    recompute pipeline (`store.recompute_handicaps_for_user`, the same code
+    the live POST path runs): 20 stable rounds (differential 50.8 each)
+    establish an LHI in the ~49 band (the LHI dips slightly below 50.8
+    because the WHS Rule 5.2a count-table adjustment applies while the
+    record is still small -- e.g. the 3rd round's best-1-of-3 average gets
+    a -2.0 adjustment -- which is itself correct WHS behavior; the exact
+    LHI is read back from the data rather than hardcoded). A run of 15
+    much-worse rounds (differential 69.3 each) then pushes the raw Rule 5.2
+    Handicap Index to 57.7 -- ABOVE 54.0 -- so the Rule 5.8 cap's
+    `increase = raw - low_hi` genuinely differs depending on whether it is
+    computed against the TRUE raw value (correct WHS order: 5.2/5.2a -> 5.9
+    -> 5.8 -> 5.3) or a pre-clamped-to-54.0 raw value (wrong order). This
+    test proves the real pipeline matches the CORRECT (cap-then-clamp)
+    order, not the wrong (clamp-then-cap) one, for this fixture."""
+    for i in range(20):
+        client.post("/api/rounds", json={
+            "date": f"2027-01-{1 + i:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": "129", "holes": {}})  # differential 50.8 each
+
+    established = get_all_rounds(1)
+    assert len(established) == 20
+    lhi_candidates = [float(r.computed_handicap) for r in established
+                       if r.computed_handicap not in ("", None)]
+    expected_low_hi = min(lhi_candidates)
+    # Sanity: the LHI band this test targets ("narrow low_hi ~49") -- close
+    # to, but distinctly below, the 54.0 maximum.
+    assert 47.0 <= expected_low_hi <= 51.0
+
+    bad_dates = [f"2027-01-{21 + i:02d}" for i in range(10)] + [f"2027-02-{1 + i:02d}" for i in range(5)]
+    assert len(bad_dates) == 15
+    for d in bad_dates:
+        client.post("/api/rounds", json={
+            "date": d, "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": "150", "holes": {}})  # differential 69.3 each
+
+    all_rounds = get_all_rounds(1)
+    stored_hi = float(all_rounds[0].computed_handicap)
+
+    from calc.handicap import calc_handicap_index, apply_handicap_cap
+    raw_hi = calc_handicap_index(all_rounds, include_9hole=True)
+    assert raw_hi == 57.7  # confirm the fixture lands in the target raw range
+    assert raw_hi > WHS_MAX_HANDICAP_INDEX  # confirms this exercises the >54 boundary
+
+    correct_order = min(apply_handicap_cap(raw_hi, expected_low_hi), WHS_MAX_HANDICAP_INDEX)
+    wrong_order = apply_handicap_cap(min(raw_hi, WHS_MAX_HANDICAP_INDEX), expected_low_hi)
+    assert correct_order != wrong_order  # fixture genuinely exercises the ordering difference
+
+    assert stored_hi == correct_order  # the real pipeline matches cap-then-clamp
+    assert stored_hi != wrong_order    # ... and NOT clamp-then-cap
 
 
 def test_live_save_consistent_with_recompute_after_cap(client):

@@ -14,6 +14,7 @@ from calc.handicap import (
     calc_career_low_handicap,
     apply_handicap_cap,
     WHS_HANDICAP_WINDOW,
+    WHS_MAX_HANDICAP_INDEX,
 )
 from calc.approach import (
     calc_fir_percent,

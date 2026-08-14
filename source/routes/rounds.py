@@ -27,6 +27,7 @@ from calc import (
     calc_course_handicap,
     calc_hole_scores,
     WHS_HANDICAP_WINDOW,
+    WHS_MAX_HANDICAP_INDEX,
     current_and_previous_handicap_index,
 )
 from source.web.charts import sparkline_svg
@@ -272,7 +273,12 @@ def register_rounds_routes(app, csrf):
             # get_all_rounds_for_user() is most-recent-first -- satisfies
             # calc_handicap_index's WHS Rule 5.2 ordering contract.
             current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+            # WHS Rule 5.3: Course Handicap (Rule 6.1) derives from the
+            # issued Handicap Index, so clamp the raw calc_handicap_index()
+            # value to the 54.0 maximum before it feeds calc_course_handicap
+            # (no lower clamp).
             if current_hi is not None:
+                current_hi = min(current_hi, WHS_MAX_HANDICAP_INDEX)
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
                 course_holes = course.get("holes", {})
                 if holes_sel != "all" and course_holes:
@@ -309,7 +315,14 @@ def register_rounds_routes(app, csrf):
         # Inserted at index 0 -- list stays most-recent-first (WHS ordering
         # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+        # WHS Rule 5.3: `new_hi` here is a transient DISPLAYED value (this
+        # row's `computed_handicap` before the recompute cascade below runs
+        # and applies the real Rule 5.8 cap using the player's LHI) -- clamp
+        # it to the 54.0 maximum. `calc_handicap_index` intentionally
+        # returns the raw, unclamped Rule 5.2/5.2a value (see its
+        # docstring), so every displayed/stored site must clamp for itself.
         if new_hi is not None:
+            new_hi = min(new_hi, WHS_MAX_HANDICAP_INDEX)
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
@@ -399,6 +412,12 @@ def register_rounds_routes(app, csrf):
         # Filter preserves all_rounds_for_user's most-recent-first order
         # (WHS ordering contract).
         hi_before = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
+        # WHS Rule 5.3: `hi_before` is rendered directly on the round-detail
+        # page ("HI Before") and feeds Course Handicap below -- clamp the
+        # raw calc_handicap_index() value to the 54.0 maximum (no lower
+        # clamp).
+        if hi_before is not None:
+            hi_before = min(hi_before, WHS_MAX_HANDICAP_INDEX)
 
         hole_nums_all = sorted(course_holes.keys(), key=int)
         if not hole_nums_all:
@@ -718,7 +737,11 @@ def register_rounds_routes(app, csrf):
             # Filter preserves all_rounds_for_user's most-recent-first order
             # (WHS ordering contract).
             current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
+            # WHS Rule 5.3: Course Handicap derives from the issued
+            # Handicap Index -- clamp the raw value before it feeds
+            # calc_course_handicap (no lower clamp).
             if current_hi is not None:
+                current_hi = min(current_hi, WHS_MAX_HANDICAP_INDEX)
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
                 course_holes = course.get("holes", {})
                 if holes_sel != "all" and course_holes:
@@ -784,7 +807,11 @@ def register_rounds_routes(app, csrf):
         # In-place replacement -- list stays most-recent-first (WHS ordering
         # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
+        # WHS Rule 5.3: transient displayed value pre-recompute -- clamp to
+        # the 54.0 maximum (see the create-path comment above for why
+        # `calc_handicap_index` itself is deliberately unclamped).
         if new_hi is not None:
+            new_hi = min(new_hi, WHS_MAX_HANDICAP_INDEX)
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 

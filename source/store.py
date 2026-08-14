@@ -360,6 +360,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         _is_eligible_diff_round,
         exceptional_reduction,
         WHS_HANDICAP_WINDOW,
+        WHS_MAX_HANDICAP_INDEX,
     )
 
     courses_data = get_courses()
@@ -479,6 +480,12 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 low_hi = min(candidates)
 
         hi = apply_handicap_cap(hi_after_esr, low_hi) if hi_after_esr is not None else None
+        # WHS Rule 5.3: the 54.0 maximum is the FINAL issued ceiling, applied
+        # AFTER the Rule 5.8 soft/hard cap (which must see the true raw
+        # increase above `low_hi` -- see calc_handicap_index's docstring).
+        # No lower clamp -- plus/negative Handicap Indexes are preserved.
+        if hi is not None:
+            hi = min(hi, WHS_MAX_HANDICAP_INDEX)
 
         if hi is not None:
             new_val = str(hi)

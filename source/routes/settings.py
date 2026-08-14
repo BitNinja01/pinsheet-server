@@ -12,7 +12,7 @@ from store import (
     get_slope_rating,
     create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
-from calc import calc_handicap_index
+from calc import calc_handicap_index, WHS_MAX_HANDICAP_INDEX
 from source.request_data import get_settings, get_courses, base_context
 from source.routes.courses import _coerce_course_numerics
 
@@ -135,6 +135,11 @@ def register_settings_routes(app, limiter, csrf):
                 history_most_recent_first = all_imported[idx:]
                 hi = calc_handicap_index(history_most_recent_first, include_9hole)
                 if hi is not None:
+                    # WHS Rule 5.3: this writes `computed_handicap` directly
+                    # without going through recompute_handicaps_for_user's
+                    # Rule 5.8 cap pipeline, so it must apply the 54.0
+                    # maximum itself here (no lower clamp).
+                    hi = min(hi, WHS_MAX_HANDICAP_INDEX)
                     update_round_handicap(r.date, r.index, hi, user_id)
 
             return render_template("settings_import.html", **base_context(

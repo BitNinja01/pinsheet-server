@@ -34,6 +34,13 @@ def calc_expected_9hole_dif(handicap_index: float) -> float:
 # implementations can't drift apart.
 WHS_HANDICAP_WINDOW = 20
 
+# WHS Rule 5.3 / 5.2a: the maximum Handicap Index that can be issued to a
+# player is 54.0. If a player's calculated Handicap Index exceeds this, it
+# is allocated as 54.0 instead. There is deliberately NO lower clamp -- WHS
+# permits plus/negative Handicap Indexes (see the Rule 5.2a/5.9 negative-HI
+# handling elsewhere in this module).
+WHS_MAX_HANDICAP_INDEX = 54.0
+
 
 def count_table_n(n: int) -> int:
     if n < 3:  return 0
@@ -155,6 +162,19 @@ def calc_handicap_index(
     avg = sum(best_n) / len(best_n)
     # WHS Rule 5.2a: subtract the count-table adjustment (keyed on the number
     # of differentials in the record) before the final round-to-tenth.
+    #
+    # NOTE (WHS Rule 5.3): this function deliberately returns the RAW
+    # (unclamped) Rule 5.2/5.2a value -- it is NOT the final issued Handicap
+    # Index. WHS order of operations is 5.2/5.2a -> 5.9 (ESR) -> 5.8 (soft/
+    # hard cap) -> 5.3 (54.0 maximum), i.e. the 54.0 ceiling is applied LAST,
+    # after the Rule 5.8 cap, so the cap's `increase = raw - low_hi`
+    # computation sees the TRUE raw value (clamping here first would distort
+    # that increase for any low_hi in the ~47-51 band where raw exceeds 54).
+    # The WHS_MAX_HANDICAP_INDEX clamp is instead applied as the final step
+    # at every DISPLAYED/STORED-value site: `store.recompute_handicaps_for_
+    # user` (after `apply_handicap_cap`), the live-save `new_hi` sites in
+    # `routes/rounds.py` (create + edit), and `calc_handicap_trend`'s
+    # per-point output.
     return round(avg + count_table_adjustment(len(diffs)), 1)
 
 
@@ -239,7 +259,9 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
     NOTE: this is an independent rolling-window accumulator -- it does NOT
     call/delegate to `calc_handicap_index`; it maintains its own sorted
     window of the most recent WHS_HANDICAP_WINDOW eligible differentials
-    as it walks the (reconstructed) chronological order."""
+    as it walks the (reconstructed) chronological order. Each emitted point
+    IS clamped to the WHS Rule 5.3 maximum (54.0, no lower clamp) since this
+    is itself a displayed value, not a raw intermediate."""
     chronological = list(reversed(all_rounds))
     result = []
     window_diffs = []
@@ -264,13 +286,24 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
             # WHS Rule 5.2a: subtract the count-table adjustment (keyed on
             # the number of differentials in the window) before rounding.
             val = round(avg + count_table_adjustment(len(window_diffs)), 1)
+            # WHS Rule 5.3: this IS a displayed/emitted value (not a raw
+            # intermediate feeding another rule's calculation), so the
+            # 54.0 maximum clamp applies directly here. No lower clamp --
+            # plus/negative Handicap Indexes are preserved.
+            val = min(val, WHS_MAX_HANDICAP_INDEX)
             result.append((r.date, val))
 
     return result
 
 
 def calc_playing_to_handicap_rate(rounds: list[RoundData], include_9hole: bool = False) -> float | None:
+    # WHS Rule 5.3: calc_handicap_index returns the raw (unclamped) value; this
+    # fallback threshold is a DISPLAYED comparison bar (the "Playing to Handicap
+    # Rate" panel) for rounds without a stored computed_handicap, so it must be
+    # clamped to the 54.0 issued maximum like every other displayed HI.
     overall_hi = calc_handicap_index(rounds, include_9hole)
+    if overall_hi is not None:
+        overall_hi = min(overall_hi, WHS_MAX_HANDICAP_INDEX)
     valid = []
     for r in rounds:
         if r.excluded:
