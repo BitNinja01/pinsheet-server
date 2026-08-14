@@ -804,3 +804,70 @@ def test_rounds_list_handicap_highlight_uses_recent_20_window(client, capture_re
     counted = [r for r in rounds if r["in_handicap"]]
     assert len(counted) == 8  # count_table_n(20) == 8
     assert all(r["date"].startswith("2026-03") for r in counted)
+
+
+# ---------------------------------------------------------------------------
+# Issue #80 (CWE-20): server-side bounds on round score fields
+# ---------------------------------------------------------------------------
+
+class TestScoreBounds:
+    """Issue #80: absurd/negative scores are clamped in place, not rejected —
+    the app tolerates malformed input (must not 500) but must not let it poison
+    the handicap. Per-hole gross clamps to [0, 20]; score-only total to
+    [0, 20 * holes]."""
+
+    def _setup(self, client):
+        _login(client)
+        _make_course(client)
+
+    def _round_on(self, date):
+        return next(r for r in store.get_all_rounds(1) if r.date == date)
+
+    def test_negative_hole_gross_clamped_to_zero(self, client):
+        self._setup(client)
+        holes = _full_detailed_holes(gross=4)
+        holes["1"]["gross"] = "-3"
+        resp = _post_round(client, date="2026-06-01", entry_mode="detailed", holes=holes)
+        assert resp.status_code == 200
+        r = self._round_on("2026-06-01")
+        assert r.holes["1"].gross == 0          # negative clamped to 0
+        assert r.total_gross == str(17 * 4)          # 68, not 68-3
+
+    def test_absurd_hole_gross_clamped_to_max(self, client):
+        self._setup(client)
+        holes = _full_detailed_holes(gross=4)
+        holes["7"]["gross"] = "99"
+        resp = _post_round(client, date="2026-06-02", entry_mode="detailed", holes=holes)
+        assert resp.status_code == 200
+        r = self._round_on("2026-06-02")
+        assert r.holes["7"].gross == 20         # clamped to MAX_HOLE_GROSS
+        assert r.total_gross == str(17 * 4 + 20)     # 88, not 167
+
+    def test_absurd_score_only_total_clamped(self, client):
+        self._setup(client)
+        resp = _post_round(client, date="2026-06-03", entry_mode="score_only", gross_total="9999")
+        assert resp.status_code == 200
+        # 18 holes * 20 = 360 ceiling
+        assert self._round_on("2026-06-03").total_gross == "360"
+
+    def test_valid_scores_pass_through_unchanged(self, client):
+        self._setup(client)
+        assert _post_round(client, date="2026-06-04", entry_mode="score_only", gross_total="85").status_code == 200
+        assert self._round_on("2026-06-04").total_gross == "85"
+        holes = _full_detailed_holes(gross=5)
+        assert _post_round(client, date="2026-06-05", entry_mode="detailed", holes=holes).status_code == 200
+        assert self._round_on("2026-06-05").total_gross == str(18 * 5)
+
+    def test_edit_path_is_also_clamped(self, client):
+        # The PUT edit path shares the sanitizer.
+        self._setup(client)
+        assert _post_round(client, date="2026-06-06", entry_mode="score_only", gross_total="85").status_code == 200
+        bad_holes = _full_detailed_holes(gross=4)
+        bad_holes["1"]["gross"] = "-1"
+        resp = client.put("/api/rounds/2026-06-06/0", json={
+            "date": "2026-06-06", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "detailed", "notes": "",
+            "gross_total": "", "holes": bad_holes,
+        })
+        assert resp.status_code == 200
+        assert self._round_on("2026-06-06").holes["1"].gross == 0

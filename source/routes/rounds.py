@@ -66,6 +66,30 @@ def _expected_hole_count(course, holes_sel):
     return 9
 
 
+MAX_HOLE_GROSS = 20  # sane per-hole ceiling (issue #80, CWE-20)
+
+
+def _sanitize_scores(data, course, holes_sel):
+    """Clamp score fields in place so a crafted or buggy client can't poison the
+    submitter's handicap with negative or absurd scores (issue #80, CWE-20).
+
+    Consistent with the app's lenient contract (malformed input must not 500):
+    non-numeric/blank gross stays unscored via _safe_int's 0 fallback rather
+    than erroring. Per-hole gross is clamped to [0, MAX_HOLE_GROSS]; a
+    score-only total is clamped to [0, MAX_HOLE_GROSS * holes_played].
+    """
+    for hole in (data.get("holes") or {}).values():
+        raw = hole.get("gross", "")
+        if raw in (None, ""):
+            continue
+        hole["gross"] = str(max(0, min(_safe_int(raw, 0), MAX_HOLE_GROSS)))
+    if data.get("entry_mode") == "score_only":
+        raw_total = data.get("gross_total", "")
+        if raw_total not in (None, ""):
+            max_total = MAX_HOLE_GROSS * _expected_hole_count(course, holes_sel)
+            data["gross_total"] = str(max(0, min(_safe_int(raw_total, 0), max_total)))
+
+
 def register_rounds_routes(app, csrf):
     @app.route("/rounds/new")
     @login_required
@@ -231,6 +255,8 @@ def register_rounds_routes(app, csrf):
             holes_sel = "all"
 
         slope, rating = get_slope_rating(tees, holes_sel)
+
+        _sanitize_scores(data, course, holes_sel)
 
         golf_round = {
             "date": date_val,
@@ -678,6 +704,8 @@ def register_rounds_routes(app, csrf):
             holes_sel = "all"
 
         slope, rating = get_slope_rating(tees, holes_sel)
+
+        _sanitize_scores(data, course, holes_sel)
 
         golf_round = {
             "date": new_date,
