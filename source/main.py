@@ -47,6 +47,12 @@ app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 app.config["REMEMBER_COOKIE_DURATION"] = 30 * 24 * 60 * 60  # 30 days
 
+# Cap the raw request/upload body to bound memory use and reject zip-bomb
+# uploads before they are read (CWE-400). Configurable via env; default 16 MB.
+app.config["MAX_CONTENT_LENGTH"] = int(
+    os.environ.get("MAX_CONTENT_LENGTH", 16 * 1024 * 1024)
+)
+
 
 class User:
     def __init__(self, user_dict):
