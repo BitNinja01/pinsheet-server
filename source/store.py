@@ -1058,8 +1058,24 @@ def get_clubs(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def save_club(club_data: dict, user_id: int) -> None:
+def save_club(club_data: dict, user_id: int) -> bool:
+    """Insert or update a club for ``user_id``.
+
+    Ownership guard (issue #69, CWE-639): the client controls the ``id`` primary
+    key, so an INSERT OR REPLACE could otherwise overwrite another user's club
+    row and reassign it. Reject when the id already exists under a different
+    owner. Returns True if saved, False if rejected as a cross-user write.
+    """
     db = get_db()
+    existing = db.execute(
+        "SELECT user_id FROM clubs WHERE id = ?", (club_data["id"],)
+    ).fetchone()
+    if existing is not None and existing["user_id"] != user_id:
+        db.close()
+        _log.warning(
+            "save_club rejected: club %s is owned by another user", club_data["id"]
+        )
+        return False
     db.execute(
         """INSERT OR REPLACE INTO clubs (id, user_id, category, club, number, brand, model, loft, lie, length, shaft_flex, shaft_brand, shaft, grip, sw, carry)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -1085,6 +1101,7 @@ def save_club(club_data: dict, user_id: int) -> None:
     db.commit()
     db.close()
     _log.info("club saved: %s", club_data["id"])
+    return True
 
 
 def delete_club(club_id: str, user_id: int) -> None:
@@ -1123,13 +1140,18 @@ def save_bag_slots(slot_ids: list, user_id: int) -> None:
     _log.info("bag slots saved for user_id=%s", user_id)
 
 
-def get_distinct_club_field_values(field: str) -> list[str]:
+def get_distinct_club_field_values(field: str, user_id: int) -> list[str]:
+    # Issue #72 (CWE-200): scope to the caller's own clubs — without WHERE
+    # user_id this leaked every user's brand/model/shaft/grip to any /bag
+    # visitor. `field` stays allowlist-checked against SAFE (not user input in
+    # the SQL text); user_id is bound as a parameter.
     SAFE = {"brand", "model", "shaft_brand", "shaft", "grip"}
     if field not in SAFE:
         return []
     db = get_db()
     rows = db.execute(
-        f"SELECT DISTINCT {field} FROM clubs WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}"
+        f"SELECT DISTINCT {field} FROM clubs WHERE user_id = ? AND {field} IS NOT NULL AND {field} != '' ORDER BY {field}",
+        (user_id,),
     ).fetchall()
     db.close()
     return [r[field] for r in rows]
