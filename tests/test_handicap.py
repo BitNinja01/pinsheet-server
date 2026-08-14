@@ -1,6 +1,7 @@
 import math
 from calc.handicap import (
     calc_hole_scores,
+    calc_strokes_given,
     calc_course_handicap,
     calc_round_dif,
     calc_expected_9hole_dif,
@@ -69,6 +70,18 @@ def test_calc_hole_scores_two_strokes():
 def test_calc_hole_scores_esc_limits_gross():
     gross, net, esc = calc_hole_scores(1, 10, 4, 9)
     assert esc == 7
+
+
+def test_calc_strokes_given_boundaries():
+    """WHS 0/1/2 stroke rule boundaries: 0 strokes below Stroke Index, 1
+    stroke at/above SI, 2 strokes only once Course Handicap reaches
+    SI + 18 (not SI + 17)."""
+    si = 10
+    assert calc_strokes_given(si, si - 1) == 0       # CH < SI -> 0
+    assert calc_strokes_given(si, si) == 1           # CH == SI -> 1
+    assert calc_strokes_given(si, si + 17) == 1       # CH == SI+17 -> still 1
+    assert calc_strokes_given(si, si + 18) == 2       # CH == SI+18 -> 2
+    assert calc_strokes_given(si, 999) == 2           # huge CH -> capped at 2
 
 
 def test_calc_course_handicap_standard():

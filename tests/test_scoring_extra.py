@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import pytest
 
 from source.models import dict_to_round, dict_to_course
+from calc.handicap import calc_course_handicap
 
 from calc.scoring import (
     calc_trend,
@@ -239,16 +240,169 @@ def test_per_hole_stats_gir_n_and_r_and_penalties(make_round, make_course):
 
 
 def test_per_hole_stats_handicap_calc_handles_invalid_slope(make_round):
+    """DA-002 changed expectation: `dict_to_course` now parses `slope`
+    through `safe_float` (blank/non-numeric-safe), same as `rating`
+    already was -- so a non-numeric "invalid" slope is resolved to the
+    sane default (113) at course-LOAD time, instead of surviving as a raw
+    string into TeeData.slope and only being caught downstream by
+    scoring.py's `float(first_tee.slope or "113")` try/except (which
+    previously made `calc_per_hole_stats` swallow the whole per-round
+    stroke computation and return `expected=None`).
+
+    With slope now resolving to 113 and rating="70" (valid), Course
+    Handicap = calc_course_handicap(10.5, 72, 113, 70) = 8; hole stroke
+    index 5 <= 8 -> 1 stroke -- a real, non-None `expected` value, which
+    is the more correct/useful behavior (the stat is no longer silently
+    dropped just because one tee field was garbage).
+    """
     course_dict = {
         "par": "72",
         "holes": {"1": {"par": 4, "hole_index": 5}},
         "tees": {"White": {"slope": "invalid", "rating": "70", "yardage": "6000"}},
     }
     courses = {"Test GC": dict_to_course("Test GC", course_dict)}
+    tee = courses["Test GC"].tees["White"]
+    assert tee.slope == 113  # non-numeric -> safe default, not a crash/raw string
+
     r = make_round(gross=80, course="Test GC")
     result = calc_per_hole_stats([r], courses, "Test GC", 1, handicap_index=10.5)
     assert result["rounds_played"] == 1
-    assert result["expected"] is None
+    assert result["expected"] == pytest.approx(1.0)
+
+
+# ---- WHS R13 regression: Course Handicap sign in strokes-received calc ----
+#
+# calc_per_hole_stats used to compute Course Handicap inline as
+# `handicap_index * slope / 113 + (course_par - rating)` -- the (par -
+# rating) term is backwards vs. the canonical WHS 2024 Rule 6.1a formula
+# `handicap * (slope / 113) + (rating - par)` used by
+# calc.handicap.calc_course_handicap. On any course where rating != par
+# this silently corrupted the strokes-received-per-hole stat. These tests
+# pin real-world numbers (hard course, easy course, missing-rating tee)
+# against the now-shared canonical formula.
+
+def test_per_hole_stats_hard_course_course_handicap_sign(make_round, make_course):
+    """Hard course: HI 10.0, slope 131, rating 76.0, par 72.
+
+    Canonical Course Handicap = round(10 * 131/113 + (76 - 72)) = 16.
+    The old sign-flipped formula gave round(10*131/113 + (72-76)) = 8.
+    Hole 12 has stroke index 12 -- <=16 (correct, new) but NOT <=8 (old
+    buggy value) -- so this hole only receives a stroke under the fix.
+    """
+    assert calc_course_handicap(10.0, 72, 131, 76.0) == 16
+
+    courses = make_course(par=72, slope=131, rating=76.0)
+    r = make_round(gross=80, course="Test GC")
+    result = calc_per_hole_stats([r], courses, "Test GC", 12, handicap_index=10.0)
+    assert result["rounds_played"] == 1
+    assert result["expected"] == pytest.approx(1.0)
+
+
+def test_per_hole_stats_course_handicap_over_18_awards_second_stroke(make_round, make_course):
+    """WHS 0/1/2 stroke rule, amplified by the sign fix: on a hard course a
+    high enough HI legitimately pushes Course Handicap above 18, at which
+    point holes with a low Stroke Index must receive a SECOND stroke
+    (Course Handicap >= Stroke Index + 18), not just one.
+
+    HI 20.0, slope 131, rating 76.0, par 72:
+    Course Handicap = round(20 * 131/113 + (76 - 72)) = 27.
+    - Hole SI 5:  27 >= 5+18=23  -> 2 strokes.
+    - Hole SI 15: 27 >= 15, but 27 < 15+18=33 -> 1 stroke (not 2).
+    """
+    assert calc_course_handicap(20.0, 72, 131, 76.0) == 27
+
+    courses = make_course(par=72, slope=131, rating=76.0)
+    r = make_round(gross=80, course="Test GC")
+
+    result_si5 = calc_per_hole_stats([r], courses, "Test GC", 5, handicap_index=20.0)
+    assert result_si5["expected"] == pytest.approx(2.0)
+
+    result_si15 = calc_per_hole_stats([r], courses, "Test GC", 15, handicap_index=20.0)
+    assert result_si15["expected"] == pytest.approx(1.0)
+
+
+def test_per_hole_stats_easy_course_course_handicap_sign(make_round, make_course):
+    """Easy course: HI 10.0, slope 113, rating 70.0, par 72 (rating < par
+    reduces Course Handicap below HI).
+
+    Canonical Course Handicap = round(10 * 113/113 + (70 - 72)) = 8.
+    Hole 8 has stroke index 8 (<= course_hcp 8, receives a stroke); hole 9
+    has stroke index 9 (> course_hcp 8, receives none).
+    """
+    assert calc_course_handicap(10.0, 72, 113, 70.0) == 8
+
+    courses = make_course(par=72, slope=113, rating=70.0)
+    r = make_round(gross=80, course="Test GC")
+
+    result_si8 = calc_per_hole_stats([r], courses, "Test GC", 8, handicap_index=10.0)
+    assert result_si8["expected"] == pytest.approx(1.0)
+
+    result_si9 = calc_per_hole_stats([r], courses, "Test GC", 9, handicap_index=10.0)
+    assert result_si9["expected"] == pytest.approx(0.0)
+
+
+def test_dict_to_course_blank_rating_and_slope_no_crash(make_round):
+    """Blank ("") tee rating/slope is explicitly allowed by
+    routes/courses.py:_coerce_course_numerics ("Blank/missing values are
+    left as-is in both modes"). `dict_to_course` previously called
+    `float(tdata.get("rating", 72.0))` directly -- since the "rating" key
+    IS present (just blank), the default never applied and float("")
+    raised ValueError at course-load time, crashing every page that
+    builds courses (dashboard/stats/rounds/matches/rankings), not just
+    this stat. Assert the course loads without error and the resulting
+    Course Handicap calc is sane (not corrupted / not a crash).
+    """
+    course_dict = {
+        "par": "72",
+        "holes": {"5": {"par": 4, "hole_index": 5}},
+        "tees": {"White": {"slope": "", "rating": "", "yardage": "6000"}},
+    }
+    courses = {"Test GC": dict_to_course("Test GC", course_dict)}  # must not raise
+    tee = courses["Test GC"].tees["White"]
+    assert tee.rating == 72.0  # blank -> safe default, not a crash
+    # DA-002: `slope` previously stored the raw un-parsed "" (violating
+    # TeeData.slope: int), only masked downstream by scoring.py's
+    # `float(first_tee.slope or "113")` idiom. dict_to_course itself must
+    # now resolve blank slope to the sane default, same as rating.
+    assert tee.slope == 113
+
+    r = make_round(gross=80, course="Test GC")
+    result = calc_per_hole_stats([r], courses, "Test GC", 5, handicap_index=10.0)
+    assert result["rounds_played"] == 1
+    # blank slope -> 113 fallback, blank rating -> 72.0 (== par) fallback:
+    # course_hcp = round(10 * 113/113 + (72 - 72)) = 10, a sane value.
+    # Hole SI 5 <= course_hcp 10 -> 1 stroke.
+    assert result["expected"] == pytest.approx(1.0)
+
+
+def test_per_hole_stats_missing_rating_falls_back_to_par_not_zero(make_round):
+    """A tee whose rating collapses to 0 (e.g. unset/placeholder source
+    data storing "0") must NOT be treated as an actual 0.0 rating -- that
+    corrupts the (rating - par) term and produces an absurd Course
+    Handicap (the old code: round(10*113/113 + (72-0)) = 82, which would
+    award 2 strokes on every single hole, including the easiest).
+
+    The fix falls back to rating == par when no real rating is present,
+    which is the least-surprising assumption (Course Handicap ~= HI) and
+    yields a sane, non-crashing result instead.
+    """
+    course_dict = {
+        "par": "72",
+        "holes": {"18": {"par": 4, "hole_index": 18}},
+        "tees": {"White": {"slope": "113", "rating": "0", "yardage": "6000"}},
+    }
+    courses = {"Test GC": dict_to_course("Test GC", course_dict)}
+    r = make_round(gross=80, course="Test GC")
+
+    # Sanity: fallback (rating == par == 72) gives course_hcp 10, not 82.
+    assert calc_course_handicap(10.0, 72, 113, 72.0) == 10
+
+    result = calc_per_hole_stats([r], courses, "Test GC", 18, handicap_index=10.0)
+    assert result["rounds_played"] == 1
+    # Hole SI 18 (the easiest hole) correctly receives NO stroke for a
+    # 10.0-handicap player under the sane fallback -- not the old code's
+    # absurd "2 strokes on every hole" behavior from rating=0.
+    assert result["expected"] == pytest.approx(0.0)
 
 
 # ---- calc_historical_window ----

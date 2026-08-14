@@ -225,6 +225,85 @@ def test_api_rounds_post_requires_login(client):
     assert resp.status_code in (302, 401)
 
 
+def test_api_rounds_post_against_zero_slope_tee_returns_clean_4xx_not_500(client):
+    """CV-001 (Critical): "0" is not blank -- routes/courses.py now rejects
+    a non-positive slope/rating at course-save time, but a course saved
+    BEFORE that guard existed (legacy data) could still have a tee with
+    slope "0" sitting in storage. POSTing a round against such a tee
+    previously 500'd inside calc_round_dif's `113 / tee_slope` division.
+    Bypass the course-write API (store.save_course directly, simulating
+    legacy/pre-fix data) and assert the round-save route now returns a
+    clean 4xx instead of crashing.
+    """
+    _login(client)
+    course_data = {
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70", "slope": "0"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    store.save_course(course_data, "ZeroSlopeGC")
+
+    resp = _post_round(client, course="ZeroSlopeGC", gross_total="85")
+    assert resp.status_code < 500
+    assert 400 <= resp.status_code < 500
+
+
+def test_api_rounds_put_against_zero_slope_tee_returns_clean_4xx_not_500(client):
+    """CV-001 PUT-route coverage: api_rounds_put (PUT /api/rounds/<date>/
+    <index>, the round-edit path) applies the same `invalid_tee_numeric_
+    reason` guard as api_rounds_post. Save a round against a valid course,
+    then edit it (PUT) to reference a legacy course whose tee has slope
+    "0" (seeded via store.save_course, bypassing the course-write guard)
+    -- must return a clean 4xx, not 500 from calc_round_dif's `113 /
+    tee_slope` division.
+    """
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    resp = _post_round(client, date="2026-06-01", gross_total="85")
+    assert resp.status_code == 200
+
+    course_data = {
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70", "slope": "0"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    store.save_course(course_data, "ZeroSlopeGC")
+
+    resp = client.put("/api/rounds/2026-06-01/0", json={
+        "date": "2026-06-01", "course": "ZeroSlopeGC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only",
+        "gross_total": "85", "notes": "", "holes": {},
+    })
+    assert resp.status_code < 500
+    assert 400 <= resp.status_code < 500
+
+
+def test_api_courses_post_rejects_non_positive_slope(client):
+    """routes/courses.py:_coerce_course_numerics write-path guard (CV-001):
+    a new course save with slope "0" (or rating "0"/negative) is rejected
+    with a clean 400, not silently persisted to poison round saves later.
+    """
+    _login(client)
+    course_data = {
+        "name": "BadSlopeGC",
+        "location": {"city": "City", "state/province": "ST", "country": "Country"},
+        "tees": {"White": {"yardage": "6000", "rating": "70", "slope": "0"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": 72,
+    }
+    resp = client.post("/api/courses", json=course_data)
+    assert resp.status_code == 400
+    assert store.get_courses().get("BadSlopeGC") is None
+
+    course_data["tees"]["White"]["slope"] = "125"
+    course_data["tees"]["White"]["rating"] = "-1"
+    resp = client.post("/api/courses", json=course_data)
+    assert resp.status_code == 400
+    assert store.get_courses().get("BadSlopeGC") is None
+
+
 def test_api_rounds_post_links_round_to_match_when_computed_handicap_present(client):
     """When >=3 rounds exist a handicap is computed; supplying match_id must
     create a match_rounds link with the correctly-derived net score."""

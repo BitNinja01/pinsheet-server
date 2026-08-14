@@ -25,6 +25,16 @@ _COURSE_NUMERIC_TEE_FIELDS = (
     "front_rating", "front_slope", "back_rating", "back_slope",
 )
 
+# Slope/rating (and their front_/back_ variants) are divisors/terms in the
+# WHS Course Handicap and Score Differential formulas
+# (calc_course_handicap, calc_round_dif). Unlike blank/missing, "0" (and
+# negative values) parse fine as a float but are domain-invalid --
+# calc_round_dif divides by slope, so slope<=0 is a ZeroDivisionError
+# waiting to happen at round-save time (CV-001). "yardage" has no such
+# constraint (a 0 yardage is merely unhelpful, not divide-by-zero
+# dangerous), so it is deliberately excluded from this stricter check.
+_POSITIVE_ONLY_TEE_FIELDS = ("rating", "slope", "front_rating", "front_slope", "back_rating", "back_slope")
+
 
 def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
     """Validate tee/hole numeric fields on an incoming course payload.
@@ -37,15 +47,19 @@ def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
     hole regardless of template behavior.
 
     strict=True (API write path, courses.py): the first present,
-      non-empty, non-numeric value causes this to return an error message
-      describing the offending tee/field; the payload is left untouched
-      so the caller can 400 before anything is persisted.
-    strict=False (zip import path, settings.py): non-numeric values are
-      blanked out in place instead of rejected, so a single bad course in
-      a batch import doesn't fail the whole import; this always returns
-      None.
+      non-empty, non-numeric OR non-positive (slope/rating only) value
+      causes this to return an error message describing the offending
+      tee/field; the payload is left untouched so the caller can 400
+      before anything is persisted.
+    strict=False (zip import path, settings.py): non-numeric/non-positive
+      values are blanked out in place instead of rejected, so a single bad
+      course in a batch import doesn't fail the whole import; this always
+      returns None.
 
     Blank/missing values are left as-is in both modes (blank is allowed).
+    A non-positive slope/rating ("0", "-5", ...) is NOT treated as blank --
+    it is domain-invalid (see `_POSITIVE_ONLY_TEE_FIELDS` above) and is
+    rejected/blanked the same as a non-numeric value.
     """
     tees = data.get("tees")
     if not isinstance(tees, dict):
@@ -58,10 +72,15 @@ def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
             if val in (None, ""):
                 continue
             try:
-                float(val)
+                parsed = float(val)
             except (TypeError, ValueError):
                 if strict:
                     return f"tee '{tee_name}' field '{field}' must be numeric"
+                tee[field] = ""
+                continue
+            if field in _POSITIVE_ONLY_TEE_FIELDS and parsed <= 0:
+                if strict:
+                    return f"tee '{tee_name}' field '{field}' must be a positive number"
                 tee[field] = ""
         yardages = tee.get("yardages")
         if isinstance(yardages, dict):

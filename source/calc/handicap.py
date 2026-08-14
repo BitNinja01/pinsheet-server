@@ -4,13 +4,27 @@ import math
 from source.models import RoundData
 
 
-def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
+def calc_strokes_given(hole_stroke_index, course_handicap) -> int:
+    """WHS stroke allocation (Rule 6.2b): a player receives 1 stroke on a
+    hole once their Course Handicap reaches/exceeds that hole's Stroke
+    Index, and a 2nd stroke once it reaches/exceeds Stroke Index + 18.
+    The +18 branch only fires once Course Handicap exceeds 18 -- e.g.
+    high-Handicap-Index players on hard/high-slope courses -- so it is
+    easy to omit by accident when a Course Handicap consumer only
+    hand-rolls the single-stroke branch. Single source of truth for the
+    0/1/2 stroke rule; shared by `calc_hole_scores` and
+    `calc.scoring.calc_per_hole_stats`'s strokes-received stat so they
+    can't drift apart."""
     strokes_given = 0
     if course_handicap >= hole_stroke_index:
         strokes_given = 1
     if course_handicap >= (hole_stroke_index + 18):
         strokes_given = 2
+    return strokes_given
 
+
+def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
+    strokes_given = calc_strokes_given(hole_stroke_index, course_handicap)
     hole_net = hole_gross - strokes_given
     esc_gross = min(hole_gross, int(hole_par) + 2 + strokes_given)
     return hole_gross, hole_net, esc_gross

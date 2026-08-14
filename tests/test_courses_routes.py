@@ -201,6 +201,25 @@ class TestApiCoursesPut:
         courses = get_courses()
         assert courses["Pebble Valley"]["location"]["city"] == "Testville"
 
+    def test_put_rejects_non_positive_slope(self, logged_in_client):
+        """CV-001 write-path guard applies to PUT (course edit) same as
+        POST (course create) -- api_courses_put calls the same
+        `_coerce_course_numerics`. slope "0" -> 400, nothing persisted
+        (the course's original valid slope/rating survive unmutated)."""
+        logged_in_client.post("/api/courses", json=VALID_COURSE)
+        payload = dict(VALID_COURSE)
+        payload["tees"] = {"White": {"yardage": "6200", "rating": "70.5", "slope": "0"}}
+        resp = logged_in_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 400
+        courses = get_courses()
+        assert courses["Pebble Valley"]["tees"]["White"]["slope"] == "125"  # unmutated
+
+        payload["tees"] = {"White": {"yardage": "6200", "rating": "-1", "slope": "125"}}
+        resp = logged_in_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 400
+        courses = get_courses()
+        assert courses["Pebble Valley"]["tees"]["White"]["rating"] == "70.5"  # unmutated
+
 
 # ---------------------------------------------------------------------------
 # /api/courses hole-key validation (canonical stroke-index key is "hole_index")

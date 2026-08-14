@@ -10,7 +10,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
-from source.models import dict_to_round, RoundData
+from source.models import dict_to_round, RoundData, safe_float, safe_positive_float
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -549,15 +549,37 @@ def recompute_all_handicaps() -> None:
 
 
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
+    """Extract (slope, rating) for the given 9/18-hole selection from a raw
+    tee dict (round save/update, matches, dashboard, settings).
+
+    Blank ("") slope/rating values are explicitly allowed by
+    routes/courses.py:_coerce_course_numerics ("Blank/missing values are
+    left as-is"), so a present-but-blank field must fall back the same as
+    a missing one -- a plain `dict.get(field, default)` does NOT do this,
+    since the default only applies when the key is absent, not when its
+    value is "".
+
+    CV-001 / DA-001: "0" (or a negative value) is NOT blank -- it parses
+    fine as a float, but is domain-invalid: slope<=0 divides by zero in
+    calc_round_dif (`113 / tee_slope`) and rating<=0 poisons the Score
+    Differential (`adjusted_gross_score - tee_rating` inflates hugely),
+    corrupting the WHS Rule 5.2 Handicap Index, not just a display stat.
+    routes/courses.py:_coerce_course_numerics now rejects non-positive
+    slope/rating at course-save time going forward, but this is the
+    defense-in-depth backstop for already-persisted/legacy course data --
+    `safe_positive_float` treats non-positive the same as blank/missing
+    and cascades through the same front_/back_ -> base -> hardcoded-default
+    fallback chain. This function must NEVER return a slope or rating <= 0.
+    """
     if holes_sel == "front":
-        slope  = float(tee_data.get("front_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("front_rating", tee_data.get("rating", 72.0)))
+        slope  = safe_positive_float(tee_data.get("front_slope"),  tee_data.get("slope"),  default=113)
+        rating = safe_positive_float(tee_data.get("front_rating"), tee_data.get("rating"), default=72.0)
     elif holes_sel == "back":
-        slope  = float(tee_data.get("back_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("back_rating", tee_data.get("rating", 72.0)))
+        slope  = safe_positive_float(tee_data.get("back_slope"),  tee_data.get("slope"),  default=113)
+        rating = safe_positive_float(tee_data.get("back_rating"), tee_data.get("rating"), default=72.0)
     else:
-        slope  = float(tee_data.get("slope",  113))
-        rating = float(tee_data.get("rating", 72.0))
+        slope  = safe_positive_float(tee_data.get("slope"),  default=113)
+        rating = safe_positive_float(tee_data.get("rating"), default=72.0)
     return slope, rating
 
 
