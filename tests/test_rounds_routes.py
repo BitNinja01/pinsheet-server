@@ -259,16 +259,19 @@ def test_api_rounds_post_links_round_to_match_when_computed_handicap_present(cli
     # calc_course_handicap, to actually catch a formula bug there):
     #   new round diff = round((113/120) * (85-70), 1) = 14.1
     #   effective diffs sorted = [10.0, 12.0, 14.1]; count_table_n(3) = 1
-    #   -> handicap index = best 1 = 10.0
-    #   course_handicap = round(10.0 * (120/113) + (70.0-72)) = round(8.619...) = 9
-    #   net = 85 - 9 = 76
+    #   -> best 1 = 10.0
+    #   WHS Rule 5.2a: 3 differentials -> -2.0 adjustment -> handicap index = 8.0
+    #   (was 10.0 pre-fix)
+    #   course_handicap = round(8.0 * (120/113) + (70.0-72)) = round(6.4956...) = 6
+    #   (was 9 pre-fix)
+    #   net = 85 - 6 = 79 (was 76 pre-fix)
     saved = [r for r in store.get_all_rounds(user["id"]) if r.date == "2026-06-10"]
     assert len(saved) == 1
     hi = float(saved[0].computed_handicap)
-    assert hi == 10.0
-    expected_ch = 9
+    assert hi == 8.0
+    expected_ch = 6
     expected_net = 85 - expected_ch
-    assert expected_net == 76
+    assert expected_net == 79
     assert float(links[0]["net"]) == float(expected_net)
 
 
@@ -441,10 +444,14 @@ def test_round_detail_computes_net_total_from_course_handicap(client, capture_re
     Hand-derived (not by calling calc_course_handicap/calc_handicap_index
     from the test itself):
       3 prior score-only rounds with differentials [10.0, 12.0, 14.0] ->
-        count_table_n(3) = 1 -> hi_before = best-1 = 10.0
-      course_handicap = round(10.0 * (120/113) + (70.0-72)) = round(8.619..) = 9
-      total_gross (18 holes @ gross=4, par=4) = 72 -> net_total = 72 - 9 = 63
-      total_par = 72 -> net_diff = 63 - 72 = -9
+        count_table_n(3) = 1 -> best-1 = 10.0
+      WHS Rule 5.2a: 3 differentials -> -2.0 adjustment -> hi_before = 8.0
+      (was 10.0 pre-fix)
+      course_handicap = round(8.0 * (120/113) + (70.0-72)) = round(6.4956..) = 6
+      (was 9 pre-fix)
+      total_gross (18 holes @ gross=4, par=4) = 72 -> net_total = 72 - 6 = 66
+      (was 63 pre-fix)
+      total_par = 72 -> net_diff = 66 - 72 = -6 (was -9 pre-fix)
     """
     user = _login(client)
     _make_course(client, slope=120, rating=70.0, par=72)
@@ -468,10 +475,10 @@ def test_round_detail_computes_net_total_from_course_handicap(client, capture_re
     assert resp.status_code == 200
     ctx = capture_render["ctx"]
 
-    assert ctx["hi_before"] == 10.0
-    assert ctx["course_handicap"] == 9
-    assert ctx["total"]["net_total"] == 63
-    assert ctx["total"]["net_diff"] == -9
+    assert ctx["hi_before"] == 8.0
+    assert ctx["course_handicap"] == 6
+    assert ctx["total"]["net_total"] == 66
+    assert ctx["total"]["net_diff"] == -6
 
 
 # ---------------------------------------------------------------------------
@@ -696,6 +703,40 @@ def test_api_rounds_exclude_sets_flag_and_recomputes_handicap(client):
     assert resp.get_json()["excluded"] is False
     saved = store.get_all_rounds(1)
     assert saved[0].excluded is False
+
+
+def test_api_rounds_exclude_response_handicap_is_stored_value(client):
+    """The exclude response's `handicap` must be the STORED displayed HI
+    (WHS Rule 5.7/5.8 capped + Rule 5.9 ESR-adjusted) that recompute just
+    wrote -- not a fresh raw calc_handicap_index() recalculation, which
+    bypasses both. Under an active Exceptional Score Reduction the two
+    diverge (raw 11.0 vs stored 10.0 below), so this test fails against
+    the old raw-response implementation and passes with the stored value.
+    """
+    _login(client)
+    _make_course(client)
+    # 20 rounds at gross 83 -> diff 12.2, baseline HI 12.2 (LHI 10.2 from
+    # the Rule 5.2a-adjusted rounds 3-4).
+    for i in range(20):
+        _post_round(client, date=f"2026-07-{1 + i:02d}", gross_total="83")
+    # Exceptional round: diff 2.8, gap 9.4 vs HI-in-effect 12.2 -> -1.0 ESR.
+    _post_round(client, date="2026-08-01", gross_total="73")
+
+    resp = client.post("/api/rounds/2026-07-10/0/exclude", json={"excluded": True})
+    assert resp.status_code == 200
+    data = resp.get_json()
+
+    stored_hi = None
+    for r in store.get_all_rounds(1):
+        if r.computed_handicap and r.computed_handicap != "0":
+            stored_hi = float(r.computed_handicap)
+            break
+    assert stored_hi is not None
+    assert data["handicap"] == stored_hi
+
+    from calc.handicap import calc_handicap_index
+    raw = calc_handicap_index(store.get_all_rounds(1), True)
+    assert raw is not None and raw != stored_hi
 
 
 # ---------------------------------------------------------------------------

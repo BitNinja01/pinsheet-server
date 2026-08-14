@@ -29,7 +29,10 @@ from source.extensions import init_app as init_extensions
 from source.plugin import _plugins
 from source.routes import register_routes
 from database import set_db_path, init_db
-from store import get_user_by_id, create_user, save_course, save_round, save_settings
+from store import (
+    get_user_by_id, create_user, save_course, save_round, save_settings,
+    recompute_handicaps_for_user, get_all_rounds,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +92,9 @@ def _build_app():
             "plugin_nav": getattr(app, "_plugin_nav", []),
             "plugin_info": {p.plugin_info["name"]: p.plugin_info for p in _plugins if hasattr(p, "plugin_info")},
         }
+
+    # mirror production jinja globals (main.py registers _fmt for stats templates)
+    app.jinja_env.globals["_fmt"] = main_mod._fmt
 
     register_routes(app, limiter, csrf, _TestUser)
     return app
@@ -190,6 +196,31 @@ def _save(date, index, holes, differential, computed_handicap="10.0", user_id=1)
         "computed_handicap": computed_handicap,
         "differential_locked": False,
     }, date, index, user_id=user_id)
+
+
+def _seed_esr_rounds(diffs, start_date="2026-05-01", user_id=1):
+    """Save `len(diffs)` score_only rounds (one per calendar day, oldest
+    first) with EXPLICIT differentials, run the real recompute pass, and
+    return the list of dates in the same (oldest-first) order. Used for WHS
+    Rule 5.9 (Exceptional Score Reduction) display-consistency regressions,
+    which need the actual recompute engine to produce a stored, ESR-
+    adjusted `computed_handicap` -- unlike `_save`'s hand-supplied
+    `computed_handicap`, which bypasses recompute entirely."""
+    from datetime import date as _date, timedelta as _timedelta
+
+    _seed_course()
+    base = _date.fromisoformat(start_date)
+    dates = []
+    for i, d in enumerate(diffs):
+        date_str = (base + _timedelta(days=i)).isoformat()
+        dates.append(date_str)
+        save_round({
+            "course": COURSE_NAME, "tees": "White", "total_gross": "85",
+            "differential": str(d), "computed_handicap": "",
+            "holes_selection": "all", "entry_mode": "score_only", "holes": {},
+        }, date_str, 0, user_id=user_id)
+    recompute_handicaps_for_user(user_id)
+    return dates
 
 
 def _seed_three_rounds():
@@ -305,6 +336,55 @@ def test_stats_penalties_computes_expected_values(auth_client, capture_render):
     # 2 of the 3 rounds (r1, r2) recorded zero penalties on every hole
     assert ctx["pen_free_pct"] == pytest.approx(66.6666, rel=1e-4)
     assert ctx["total_ob_rd"] == 0.0
+
+    # hole breakdown is data-driven: 54 holes, only r3's 18 carry penalties, no OB
+    hb = ctx["hole_breakdown"]
+    assert hb["total_holes"] == 54
+    assert hb["clean_pct"] == pytest.approx(66.6666, rel=1e-4)
+    assert hb["penalty_pct"] == pytest.approx(33.3333, rel=1e-4)
+    assert hb["ob_pct"] == pytest.approx(0.0)
+    assert hb["clean_pct"] + hb["penalty_pct"] + hb["ob_pct"] == pytest.approx(100.0)
+
+    # penalty_cost = penalty_vs_par - clean_vs_par (extra strokes a penalty hole costs)
+    assert ctx["penalty_cost"] == pytest.approx(ctx["penalty_vs_par"] - ctx["clean_vs_par"])
+
+
+def test_stats_penalties_pen_free_excludes_score_only_rounds(auth_client, capture_render):
+    """Score-only rounds (no hole data) must not deflate Pen-Free % — they
+    can't be classified pen-free, so they belong in neither numerator nor
+    denominator (regression: denominator previously used len(b8))."""
+    _seed_course()
+    # two detailed, genuinely penalty-free rounds
+    _save("2026-03-01", 0, _uniform_holes(delta=0, penalties=0), "8.0", "9.0")
+    _save("2026-03-08", 0, _uniform_holes(delta=1, penalties=0), "10.0", "11.0")
+    # one score-only round: no per-hole data
+    save_round({
+        "course": COURSE_NAME, "tees": "White", "holes_played": "all",
+        "entry_mode": "score_only", "holes": {},
+        "total_gross": "82", "differential": "9.0",
+        "notes": "", "excluded": False, "computed_handicap": "10.0",
+        "differential_locked": False,
+    }, "2026-03-15", 0, user_id=1)
+
+    resp = auth_client.get("/stats/penalties")
+    assert resp.status_code == 200
+    ctx = capture_render["ctx"]
+    # 2 of 2 *scored* rounds are pen-free -> 100%, not 66.7% (would be 2/3)
+    assert ctx["pen_free_pct"] == pytest.approx(100.0)
+
+
+def test_stats_penalties_template_renders(auth_client):
+    """Full Jinja render (no capture_render stub): the redesigned page compiles
+    and shows the new unique sections rather than the removed duplicate panels."""
+    _seed_three_rounds()
+    resp = auth_client.get("/stats/penalties")
+    assert resp.status_code == 200
+    body = resp.data
+    assert b"Worst Penalty Holes" in body
+    assert b"Approach (GIR) OB / Round" in body
+    # removed redundant panels
+    assert b"Penalty Impact" not in body
+    assert b"Clean vs Dirty" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -500,9 +580,52 @@ def test_stats_trends_computes_expected_values(auth_client, capture_render):
     assert ctx["scoring_trend"] == [("2026-03-01", 73), ("2026-03-08", 91), ("2026-03-15", 109)]
     assert ctx["gir_trend"] == [("2026-03-01", 100.0), ("2026-03-08", 0.0), ("2026-03-15", 0.0)]
     assert ctx["putts_trend"] == [("2026-03-01", 36.0), ("2026-03-08", 36.0), ("2026-03-15", 54.0)]
-    # only r3 has a computed_handicap that survives to the trend series in
-    # this dataset window (18.0 on the most recent round)
-    assert ctx["handicap_trend"] == [("2026-03-15", 8.0)]
+    # WHS Rule 5.7/5.8/5.9 display-consistency fix: the handicap trend now
+    # plots the STORED, displayed `computed_handicap` for every round that
+    # has one (see `handicap_trend_from_stored`), rather than independently
+    # re-deriving a raw Handicap Index from differentials and re-enforcing
+    # WHS Rule 5.2's own minimum-3-acceptable-scores threshold a second
+    # time. `_seed_three_rounds()` sets an explicit `computed_handicap` on
+    # ALL three rounds (9.0/14.0/18.0), so all three now surface -- unlike
+    # the old raw-recompute behavior, which only emitted round 3 (the first
+    # point at which its OWN independent windowing considered 3
+    # differentials collected, giving 6.0 -- a value that never actually
+    # matched what was stored for round 3 anyway, since this fixture's
+    # `computed_handicap` values are hand-supplied and decoupled from its
+    # differentials).
+    assert ctx["handicap_trend"] == [
+        ("2026-03-01", 9.0), ("2026-03-08", 14.0), ("2026-03-15", 18.0),
+    ]
+
+
+def test_stats_trends_handicap_trend_reflects_stored_hi_under_active_esr(auth_client, capture_render):
+    """WHS Rule 5.9 display-consistency regression: once ESR is active, the
+    `/stats/trends` handicap trend chart's most recent point must equal the
+    STORED, displayed `computed_handicap` (ESR-adjusted + Rule 5.8-capped)
+    -- not a fresh raw `calc_handicap_trend` recalculation, which applies
+    neither. Non-vacuous: the fixture is chosen so the raw and stored
+    values provably differ."""
+    diffs = [20.0] * 20 + [12.0]  # round 21: gap 8.0 -> Rule 5.9 -1.0
+    dates = _seed_esr_rounds(diffs)
+
+    stored_hi = float(get_all_rounds(1)[0].computed_handicap)  # most-recent-first
+
+    from calc.handicap import calc_handicap_trend
+    raw_trend = calc_handicap_trend(get_all_rounds(1), True)
+    assert raw_trend[-1][1] != stored_hi, (
+        "Fixture did not actually trigger a raw/stored divergence -- this "
+        "regression would pass vacuously without exercising Rule 5.9."
+    )
+
+    resp = auth_client.get("/stats/trends")
+    assert resp.status_code == 200
+    ctx = capture_render["ctx"]
+
+    assert ctx["handicap_trend"][-1] == (dates[-1], stored_hi), (
+        f"Trend chart's most recent point {ctx['handicap_trend'][-1]!r} "
+        f"must be the stored, ESR-adjusted HI {(dates[-1], stored_hi)!r}, "
+        f"not the raw recalculation."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +715,41 @@ def test_season_summary_filters_by_season_window_when_enabled(auth_client, captu
     # only 2026-03-15 (r3) falls within March 10-31
     assert ctx["rounds_count"] == 1
     assert ctx["total_rounds"] == 3
+
+
+def test_season_summary_ended_at_uses_stored_hi_under_active_esr(auth_client, capture_render):
+    """WHS Rule 5.9 display-consistency regression: once ESR is active, the
+    season summary's "Ended at" Handicap Index (`journey`'s end value) must
+    equal the STORED, displayed `computed_handicap` of the most recent
+    round -- not a fresh raw `calc_handicap_index()` recalculation, which
+    bypasses both the Rule 5.8 cap and Rule 5.9's Exceptional Score
+    Reduction. The season START value already reads `computed_handicap`
+    directly (via `calc_hi_journey`'s own scan); this proves END is now
+    consistent with it. Non-vacuous: the fixture is chosen so raw and
+    stored HI provably differ."""
+    diffs = [20.0] * 20 + [12.0]  # round 21: gap 8.0 -> Rule 5.9 -1.0
+    _seed_esr_rounds(diffs)
+
+    stored_hi = float(get_all_rounds(1)[0].computed_handicap)  # most-recent-first
+
+    from calc.handicap import calc_handicap_index
+    raw_hi = calc_handicap_index(get_all_rounds(1), include_9hole=True)
+    assert raw_hi != stored_hi, (
+        "Fixture did not actually trigger a raw/stored divergence -- this "
+        "regression would pass vacuously without exercising Rule 5.9."
+    )
+
+    resp = auth_client.get("/season")
+    assert resp.status_code == 200
+    ctx = capture_render["ctx"]
+
+    assert ctx["journey"] is not None
+    start_hi, end_hi, delta = ctx["journey"]
+    assert end_hi == stored_hi, (
+        f"Season 'Ended at' HI {end_hi!r} must equal the stored, "
+        f"ESR-adjusted computed_handicap {stored_hi!r}, not the raw "
+        f"recalculation {raw_hi!r}."
+    )
 
 
 # ---------------------------------------------------------------------------

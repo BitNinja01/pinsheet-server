@@ -13,6 +13,8 @@ from calc.handicap import (
     calc_raw_hi,
     calc_handicap_values_in_range,
     calc_career_low_handicap,
+    apply_handicap_cap,
+    WHS_HANDICAP_WINDOW,
 )
 from calc.approach import (
     calc_fir_percent,
@@ -77,6 +79,7 @@ from calc.scoring import (
 )
 from calc.analysis import (
     calc_penalty_stats,
+    calc_penalty_hole_breakdown,
     calc_momentum_recovery,
 )
 from calc.milestones import (
@@ -109,6 +112,8 @@ from calc.composite import (
     StatBundle,
     last_n_rounds,
     best_n_rounds,
+    current_and_previous_handicap_index,
+    handicap_trend_from_stored,
 )
 from calc.rankings import (
     compute_rankings,
