@@ -381,7 +381,7 @@ def test_no_new_dependencies_added(test_app):
         for d in data["project"]["dependencies"]
     )
     assert names == sorted(
-        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf"]
+        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "werkzeug"]
     )
 
 

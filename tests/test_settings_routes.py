@@ -330,3 +330,62 @@ class TestSettingsImport:
         client = test_app.test_client()
         resp = client.get("/settings/import", follow_redirects=True)
         assert b"login" in resp.data.lower() or b"Login" in resp.data
+
+    def test_import_windows_handicap_to_recent_20_for_more_than_20_rounds(self, logged_in_client):
+        """WHS Rule 5.2 windowing regression via the /settings/import path.
+
+        settings.py's per-round handicap computation must window to the most
+        recent 20 ELIGIBLE differentials -- neither the old unbounded
+        oldest-first `chronological[:i+1]` bug, nor a raw <=20 slice. 25
+        rounds with distinct, already-nonzero differentials (so the
+        differential-recompute branch is a no-op and this isolates the
+        windowing behavior); assert the most-recent round's persisted
+        computed_handicap matches a direct
+        calc_handicap_index(most-recent-first full list) call."""
+        course_payload = {
+            "ImportGC": {
+                "par": "72",
+                "holes": {str(n): {"par": 4, "hole_index": n} for n in range(1, 19)},
+                "tees": {"White": {"slope": 120, "rating": 70.0, "yardage": "6000"}},
+            }
+        }
+        diffs = [17.1, 27.1, 20.8, 21.9, 15.3, 23.8, 18.0, 23.8, 22.6, 25.3,
+                 21.1, 29.8, 21.5, 23.8, 23.2, 23.2, 31.1, 22.6, 25.7, 24.8,
+                 21.7, 25.3, 37.1, 25.6, 33.6]  # 25 distinct differentials
+        rounds_payload = {}
+        for i, d in enumerate(diffs):
+            day = 25 - i  # i=0 -> day 25 (most recent), i=24 -> day 1 (oldest)
+            date_str = f"2026-06-{day:02d}"
+            rounds_payload[date_str] = {
+                "0": {
+                    "course": "ImportGC", "tees": "White", "holes_selection": "all",
+                    "total_gross": "85", "differential": str(d),
+                    "computed_handicap": "", "holes": {},
+                },
+            }
+        zip_bytes = _make_zip({
+            "courses.json": json.dumps(course_payload),
+            "rounds/2026.json": json.dumps(rounds_payload),
+        })
+
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "export.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"Imported 1 courses and 25 rounds." in resp.data
+
+        rounds = get_all_rounds(1)  # most-recent-first (ORDER BY date DESC)
+        assert len(rounds) == 25
+
+        from calc.handicap import calc_handicap_index
+        expected_hi = calc_handicap_index(rounds, include_9hole=True)
+        assert expected_hi is not None
+        assert rounds[0].computed_handicap == str(expected_hi)
+
+        # Sanity: prove the fixture exercises windowing -- an unwindowed
+        # (old-bug-style) calc over the full 25 gives a DIFFERENT value
+        # (19.7 best-8-of-all-25 vs 19.8 windowed best-8-of-recent-20).
+        unwindowed_hi = calc_handicap_index(rounds, include_9hole=True, window=None)
+        assert unwindowed_hi != expected_hi

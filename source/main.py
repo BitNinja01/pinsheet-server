@@ -249,6 +249,26 @@ def main():
 
     register_routes(app, limiter, csrf, User)
 
+    @app.after_request
+    def _set_csp(response):
+        # Defense-in-depth for finding U1 / GH#68 (stored XSS via course
+        # catalog fields). The actual XSS control is Jinja autoescape in the
+        # templates; this CSP is a secondary layer.
+        #
+        # Shipped as Report-Only (NOT enforcing) on purpose: the app has
+        # inline <script> blocks in course_detail.html, bag.html,
+        # round_detail.html, round_entry.html, welcome.html, and
+        # stats/macros.html. A strict "script-src 'self'" would BREAK those
+        # (a functional regression), so enforcing it now would trade an XSS
+        # fix for broken UI. Report-Only collects violation reports without
+        # breaking anything. Flipping to the enforcing "Content-Security-
+        # Policy" header requires first externalizing/noncing those inline
+        # scripts — tracked under #73 (security-headers) and #71 (bag |tojson).
+        response.headers["Content-Security-Policy-Report-Only"] = (
+            "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"
+        )
+        return response
+
     port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
 

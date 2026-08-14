@@ -32,6 +32,9 @@ STAT_CATALOG: list = [
         "suffix": "",
         "higher_better": False,
         "color": (64, 196, 255),
+        # `l20` is caller-supplied and must be most-recent-first (WHS
+        # ordering contract for calc_handicap_index); callers here pass
+        # date-range-scoped rounds, already in most-recent-first order.
         "fn_primary":   lambda l20, b8, c, i9: calc_handicap_index(l20, i9),
         "fn_secondary": lambda l20, b8, c, i9: calc_handicap_index(l20[1:], i9),
         "trend_fn":     lambda all_r, c, i9: calc_handicap_trend(all_r, i9),
