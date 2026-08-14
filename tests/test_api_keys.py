@@ -504,6 +504,36 @@ def test_unauthenticated_scoped_route_is_not_scope_403(test_app):
     assert client.get("/stats/scoring").status_code == 302
 
 
+def test_scope_import_requires_both_write_scopes(test_app):
+    # /settings/import bulk-writes rounds AND courses (save_round + save_course),
+    # so it is gated on both scopes — closing an unscoped round/course write path.
+    ro, rok, _ = _keyed_client(test_app, ["rounds:read"], username="i1", display="I1")
+    r = ro.get("/settings/import", headers=_bearer(rok))
+    assert r.status_code == 403 and r.get_json()["required"] == "rounds:write"
+
+    rw, rwk, _ = _keyed_client(test_app, ["rounds:write"], username="i2", display="I2")
+    r = rw.get("/settings/import", headers=_bearer(rwk))
+    assert r.status_code == 403 and r.get_json()["required"] == "courses:write"
+
+    both, bk, _ = _keyed_client(test_app, ["rounds:write", "courses:write"], username="i3", display="I3")
+    assert both.get("/settings/import", headers=_bearer(bk)).status_code == 200
+
+
+def test_scope_match_link_round_requires_rounds_write(test_app):
+    ro, rok, _ = _keyed_client(test_app, ["rounds:read"], username="m1", display="M1")
+    r = ro.get("/matches/1/link-round", headers=_bearer(rok))
+    assert r.status_code == 403 and r.get_json()["required"] == "rounds:write"
+    # With the scope the gate passes; the handler then 404s on the missing match.
+    rw, rwk, _ = _keyed_client(test_app, ["rounds:write"], username="m2", display="M2")
+    assert rw.get("/matches/1/link-round", headers=_bearer(rwk)).status_code == 404
+
+
+def test_session_user_unaffected_by_import_and_link_gates(test_app):
+    client, _ = _login(test_app)
+    assert client.get("/settings/import").status_code == 200
+    assert client.get("/matches/1/link-round").status_code == 404  # gate bypassed, match missing
+
+
 def test_csrf_exemption_survives_scope_decorator(test_app):
     """Inserting @require_permission between @login_required and @csrf.exempt must
     not break CSRF exemption. flask_wtf matches exemptions by

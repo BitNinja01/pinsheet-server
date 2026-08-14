@@ -6,6 +6,7 @@ import logging
 from flask import render_template, request, jsonify, g, current_app, redirect, url_for
 from flask_login import login_required, current_user
 
+from auth_keys import require_permission
 from store import (
     save_settings, save_course, save_round,
     get_all_rounds, update_round_handicap, update_round_differential,
@@ -37,9 +38,15 @@ def register_settings_routes(app, limiter, csrf):
             courses=get_courses(), themes=themes,
         ))
 
+    # Bulk restore writes both rounds and courses (save_round + save_course), so a
+    # key needs BOTH scopes — otherwise import is an unscoped round/course write
+    # path around the /api gates. Stacked decorators give AND-semantics; session
+    # users bypass each one and keep full access.
     @app.route("/settings/import", methods=["GET", "POST"])
     @login_required
     @limiter.limit("5 per minute")
+    @require_permission("rounds:write")
+    @require_permission("courses:write")
     def settings_import():
         def _import_error(msg):
             return render_template("settings_import.html", **base_context(
