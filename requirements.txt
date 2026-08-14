@@ -1,7 +1,7 @@
-flask>=3.0
-werkzeug>=3.0  # T3/VULN-07: safe_join traversal hardening; pinned so the mitigation isn't incidental to flask's transitive resolution
-waitress>=2.0
-bcrypt>=4.0
-flask-login>=0.6
-flask-limiter>=3.0
-flask-wtf>=1.2
+flask>=3.0,<4.0
+werkzeug>=3.0,<4.0  # T3/VULN-07: safe_join traversal hardening; pinned so the mitigation isn't incidental to flask's transitive resolution
+waitress>=2.0,<4.0
+bcrypt>=4.0,<6.0
+flask-login>=0.6,<0.7
+flask-limiter>=3.0,<5.0
+flask-wtf>=1.2,<2.0
