@@ -108,6 +108,37 @@ class StatBundle:
     panels: dict[str, StatPanel] = field(default_factory=dict)
 
 
+def stat_arrow(primary, secondary, higher_better, suffix="", precision=1):
+    """Directional delta between a primary and secondary stat value.
+
+    Returns None when either value is missing, matching the blank-card
+    behavior (no arrow rendered). Otherwise returns a small struct:
+
+      direction: "up" | "down" | "flat" — flat when the two values are equal
+                 at the displayed precision (rounding acts as the epsilon).
+      magnitude: absolute change, rounded to `precision`.
+      display:   magnitude formatted with `suffix` (e.g. "1.2%").
+      is_good:   whether the movement is favorable per `higher_better`.
+    """
+    if primary is None or secondary is None:
+        return None
+    diff = round(primary - secondary, precision)
+    if diff > 0:
+        direction = "up"
+    elif diff < 0:
+        direction = "down"
+    else:
+        direction = "flat"
+    is_good = direction != "flat" and (direction == "up") == higher_better
+    magnitude = abs(diff)
+    return {
+        "direction": direction,
+        "magnitude": magnitude,
+        "display": f"{magnitude:.{precision}f}{suffix}",
+        "is_good": is_good,
+    }
+
+
 def compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole) -> StatBundle:
     """`rounds` is the FULL most-recent-first round list (unbounded). It is
     used ONLY for the handicap-index panel, via

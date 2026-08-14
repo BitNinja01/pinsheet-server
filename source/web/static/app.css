@@ -425,6 +425,11 @@ body {
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
 }
+.ps-stat .ps-stat-delta .ps-stat-arrow { font-size: 0.9em; }
+.ps-stat .ps-stat-delta.is-good { color: var(--ps-accent); }
+.ps-stat .ps-stat-delta.is-bad { color: var(--ps-warn); }
+.ps-stat .ps-stat-delta.is-flat { color: var(--ps-ink-3); }
+/* legacy directional class retained for backward compatibility */
 .ps-stat .ps-stat-delta.is-down { color: var(--ps-warn); }
 
 .ps-stat .ps-stat-blank {
@@ -1048,6 +1053,11 @@ select.hole-input { width: 3rem; appearance: none; }
     font-weight: var(--ps-fw-label);
     margin-top: var(--ps-sp-1);
 }
+.ps-stat .ps-stat-delta .ps-stat-arrow { font-size: 0.9em; }
+.ps-stat .ps-stat-delta.is-good { color: var(--ps-accent); }
+.ps-stat .ps-stat-delta.is-bad { color: var(--ps-warn); }
+.ps-stat .ps-stat-delta.is-flat { color: var(--ps-ink-3); }
+/* legacy directional class retained for backward compatibility */
 .ps-stat .ps-stat-delta.is-down { color: var(--ps-warn); }
 
 /* ── Avatar ─────────────────────────────────────────────────────────── */

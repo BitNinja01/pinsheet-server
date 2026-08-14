@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 
+{% macro stat_delta(d) %}
+    {% if d %}
+        {% set glyph = '▲' if d.direction == 'up' else ('▼' if d.direction == 'down' else '–') %}
+        {% set tone = 'is-flat' if d.direction == 'flat' else ('is-good' if d.is_good else 'is-bad') %}
+        <div class="ps-stat-delta {{ tone }}"><span class="ps-stat-arrow">{{ glyph }}</span> {{ d.display }}</div>
+    {% endif %}
+{% endmacro %}
+
 <div class="ps-topbar">
     <div>
         <div class="ps-eyebrow">{{ season_label }}</div>
@@ -80,9 +88,7 @@
         <div class="ps-eyebrow">{{ p.label if p else key }}</div>
         {% if p and p.value != "--" %}
             <div class="ps-stat-v">{{ p.value }}</div>
-            {% if p.secondary and p.secondary != "--" %}
-                <div class="ps-stat-delta">L20 {{ p.secondary }}</div>
-            {% endif %}
+            {{ stat_delta(p.delta) }}
         {% else %}
             <div class="ps-stat-blank">{{ p.blank_text if p else "No data" }}</div>
         {% endif %}
@@ -93,9 +99,7 @@
         <div class="ps-eyebrow">Handicap</div>
         {% if handicap_value %}
             <div class="ps-stat-v">{{ handicap_value }}</div>
-            {% if last_year_hi is not none %}
-                <div class="ps-stat-delta">1y {{ last_year_hi }}</div>
-            {% endif %}
+            {{ stat_delta(hcp_1y_delta) }}
         {% else %}
             <div class="ps-stat-blank">Play 3+ rounds</div>
         {% endif %}
