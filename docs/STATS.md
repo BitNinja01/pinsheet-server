@@ -20,11 +20,13 @@ Courses are entered once via the course entry wizard and referenced by rounds. A
 
 ### Per-Hole Stats (Recorded on Scorecard)
 
-Five stats are captured manually each hole using a record-by-exception shorthand — only misses are written down, blanks are hits:
+Five stats are captured manually each hole. On the paper scorecard you record by exception — only misses are written down, hits left blank. When transcribing into the app, each hole's fairway and GIR take an explicit code (`H` = hit); a blank cell fails validation.
+
+Fairway and GIR share one validated code set: `H` / `L` / `R` / `S` / `LO` / `N` / `OBL` / `OBR` / `OBS` / `OBLO`.
 
 1. **Score** — total strokes for the hole
-2. **Fairway** — miss direction on a miss; blank = hit (or N/A on par 3s). Codes: `L` / `R` / `OBL` / `OBR` / `N`
-3. **Green in Regulation (GIR)** — miss direction on a miss; blank = hit. Codes: `L` / `R` / `S` / `LO` / `OBL` / `OBR` / `OBS` / `OBLO`
+2. **Fairway** — `H` hit; miss direction on a miss (`L` / `R`, out-of-bounds `OBL` / `OBR`); `N` = N/A (par 3)
+3. **Green in Regulation (GIR)** — `H` hit; miss direction on a miss (`L` left / `R` right / `S` short / `LO` long, out-of-bounds `OBL` / `OBR` / `OBS` / `OBLO`)
 4. **Putts** — number of putts on the green
 5. **Penalties** — penalty strokes taken on the hole
 

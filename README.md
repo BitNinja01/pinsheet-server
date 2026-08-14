@@ -28,6 +28,8 @@ python source/main.py
 
 The terminal shows `PinSheet -> http://127.0.0.1:8080` and your browser opens automatically. On first run, register an account (auto-admin — no invite code needed).
 
+New here? Follow **[docs/TUTORIAL.md](docs/TUTORIAL.md)** to record your first round and see your stats, step by step.
+
 ## Installation
 
 ### 1. Install Python
@@ -129,3 +131,13 @@ Available plugins (each in its own repository):
 ## Data Storage
 
 All data in `data/pinsheet.db` (SQLite) and `data/drafts/` (per-user wizard state as JSON). No external database required. The `data/` directory is portable — copy it between machines.
+
+## Documentation
+
+| Doc | Type | For |
+|-----|------|-----|
+| [docs/TUTORIAL.md](docs/TUTORIAL.md) | Tutorial | Record your first round end to end |
+| [docs/STATS.md](docs/STATS.md) | Reference | Data model + the 50+ derived stats |
+| [docs/PLUGINS.md](docs/PLUGINS.md) | How-to / Reference | Build a plugin |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Explanation | Why the system is built the way it is |
+| [docs/REFERENCES.md](docs/REFERENCES.md) | Reference | Source-of-truth links + how to refresh the docs |
