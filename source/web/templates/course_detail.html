@@ -276,7 +276,7 @@
     {% endif %}
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 {% if edit_mode %}
 document.getElementById("btn-save-course")?.addEventListener("click", function() {
     var name = document.getElementById("edit-name").value;
