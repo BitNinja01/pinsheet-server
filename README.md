@@ -87,6 +87,16 @@ sudo systemctl enable --now pinsheet
 - **User switcher** — view any user's dashboard, stats, and rounds via the `?user=` URL parameter.
 - **Read-only enforcement** — write operations (save round, edit course, change settings) are restricted to your own data.
 
+## Plugins
+
+PinSheet supports plugins — drop a plugin package into `plugins/` and it loads at startup. Plugins live in their own repositories.
+
+- [**pinsheet-balls**](https://github.com/BitNinja01/pinsheet-balls) — ball performance tracking with filtering and aggregation
+- [**pinsheet-cartographer**](https://github.com/BitNinja01/pinsheet-cartographer) — scoring map visualization
+- [**pinsheet-minigames**](https://github.com/BitNinja01/pinsheet-minigames) — on-course practice games
+- [**pinsheet-printables**](https://github.com/BitNinja01/pinsheet-printables) — printable scorecard and stat report PDFs
+- [**pinsheet-leaderboard-mascots**](https://github.com/malcolm-x-evo/pinsheet-leaderboard-mascots) — custom mascot images for leaderboard identities
+
 ## Migrating from PinSheet (TUI)
 
 1. Zip your old `data/` directory (`courses.json`, `rounds/`, `settings.json`).

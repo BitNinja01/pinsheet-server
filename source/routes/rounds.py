@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import date
 
 from flask import render_template, request, jsonify, g, current_app
@@ -7,7 +8,7 @@ from flask_login import login_required, current_user
 from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
-    get_slope_rating, save_round, delete_round,
+    get_slope_rating, save_round, update_round, delete_round,
     get_matches_for_user, link_round,
     recompute_all_handicaps,
     recompute_handicaps_for_user,
@@ -25,6 +26,8 @@ from calc import (
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
     calc_hole_scores,
+    WHS_HANDICAP_WINDOW,
+    current_and_previous_handicap_index,
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
@@ -33,6 +36,14 @@ from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
 _log = logging.getLogger("pinsheet")
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _valid_date(val) -> bool:
+    """True for a well-formed ISO YYYY-MM-DD string. Keeps a malformed date out
+    of the DB (and out of the client-side redirect that builds a round URL)."""
+    return isinstance(val, str) and bool(_DATE_RE.match(val))
 
 
 def _safe_int(val, default=0):
@@ -136,11 +147,14 @@ def register_rounds_routes(app, csrf):
                 "putts": total_putts,
             })
 
-        # The current handicap index uses the best 8 differentials from the
-        # most recent 20 eligible rounds (WHS), so only that window can light up.
-        # all_rounds_for_user is newest-first, so the recent 20 are the first 20.
-        recent_20 = all_rounds_for_user[:20]
-        best_rounds = get_best_n_rounds(recent_20, include_9hole)
+        # WHS Rule 5.2: the current handicap index uses the best-N
+        # differentials from the most recent 20 ELIGIBLE rounds, so only
+        # that window can light up. all_rounds_for_user is most-recent-first
+        # already; pass it in full with an explicit window rather than
+        # pre-truncating to raw [:20], which would under-count (and diverge
+        # from the stored/recompute Handicap Index) when excluded/"0"/
+        # 9-hole-gated rounds sit within the raw most-recent-20.
+        best_rounds = get_best_n_rounds(all_rounds_for_user, include_9hole, window=WHS_HANDICAP_WINDOW)
         best_keys = {(r.date, r.index) for r in best_rounds}
         for rd in rounds_data:
             if (rd["date"], rd["index"]) in best_keys:
@@ -199,6 +213,8 @@ def register_rounds_routes(app, csrf):
     def api_rounds_post():
         data = request.get_json()
         date_val = data.get("date", "")
+        if not _valid_date(date_val):
+            return jsonify({"error": "Invalid date"}), 400
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
         match_id = data.get("match_id")
@@ -253,6 +269,8 @@ def register_rounds_routes(app, csrf):
         all_rounds_for_user = get_all_rounds_for_user()
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
+            # get_all_rounds_for_user() is most-recent-first -- satisfies
+            # calc_handicap_index's WHS Rule 5.2 ordering contract.
             current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
             if current_hi is not None:
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
@@ -288,6 +306,8 @@ def register_rounds_routes(app, csrf):
 
         golf_round_typed = dict_to_round(golf_round)
         all_rounds_for_user.insert(0, golf_round_typed)
+        # Inserted at index 0 -- list stays most-recent-first (WHS ordering
+        # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
@@ -296,6 +316,29 @@ def register_rounds_routes(app, csrf):
         index = next_round_index(date_val, current_user.id)
         round_id = save_round(golf_round, date_val, index, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
+
+        # WHS Rule 5.7/5.8 -- the value written above (`new_hi`) is the raw,
+        # uncapped Handicap Index; only `recompute_handicaps_for_user` knows
+        # the player's Low Handicap Index and applies the soft/hard cap. Run
+        # it now so the row just saved (and any rounds after it) hold the
+        # same capped value recompute would independently produce --
+        # live-save must equal recompute for the capped value.
+        # Tradeoff (accepted): this reruns the full O(n) sequential
+        # recompute over the user's entire round history on every single
+        # POST, rather than only updating the newly-saved row -- required
+        # because Rule 5.7's LHI (and thus the cap applied to THIS round)
+        # depends on the whole prior record, and later rounds may also need
+        # their own cap re-evaluated. Acceptable at per-user round volumes
+        # (hundreds, not millions); revisit with incremental/cached LHI
+        # tracking if per-user round counts grow large enough to matter.
+        recompute_handicaps_for_user(current_user.id)
+        fresh_rounds = get_all_rounds_for_user(force=True)
+        for fr in fresh_rounds:
+            if fr.date == date_val and fr.index == index:
+                if fr.computed_handicap:
+                    golf_round["computed_handicap"] = fr.computed_handicap
+                    golf_round_typed.computed_handicap = fr.computed_handicap
+                break
 
         if match_id and golf_round.get("computed_handicap"):
             try:
@@ -353,6 +396,8 @@ def register_rounds_routes(app, csrf):
 
         rounds_before = [r for r in all_rounds_for_user
                          if r.date < round_data.date or (r.date == round_data.date and r.index < round_data.index)]
+        # Filter preserves all_rounds_for_user's most-recent-first order
+        # (WHS ordering contract).
         hi_before = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
 
         hole_nums_all = sorted(course_holes.keys(), key=int)
@@ -616,6 +661,9 @@ def register_rounds_routes(app, csrf):
             return jsonify({"error": "Round not found"}), 404
 
         data = request.get_json()
+        new_date = data.get("date", date)
+        if not _valid_date(new_date):
+            return jsonify({"error": "Invalid date"}), 400
         course_name = data.get("course", "")
         tees_name = data.get("tees", "")
         course = get_courses().get(course_name, {})
@@ -632,7 +680,7 @@ def register_rounds_routes(app, csrf):
         slope, rating = get_slope_rating(tees, holes_sel)
 
         golf_round = {
-            "date": data.get("date", date),
+            "date": new_date,
             "course": course_name,
             "tees": tees_name,
             "holes_played": data.get("holes_played", "18"),
@@ -667,6 +715,8 @@ def register_rounds_routes(app, csrf):
                 r for r in all_rounds_for_user
                 if not (r.date == date and str(r.index) == str(index))
             ]
+            # Filter preserves all_rounds_for_user's most-recent-first order
+            # (WHS ordering contract).
             current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
             if current_hi is not None:
                 adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
@@ -717,26 +767,39 @@ def register_rounds_routes(app, csrf):
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
 
-        if data.get("date", date) != date:
-            delete_round(date, index, current_user.id)
+        if new_date != date:
+            # Moving to a different day: claim a free index there so we don't
+            # collide with an existing round on that date. The round stays put
+            # in the DB until update_round runs, so it isn't counted here.
+            new_index = next_round_index(new_date, current_user.id)
+        else:
+            new_index = int(index)
 
         golf_round_typed = dict_to_round(golf_round)
+        golf_round_typed.index = new_index
         for i, r in enumerate(all_rounds_for_user):
             if r.date == date and str(r.index) == str(index):
                 all_rounds_for_user[i] = golf_round_typed
                 break
+        # In-place replacement -- list stays most-recent-first (WHS ordering
+        # contract).
         new_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
         if new_hi is not None:
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        save_round(golf_round, data.get("date", date), int(index), current_user.id)
+        # Update in place by row id so the round keeps its identity — any
+        # match_rounds link (and the round's own URL) survives a date edit.
+        updated = update_round(old_round.id, golf_round, new_date, new_index, current_user.id)
+        if not updated:
+            # Row vanished between the read above and this write (concurrent delete).
+            return jsonify({"error": "Round not found"}), 404
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
         # Recompute cascade — update computed_handicap on this user's subsequent rounds
         recompute_handicaps_for_user(current_user.id)
 
-        return jsonify({"ok": True, "differential": differential})
+        return jsonify({"ok": True, "differential": differential, "date": new_date, "index": new_index})
 
     @app.route("/api/rounds/<date>/<index>/exclude", methods=["POST"])
     @login_required
@@ -751,8 +814,15 @@ def register_rounds_routes(app, csrf):
         set_round_excluded(date, int(index), excluded, current_user.id)
         recompute_handicaps_for_user(current_user.id)
         new_all = get_all_rounds_for_user(force=True)
-        new_hi_obj = calc_handicap_index(new_all, get_settings().get("include_9hole", True))
-        new_hi = round(new_hi_obj, 1) if new_hi_obj is not None else None
+        # WHS Rule 5.7/5.8/5.9: respond with the STORED displayed Handicap
+        # Index recompute just wrote (already capped and ESR-adjusted), not
+        # a fresh raw calc_handicap_index() recalculation -- the frontend
+        # paints this value into the round ledger immediately, so a raw
+        # recalc would diverge from every other HI display whenever a cap
+        # or Exceptional Score Reduction is active.
+        new_hi, _ = current_and_previous_handicap_index(
+            new_all, get_settings().get("include_9hole", True)
+        )
         return jsonify({"ok": True, "excluded": excluded, "handicap": new_hi})
 
     @app.route("/api/rounds/<date>/<index>", methods=["DELETE"])

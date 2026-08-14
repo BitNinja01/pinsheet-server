@@ -9,7 +9,7 @@ from calc import (
     calc_putts_per_round, calc_scramble_percent, calc_penalties_per_round,
     calc_scoring_avg_by_par_type, calc_one_putt_percent, calc_two_putt_percent,
     calc_three_putt_percent, calc_putts_per_gir, calc_personal_bests,
-    calc_handicap_index, calc_hi_journey, calc_most_played_course,
+    calc_hi_journey, calc_most_played_course,
     calc_golfiest_month, calc_most_common_day, calc_best_single_round,
     calc_best_3round_stretch, calc_biggest_improvement, calc_first_score_milestone,
     calc_first_hi_milestone, calc_score_breakdown, calc_hole_in_ones,
@@ -23,11 +23,13 @@ from calc import (
     calc_fir_miss_tendency, calc_scoring_by_fairway, calc_scoring_by_miss_side,
     calc_gir_by_par_type, calc_gir_miss_direction, calc_gir_from_fairway_vs_rough,
     calc_scoring_by_gir, calc_scramble_by_miss_direction, calc_scramble_by_par_type,
-    calc_ob_stats, calc_penalty_stats, calc_momentum_recovery,
+    calc_ob_stats, calc_penalty_stats, calc_penalty_hole_breakdown, calc_momentum_recovery,
     calc_nemesis_best_holes, calc_scoring_trend, calc_fir_trend, calc_gir_trend,
-    calc_putts_trend, calc_scramble_trend, calc_handicap_trend,
+    calc_putts_trend, calc_scramble_trend,
     calc_playing_to_handicap_rate,
     calc_par_or_better_percent,
+    current_and_previous_handicap_index,
+    handicap_trend_from_stored,
 )
 from calc import stat_delta
 from source.models import dict_to_course
@@ -119,18 +121,36 @@ def register_stats_routes(app):
         ob_stats = calc_ob_stats(b8, courses_dict)
         total_ob_rd = ob_stats.get("total_ob_per_round")
 
-        pen_free = sum(1 for r in b8 if r.holes and sum(h.penalties for h in r.holes.values()) == 0)
-        pen_free_pct = (pen_free / len(b8) * 100) if b8 else None
+        # Only rounds with hole-by-hole data can be classified pen-free; filter both
+        # numerator and denominator so score-only rounds don't deflate the rate
+        # (matches calc_penalties_per_round / calc_penalty_free_rounds convention).
+        scored = [r for r in b8 if r.holes]
+        pen_free = sum(1 for r in scored if sum(h.penalties for h in r.holes.values()) == 0)
+        pen_free_pct = (pen_free / len(scored) * 100) if scored else None
+
+        hole_breakdown = calc_penalty_hole_breakdown(b8)
+        pen_vs = pen_stats.get("penalty_avg_vs_par")
+        clean_vs = pen_stats.get("clean_avg_vs_par")
+        penalty_cost = (pen_vs - clean_vs) if pen_vs is not None and clean_vs is not None else None
+
+        worst = pen_stats.get("worst_holes") or []
+        worst_pen_rows = [
+            {"label": f"{course} · #{hole}", "value": _fmt(avg, "", 2), "warn": True}
+            for course, hole, avg in worst[:4]
+        ] or [{"label": "No penalty holes yet", "value": None}]
 
         return render_template("stats/penalties.html", **base_context(
             current_page="stats",
             penalties_per_round=pen_rd_b8, pen_rd_delta=_delta(pen_rd_b8, pen_rd_l20, False),
-            penalty_vs_par=pen_stats.get("penalty_avg_vs_par"),
-            clean_vs_par=pen_stats.get("clean_avg_vs_par"),
+            penalty_vs_par=pen_vs,
+            clean_vs_par=clean_vs,
             pen_free_pct=pen_free_pct,
+            penalty_cost=penalty_cost,
+            worst_pen_rows=worst_pen_rows,
             total_ob_rd=total_ob_rd,
             ob_stats=ob_stats,
             penalty_stats=pen_stats,
+            hole_breakdown=hole_breakdown,
         ))
 
     @app.route("/stats/fairways")
@@ -313,7 +333,11 @@ def register_stats_routes(app):
         gir_t = calc_gir_trend(all_rounds)
         putts_t = calc_putts_trend(all_rounds)
         scramble_t = calc_scramble_trend(all_rounds, courses_dict)
-        hi_t = calc_handicap_trend(all_rounds, include_9hole)
+        # WHS Rule 5.7/5.8/5.9: plot the STORED, displayed per-round
+        # computed_handicap (already capped + ESR-adjusted by
+        # recompute_handicaps_for_user) rather than calc_handicap_trend's
+        # raw recalculation -- see handicap_trend_from_stored's docstring.
+        hi_t = handicap_trend_from_stored(all_rounds)
         pth = calc_playing_to_handicap_rate(all_rounds, include_9hole)
 
         return render_template("stats/trends.html", **base_context(
@@ -363,7 +387,18 @@ def register_stats_routes(app):
         else:
             season_rounds = rounds
 
-        hi = calc_handicap_index(rounds, include_9hole)
+        # get_all_rounds_for_user() (and this copy of it) is most-recent-first
+        # (WHS ordering contract). WHS Rule 5.7/5.8/5.9: the season's "Ended
+        # at" value must be the DISPLAYED Handicap Index (stored
+        # computed_handicap, already Rule-5.8-capped and Rule-5.9-ESR-
+        # adjusted) -- not a fresh raw `calc_handicap_index()` recalculation,
+        # which bypasses both. `current_and_previous_handicap_index` sources
+        # the stored value (falling back to raw only when nothing has been
+        # established yet), mirroring the dashboard/rankings fix for the
+        # same class of bug. The season START value already reads
+        # `computed_handicap` directly inside `calc_hi_journey`; this makes
+        # END consistent with it.
+        hi, _ = current_and_previous_handicap_index(rounds, include_9hole)
         journey = calc_hi_journey(rounds, season_rounds, hi)
         most_played = calc_most_played_course(season_rounds)
         golfiest = calc_golfiest_month(season_rounds)

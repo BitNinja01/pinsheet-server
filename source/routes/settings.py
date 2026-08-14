@@ -14,9 +14,17 @@ from store import (
 )
 from calc import calc_handicap_index
 from source.request_data import get_settings, get_courses, base_context
+from source.routes.courses import _coerce_course_numerics
 
 
 _log = logging.getLogger("pinsheet")
+
+# Zip-import decompression bounds (CWE-400 / zip-bomb defense). MAX_CONTENT_LENGTH
+# caps the compressed upload; these cap the uncompressed expansion, which a small
+# compressed payload can otherwise blow up into.
+MAX_IMPORT_ENTRIES = 1000            # max members in the archive
+MAX_ENTRY_UNCOMPRESSED = 10 * 1024 * 1024   # 10 MB per member
+MAX_TOTAL_UNCOMPRESSED = 50 * 1024 * 1024   # 50 MB aggregate
 
 
 def register_settings_routes(app, limiter, csrf):
@@ -30,47 +38,77 @@ def register_settings_routes(app, limiter, csrf):
         ))
 
     @app.route("/settings/import", methods=["GET", "POST"])
-    @limiter.limit("10 per minute", methods=["POST"])
     @login_required
+    @limiter.limit("5 per minute")
     def settings_import():
+        def _import_error(msg):
+            return render_template("settings_import.html", **base_context(
+                current_page="settings",
+                imported=None, error=msg,
+            ))
+
         if request.method == "POST":
             uploaded = request.files.get("zipfile")
             if not uploaded:
-                return render_template("settings_import.html", **base_context(
-                    current_page="settings",
-                    imported=None, error="No file provided",
-                ))
+                return _import_error("No file provided")
 
             try:
                 zf = zipfile.ZipFile(io.BytesIO(uploaded.read()))
             except zipfile.BadZipFile:
-                return render_template("settings_import.html", **base_context(
-                    current_page="settings",
-                    imported=None, error="Invalid zip file",
-                ))
+                return _import_error("Invalid zip file")
+
+            # Reject decompression bombs before reading any member: bound the
+            # entry count and both per-entry and aggregate uncompressed size.
+            infos = zf.infolist()
+            if len(infos) > MAX_IMPORT_ENTRIES:
+                return _import_error("Archive has too many entries")
+            total_uncompressed = 0
+            for info in infos:
+                if info.file_size > MAX_ENTRY_UNCOMPRESSED:
+                    return _import_error("Archive entry too large")
+                total_uncompressed += info.file_size
+                if total_uncompressed > MAX_TOTAL_UNCOMPRESSED:
+                    return _import_error("Archive contents too large")
+
+            # Header file_size can be spoofed, so also enforce the real
+            # decompressed size while streaming each member we actually read.
+            def _read_member(member_name):
+                with zf.open(member_name) as fh:
+                    data = fh.read(MAX_ENTRY_UNCOMPRESSED + 1)
+                if len(data) > MAX_ENTRY_UNCOMPRESSED:
+                    raise ValueError("member too large")
+                return data
 
             user_id = current_user.id
             courses_count = 0
             rounds_count = 0
 
-            for name in zf.namelist():
-                if name.endswith("courses.json"):
-                    courses_data = json.loads(zf.read(name))
-                    for cname, cdata in courses_data.items():
-                        save_course(cdata, cname)
-                        courses_count += 1
-                elif "rounds/" in name and name.endswith(".json"):
-                    year_data = json.loads(zf.read(name))
-                    for date_str, date_rounds in year_data.items():
-                        for idx, rdata in date_rounds.items():
-                            save_round(rdata, date_str, int(idx), user_id)
-                            rounds_count += 1
-                elif name.endswith("settings.json"):
-                    settings_data = json.loads(zf.read(name))
-                    save_settings(settings_data, user_id)
+            try:
+                for name in zf.namelist():
+                    if name.endswith("courses.json"):
+                        courses_data = json.loads(_read_member(name))
+                        for cname, cdata in courses_data.items():
+                            # Same numeric-field validation as the API write path
+                            # (finding U1 / GH#68), but lenient: blank out any
+                            # non-numeric value instead of rejecting the import.
+                            _coerce_course_numerics(cdata, strict=False)
+                            save_course(cdata, cname)
+                            courses_count += 1
+                    elif "rounds/" in name and name.endswith(".json"):
+                        year_data = json.loads(_read_member(name))
+                        for date_str, date_rounds in year_data.items():
+                            for idx, rdata in date_rounds.items():
+                                save_round(rdata, date_str, int(idx), user_id)
+                                rounds_count += 1
+                    elif name.endswith("settings.json"):
+                        settings_data = json.loads(_read_member(name))
+                        save_settings(settings_data, user_id)
+            except ValueError:
+                return _import_error("Archive entry too large")
 
             all_imported = get_all_rounds(user_id)
             chronological = list(reversed(all_imported))
+            total = len(all_imported)
             courses_data = get_courses()
             include_9hole = get_settings().get("include_9hole", True)
             for i, r in enumerate(chronological):
@@ -85,8 +123,17 @@ def register_settings_routes(app, limiter, csrf):
                             # Keep the in-memory object in sync with the DB write so the
                             # handicap window below sees the fresh differential (not stale "0").
                             r.differential = str(diff)
-                window = chronological[:i + 1]
-                hi = calc_handicap_index(window, include_9hole)
+                # WHS Rule 5.2: calc_handicap_index requires most-recent-first
+                # input and windows to the most recent 20 ELIGIBLE
+                # differentials internally. `r` is chronological[i]
+                # (oldest-first); its position in the original
+                # most-recent-first `all_imported` is `idx`, so
+                # `all_imported[idx:]` is "all rounds up to and including r,
+                # in most-recent-first order" -- the old oldest-first,
+                # unbounded `chronological[:i + 1]` violated the contract.
+                idx = total - 1 - i
+                history_most_recent_first = all_imported[idx:]
+                hi = calc_handicap_index(history_most_recent_first, include_9hole)
                 if hi is not None:
                     update_round_handicap(r.date, r.index, hi, user_id)
 

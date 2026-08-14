@@ -287,7 +287,7 @@
     </div>
 </div>
 <script>
-var BAG = { clubs: {{ clubs_json|safe }}, slots: {{ slots_json|safe }}, bagSize: {{ bag_size }} };
+var BAG = { clubs: {{ clubs_by_id|tojson }}, slots: {{ slots|tojson }}, bagSize: {{ bag_size }} };
 var _editingClubId = null;
 var AC_DATA = {{ autocomplete_data|tojson|safe }};
 
