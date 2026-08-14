@@ -136,6 +136,37 @@ class TestSettingsImport:
         assert resp.status_code == 200
         assert b"Invalid zip file" in resp.data
 
+    def test_import_rejects_oversized_entry(self, logged_in_client):
+        # A member that decompresses far past the per-entry cap is a zip bomb;
+        # it compresses tiny but must be rejected before json.loads eats memory.
+        big = "A" * (11 * 1024 * 1024)
+        zip_bytes = _make_zip({"courses.json": big})
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "bomb.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"too large" in resp.data
+        # Nothing should have been persisted.
+        assert get_courses() == {}
+
+    def test_import_rejects_too_many_entries(self, logged_in_client):
+        entries = {f"rounds/{i}.json": "{}" for i in range(1001)}
+        zip_bytes = _make_zip(entries)
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "many.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"too many entries" in resp.data
+
+    def test_max_content_length_configured(self):
+        # Upstream body cap must exist so oversized uploads are rejected (413)
+        # before the route reads them into memory.
+        assert app.config.get("MAX_CONTENT_LENGTH")
+
     def test_import_valid_zip_persists_courses_rounds_and_settings(self, logged_in_client):
         course_payload = {
             "ImportGC": {
