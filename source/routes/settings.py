@@ -170,6 +170,7 @@ def register_settings_routes(app, limiter, csrf):
 
     @app.route("/settings/api-keys", methods=["POST"])
     @login_required
+    @limiter.limit("10 per minute")  # issue #75: throttle credential minting
     def api_keys_create():
         label = request.form.get("label", "").strip() or "Unnamed key"
         permissions = [p for p in request.form.getlist("permissions") if p in API_KEY_PERMISSIONS]
