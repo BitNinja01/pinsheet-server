@@ -1,4 +1,4 @@
-from source.models import RoundData, CourseData, HoleDef
+from source.models import RoundData, CourseData, HoleDef, FIR_OB_CODES, GIR_OB_CODES
 
 
 def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
@@ -44,6 +44,37 @@ def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) 
         "penalty_avg_vs_par": sum(penalty_vs_par) / len(penalty_vs_par) if penalty_vs_par else None,
         "clean_avg_vs_par": sum(clean_vs_par) / len(clean_vs_par) if clean_vs_par else None,
         "worst_holes": worst,
+    }
+
+
+def calc_penalty_hole_breakdown(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
+    """Classify every played hole into exactly one of clean / penalty / OB.
+
+    OB takes priority (an OB hole usually also carries penalty strokes), then
+    penalty (h.penalties > 0), else clean. Percentages are over played holes
+    (gross present) and sum to ~100% when any hole was played.
+    """
+    clean = penalty = ob = 0
+    for r in rounds:
+        if not r.holes:
+            continue
+        for h in r.holes.values():
+            if not h.gross:
+                continue
+            if h.fairway in FIR_OB_CODES or h.gir in GIR_OB_CODES:
+                ob += 1
+            elif h.penalties > 0:
+                penalty += 1
+            else:
+                clean += 1
+    total = clean + penalty + ob
+    if not total:
+        return {"clean_pct": None, "penalty_pct": None, "ob_pct": None, "total_holes": 0}
+    return {
+        "clean_pct": clean / total * 100,
+        "penalty_pct": penalty / total * 100,
+        "ob_pct": ob / total * 100,
+        "total_holes": total,
     }
 
 

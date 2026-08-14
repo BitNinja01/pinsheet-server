@@ -1,6 +1,12 @@
 from dataclasses import dataclass, field
 
 
+# Out-of-bounds hole codes, shared across calc modules. Fairway (tee-shot) OB
+# is left/right; green-in-regulation OB additionally includes short/long-over.
+FIR_OB_CODES = {"OBL", "OBR"}
+GIR_OB_CODES = {"OBL", "OBR", "OBS", "OBLO"}
+
+
 @dataclass
 class HoleData:
     gross: int = 0

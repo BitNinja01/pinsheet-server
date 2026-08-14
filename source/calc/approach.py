@@ -1,4 +1,4 @@
-from source.models import RoundData, CourseData, HoleDef
+from source.models import RoundData, CourseData, HoleDef, FIR_OB_CODES, GIR_OB_CODES
 from calc.scoring import calc_trend
 
 
@@ -270,8 +270,6 @@ def calc_scramble_by_par_type(rounds: list[RoundData], courses: dict[str, Course
 
 
 def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
-    _FIR_OB = {"OBL", "OBR"}
-    _GIR_OB = {"OBL", "OBR", "OBS", "OBLO"}
     fir_ob_round_totals = []
     gir_ob_round_totals = []
     fir_ob_vs_par = []
@@ -299,7 +297,7 @@ def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> di
             key_gir = (course_name, hole_num)
             if par != 3 and fw != "N":
                 hole_fir_counts[key_fir] = hole_fir_counts.get(key_fir, 0) + 1
-                if fw in _FIR_OB:
+                if fw in FIR_OB_CODES:
                     fir_ob_count += 1
                     hole_fir_ob[key_fir] = hole_fir_ob.get(key_fir, 0) + 1
                     if par and gross is not None:
@@ -308,7 +306,7 @@ def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> di
                     fir_clean_vs_par.append(gross - par)
             if gir != "N":
                 hole_gir_counts[key_gir] = hole_gir_counts.get(key_gir, 0) + 1
-                if gir in _GIR_OB:
+                if gir in GIR_OB_CODES:
                     gir_ob_count += 1
                     hole_gir_ob[key_gir] = hole_gir_ob.get(key_gir, 0) + 1
                     if par and gross is not None:

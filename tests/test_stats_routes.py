@@ -292,6 +292,10 @@ def test_stats_penalties_empty_state(auth_client, capture_render):
     ctx = capture_render["ctx"]
     assert ctx["penalties_per_round"] is None
     assert ctx["pen_free_pct"] is None
+    assert ctx["hole_breakdown"]["total_holes"] == 0
+    assert ctx["hole_breakdown"]["clean_pct"] is None
+    assert ctx["hole_breakdown"]["penalty_pct"] is None
+    assert ctx["hole_breakdown"]["ob_pct"] is None
 
 
 def test_stats_penalties_computes_expected_values(auth_client, capture_render):
@@ -305,6 +309,35 @@ def test_stats_penalties_computes_expected_values(auth_client, capture_render):
     # 2 of the 3 rounds (r1, r2) recorded zero penalties on every hole
     assert ctx["pen_free_pct"] == pytest.approx(66.6666, rel=1e-4)
     assert ctx["total_ob_rd"] == 0.0
+
+    # hole breakdown is data-driven (was hardcoded 94.4/4.4/1.2):
+    # 54 played holes; r3's 18 all carry a penalty, none OB
+    hb = ctx["hole_breakdown"]
+    assert hb["total_holes"] == 54
+    assert hb["clean_pct"] == pytest.approx(66.6666, rel=1e-4)
+    assert hb["penalty_pct"] == pytest.approx(33.3333, rel=1e-4)
+    assert hb["ob_pct"] == 0.0
+    assert hb["clean_pct"] + hb["penalty_pct"] + hb["ob_pct"] == pytest.approx(100.0)
+
+
+def test_stats_penalties_breakdown_renders_computed_values(auth_client):
+    """End-to-end: real Jinja render (no capture_render monkeypatch) must emit
+    the computed percentages in the HTML, not the old hardcoded 94.4/4.4/1.2.
+    Guards the exact template-display bug class of issue #34."""
+    _seed_three_rounds()
+    # the stripped test app omits the _fmt jinja global that main.py registers;
+    # wire in the real one so the template renders as it does in production.
+    auth_client.application.jinja_env.globals["_fmt"] = main_mod._fmt
+    resp = auth_client.get("/stats/penalties")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    # computed bar displays (36/18/0 of 54 played holes)
+    assert "66.7%" in html
+    assert "33.3%" in html
+    # the old hardcoded placeholders must be gone
+    assert "94.4%" not in html
+    assert "4.4%" not in html
+    assert "1.2%" not in html
 
 
 # ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ from calc import (
     calc_fir_miss_tendency, calc_scoring_by_fairway, calc_scoring_by_miss_side,
     calc_gir_by_par_type, calc_gir_miss_direction, calc_gir_from_fairway_vs_rough,
     calc_scoring_by_gir, calc_scramble_by_miss_direction, calc_scramble_by_par_type,
-    calc_ob_stats, calc_penalty_stats, calc_momentum_recovery,
+    calc_ob_stats, calc_penalty_stats, calc_penalty_hole_breakdown, calc_momentum_recovery,
     calc_nemesis_best_holes, calc_scoring_trend, calc_fir_trend, calc_gir_trend,
     calc_putts_trend, calc_scramble_trend, calc_handicap_trend,
     calc_playing_to_handicap_rate,
@@ -118,6 +118,7 @@ def register_stats_routes(app):
         pen_stats = calc_penalty_stats(b8, courses_dict)
         ob_stats = calc_ob_stats(b8, courses_dict)
         total_ob_rd = ob_stats.get("total_ob_per_round")
+        hole_breakdown = calc_penalty_hole_breakdown(b8, courses_dict)
 
         pen_free = sum(1 for r in b8 if r.holes and sum(h.penalties for h in r.holes.values()) == 0)
         pen_free_pct = (pen_free / len(b8) * 100) if b8 else None
@@ -131,6 +132,7 @@ def register_stats_routes(app):
             total_ob_rd=total_ob_rd,
             ob_stats=ob_stats,
             penalty_stats=pen_stats,
+            hole_breakdown=hole_breakdown,
         ))
 
     @app.route("/stats/fairways")

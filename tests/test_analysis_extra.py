@@ -3,7 +3,11 @@ import pytest
 
 from source.models import dict_to_round
 
-from calc.analysis import calc_penalty_stats, calc_momentum_recovery
+from calc.analysis import (
+    calc_penalty_stats,
+    calc_penalty_hole_breakdown,
+    calc_momentum_recovery,
+)
 
 
 def _round_with_holes(holes, course="Test GC", tees="White", date_="2026-01-01",
@@ -90,3 +94,46 @@ def test_momentum_recovery_empty():
     result = calc_momentum_recovery([], {})
     assert result["after_bogey_avg"] is None
     assert result["recovery_rate"] is None
+
+
+# ---- calc_penalty_hole_breakdown: data-driven clean/penalty/OB classification ----
+
+def test_penalty_hole_breakdown_classifies_and_sums_100(make_course):
+    courses = make_course()
+    holes = {
+        "1": {"gross": "4", "putts": "2", "fairway": "H", "gir": "H", "penalties": "0"},    # clean
+        "2": {"gross": "6", "putts": "2", "fairway": "H", "gir": "H", "penalties": "1"},    # penalty
+        "3": {"gross": "7", "putts": "2", "fairway": "OBL", "gir": "H", "penalties": "2"},  # OB (fairway) — priority over penalty
+        "4": {"gross": "5", "putts": "2", "fairway": "H", "gir": "OBS", "penalties": "0"},  # OB (gir)
+        "5": {"gross": "0", "putts": "0", "fairway": "", "gir": "", "penalties": "0"},      # no gross -> skipped
+    }
+    r = _round_with_holes(holes)
+    result = calc_penalty_hole_breakdown([r], courses)
+
+    assert result["total_holes"] == 4
+    assert result["clean_pct"] == pytest.approx(25.0)
+    assert result["penalty_pct"] == pytest.approx(25.0)     # OB hole with penalties counts as OB, not penalty
+    assert result["ob_pct"] == pytest.approx(50.0)
+    assert result["clean_pct"] + result["penalty_pct"] + result["ob_pct"] == pytest.approx(100.0)
+
+
+def test_penalty_hole_breakdown_penalty_on_non_ob_fairway_miss(make_course):
+    # water hazard / lateral: fairway missed left (not OB), penalty stroke -> classified penalty
+    courses = make_course()
+    holes = {
+        "1": {"gross": "6", "putts": "2", "fairway": "L", "gir": "N", "penalties": "1"},  # penalty
+        "2": {"gross": "4", "putts": "2", "fairway": "H", "gir": "H", "penalties": "0"},  # clean
+    }
+    r = _round_with_holes(holes)
+    result = calc_penalty_hole_breakdown([r], courses)
+    assert result["total_holes"] == 2
+    assert result["penalty_pct"] == pytest.approx(50.0)
+    assert result["ob_pct"] == 0.0
+
+
+def test_penalty_hole_breakdown_empty_returns_none():
+    result = calc_penalty_hole_breakdown([], {})
+    assert result["total_holes"] == 0
+    assert result["clean_pct"] is None
+    assert result["penalty_pct"] is None
+    assert result["ob_pct"] is None
