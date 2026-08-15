@@ -28,9 +28,10 @@ Each run emits one JSON record; scoring is arm-blind on the final answer only.
    (`{"trials":[...]}`).
 3. Score: `python3 scripts/graphify-uplift/score.py RESULTS.json scripts/graphify-uplift/task_pairs.json`
 
-## Findings (n=8, directional; full write-up gitignored in .context/graphify-uplift/)
-Token uplift ~neutral (ratio-of-means −1.3%, median per-task +1%). Real edge:
-**consistency + completeness** on large caller-set impact analysis (T3: treatment
-62 callers both reps, stdev 462 tokens; baseline 62→21 callers, stdev 7,865) and
-**higher file precision** (less over-scoping) on impact/cross-cutting tasks
-(T4 0.88→1.00, T6 0.40→1.00). Not a token multiplier. Keep #101; keep CI non-blocking.
+## Findings (n=8, 26 runs, directional; full write-up gitignored in .context/graphify-uplift/)
+Token uplift ~neutral (ratio-of-means −1.9%, median per-task +1.5%). Real edge is
+**reliability**, all replicated (2 reps): completeness on large caller-set impact
+analysis (T3 symbol-recall treatment 0.99 vs baseline 0.67; token stdev 462 vs 7,865)
+and **precision stability** on impact/cross-cutting tasks (treatment precision stdev
+0.000 vs baseline 0.062/0.300 on T4/T6 — baseline reaches the same answers but
+inconsistently). Not a token multiplier. Keep #101; keep CI non-blocking.
