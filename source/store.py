@@ -10,7 +10,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
-from source.models import dict_to_round, RoundData
+from source.models import dict_to_round, RoundData, clamp_pcc, effective_pcc
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -138,6 +138,7 @@ def get_all_rounds(user_id: int, limit: int = None) -> list[RoundData]:
             "excluded": bool(row["excluded"]),
             "computed_handicap": row["computed_handicap"],
             "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+            "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
@@ -168,6 +169,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
         "excluded": bool(row["excluded"]),
         "computed_handicap": row["computed_handicap"],
         "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+        "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
     }
     if row["total_putts"]:
         r["total_putts"] = row["total_putts"]
@@ -201,12 +203,18 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: clamp defensively here too (not just at the
+    # HTTP input boundary in routes/rounds.py) so a raw caller -- e.g. the
+    # zip-import path in routes/settings.py, which passes an archive's raw
+    # (untrusted) round dict straight through -- can never persist an
+    # out-of-range pcc.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
             entry_mode, holes, total_gross, total_putts, differential, notes,
-            excluded, computed_handicap, differential_locked)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            excluded, computed_handicap, differential_locked, pcc)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id,
             golf_round.get("course", ""),
@@ -223,6 +231,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
         ),
     )
     round_id = cur.lastrowid
@@ -261,12 +270,14 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: same defensive clamp as save_round.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """UPDATE rounds SET
              course_name = ?, date = ?, round_index = ?, tee_name = ?,
              holes_played = ?, entry_mode = ?, holes = ?, total_gross = ?,
              total_putts = ?, differential = ?, notes = ?, excluded = ?,
-             computed_handicap = ?, differential_locked = ?
+             computed_handicap = ?, differential_locked = ?, pcc = ?
            WHERE id = ? AND user_id = ?""",
         (
             golf_round.get("course", ""),
@@ -283,6 +294,7 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
             round_id,
             user_id,
         ),
@@ -420,9 +432,15 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 tee_data = course_data.get("tees", {}).get(r.tees)
                 if tee_data and r.total_gross and r.total_gross != "0":
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                    # WHS Rule 5.1a: nearest tenth, .5 rounded upwards -- see
-                    # round_half_up (not banker's-rounding round()).
-                    diff = round_half_up((113 / slope) * (float(r.total_gross) - rating), 1)
+                    # WHS Rule 5.6 / 5.1a: nearest tenth, .5 rounded upwards
+                    # -- see round_half_up (not banker's-rounding round()) --
+                    # and subtract this round's own PCC (r.pcc, already
+                    # range-clamped by clamp_pcc at every write/construction
+                    # site), matching calc_round_dif's formula exactly so
+                    # this inline recompute site never disagrees with it.
+                    # WHS Rule 5.1b: a 9-hole score only applies HALF the
+                    # day's PCC -- effective_pcc(r.pcc, r.holes_selection).
+                    diff = round_half_up((113 / slope) * (float(r.total_gross) - rating - effective_pcc(r.pcc, r.holes_selection)), 1)
                     str_diff = str(diff)
                     if r.differential != str_diff:
                         db.execute(

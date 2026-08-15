@@ -88,10 +88,19 @@ def calc_playing_handicap(course_handicap: int, allowance_percent: float = 100) 
     return int(round_half_up(course_handicap * allowance_percent / 100.0, 0))
 
 
-def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
-    # WHS Rule 5.1a: "...rounded to the nearest tenth, with .5 rounded
-    # upwards" -- use round_half_up, not banker's-rounding round().
-    return round_half_up((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
+def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating, pcc: float = 0.0) -> float:
+    # WHS Rule 5.6 / 5.1a: Score Differential = (113/Slope) x (Adjusted Gross
+    # Score - Course Rating - PCC), rounded to the nearest tenth with .5
+    # rounded upwards -- use round_half_up, not banker's-rounding round().
+    # PCC (Playing Conditions Calculation, WHS Rule 5.6) ranges -1.0..+3.0
+    # and is normally computed centrally by the handicap authority from the
+    # day's whole field of scores, which a single-user tracking app has no
+    # way to compute -- so it's plumbed through here as an optional
+    # per-round input (see source.models.clamp_pcc for the range guard
+    # applied at every input boundary). Default 0.0 (no PCC adjustment)
+    # reproduces every differential exactly as computed before this
+    # parameter existed, for every caller that doesn't pass pcc.
+    return round_half_up((113 / tee_slope) * (adjusted_gross_score - tee_rating - pcc), 1)
 
 
 def calc_expected_9hole_dif(handicap_index: float) -> float:

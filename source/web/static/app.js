@@ -1166,6 +1166,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var matchSelect = document.getElementById('round-match');
         var matchId = matchSelect ? matchSelect.value : '';
 
+        var pccInput = document.getElementById('round-pcc');
+        var pcc = pccInput && pccInput.value !== '' ? parseFloat(pccInput.value) : 0;
+        if (isNaN(pcc)) pcc = 0;
+
         var payload = {
             date: date,
             course: courseName,
@@ -1175,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', function () {
             entry_mode: entryMode,
             notes: notes,
             match_id: matchId || null,
+            pcc: pcc,
         };
 
         if (entryMode === 'detailed') {

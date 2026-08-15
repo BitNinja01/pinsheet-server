@@ -32,7 +32,7 @@ from calc import (
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
-from source.models import dict_to_round, dict_to_course
+from source.models import dict_to_round, dict_to_course, clamp_pcc, effective_pcc
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
@@ -233,6 +233,14 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        # WHS Rule 5.6 / 5.1a: PCC (Playing Conditions Calculation) is an
+        # OPTIONAL per-round input (a single-user app can't compute the
+        # handicap authority's field-wide PCC itself) -- default 0.0 (no
+        # adjustment, current/prior behavior) if omitted, clamped to
+        # [-1.0, +3.0] (WHS Rule 5.6's own bound) if provided, non-numeric
+        # input defaults to 0.0. See clamp_pcc for the full contract.
+        pcc = clamp_pcc(data.get("pcc", 0))
+
         golf_round = {
             "date": date_val,
             "course": course_name,
@@ -244,6 +252,7 @@ def register_rounds_routes(app, csrf):
             "notes": data.get("notes", ""),
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
+            "pcc": pcc,
         }
 
         total_gross = 0
@@ -302,7 +311,10 @@ def register_rounds_routes(app, csrf):
             # handicap calc (str(0.0) == "0.0" would NOT be excluded).
             golf_round["differential"] = "0"
         else:
-            differential = calc_round_dif(slope, adjusted_gross, rating)
+            # WHS Rule 5.1b: 9-hole scores apply only 50% of the day's PCC --
+            # effective_pcc halves `pcc` when holes_sel != "all" ("front"/
+            # "back"), passes it through unchanged for "all" (18-hole).
+            differential = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
@@ -687,6 +699,16 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        # WHS Rule 5.6 / 5.1a: same optional/clamped PCC contract as the
+        # POST path (see clamp_pcc), but defaulting to the round's EXISTING
+        # pcc (not 0.0) when the field is omitted entirely -- mirrors the
+        # `excluded` field's default-to-prior-value pattern immediately
+        # below, so an edit made from a form that doesn't surface a PCC
+        # input (e.g. the current round_detail.html quick-edit form) can't
+        # silently wipe a PCC set at creation time. A request that DOES send
+        # "pcc" (including explicit pcc=0) always wins.
+        pcc = clamp_pcc(data.get("pcc", old_round.pcc))
+
         golf_round = {
             "date": new_date,
             "course": course_name,
@@ -699,6 +721,7 @@ def register_rounds_routes(app, csrf):
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
             "excluded": data.get("excluded", old_round.excluded),
+            "pcc": pcc,
         }
 
         total_gross = 0
@@ -763,8 +786,9 @@ def register_rounds_routes(app, csrf):
             golf_round["differential_locked"] = True
             golf_round["differential"] = str(differential)
         elif send_override and diff_override is None:
-            # User cleared the lock — recompute
-            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
+            # User cleared the lock — recompute. WHS Rule 5.1b: halve pcc for
+            # a 9-hole score (effective_pcc), full pcc for "all" (18-hole).
+            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
         elif old_round.differential_locked:
@@ -773,8 +797,9 @@ def register_rounds_routes(app, csrf):
             golf_round["differential_locked"] = True
             golf_round["differential"] = str(differential)
         else:
-            # Normal recompute
-            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
+            # Normal recompute. WHS Rule 5.1b: same effective_pcc halving as
+            # the cleared-lock branch above.
+            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
 

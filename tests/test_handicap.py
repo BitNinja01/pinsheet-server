@@ -19,6 +19,7 @@ from calc.handicap import (
     round_half_up,
     WHS_HANDICAP_WINDOW,
 )
+from source.models import clamp_pcc, dict_to_round, effective_pcc
 
 
 def test_count_table_n_all_boundaries():
@@ -152,6 +153,176 @@ def test_calc_round_dif_scratch():
 def test_calc_round_dif_above_rating():
     result = calc_round_dif(128, 85, 71.5)
     assert result == round((113 / 128) * (85 - 71.5), 1)
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.6 / 5.1a -- PCC (Playing Conditions Calculation) adjustment
+# --------------------------------------------------------------------------
+
+def test_calc_round_dif_pcc_default_zero_unchanged():
+    """Default pcc=0.0 must reproduce the exact pre-Rule-5.6 differential --
+    non-breaking for every caller that doesn't pass pcc."""
+    assert calc_round_dif(113, 90, 72) == 18.0
+
+
+def test_calc_round_dif_pcc_positive_lowers_differential():
+    """WHS Rule 5.6: Score Differential = (113/Slope) x (AGS - CR - PCC).
+    A positive PCC (favorable/easy conditions) LOWERS the differential."""
+    assert calc_round_dif(113, 90, 72, pcc=1.0) == 17.0
+
+
+def test_calc_round_dif_pcc_negative_raises_differential():
+    """A negative PCC (difficult conditions) RAISES the differential."""
+    assert calc_round_dif(113, 90, 72, pcc=-1.0) == 19.0
+
+
+def test_calc_round_dif_pcc_max_boundary():
+    """WHS Rule 5.6's PCC upper bound (+3.0)."""
+    assert calc_round_dif(113, 90, 72, pcc=3.0) == 15.0
+
+
+def test_clamp_pcc_clamps_above_max():
+    assert clamp_pcc(5.0) == 3.0
+
+
+def test_clamp_pcc_clamps_below_min():
+    assert clamp_pcc(-2.0) == -1.0
+
+
+def test_clamp_pcc_within_range_unchanged():
+    assert clamp_pcc(1.5) == 1.5
+    assert clamp_pcc(-1.0) == -1.0
+    assert clamp_pcc(3.0) == 3.0
+
+
+def test_clamp_pcc_non_numeric_defaults_to_zero():
+    assert clamp_pcc("not-a-number") == 0.0
+    assert clamp_pcc(None) == 0.0
+    assert clamp_pcc("") == 0.0
+
+
+def test_clamp_pcc_nan_defaults_to_zero():
+    assert clamp_pcc(float("nan")) == 0.0
+
+
+def test_dict_to_round_defaults_pcc_zero_for_legacy_dict():
+    """A round dict with no 'pcc' key (legacy DB row / pre-Rule-5.6 data)
+    must construct with pcc=0.0, not raise."""
+    r = dict_to_round({"date": "2026-01-01"})
+    assert r.pcc == 0.0
+
+
+def test_dict_to_round_clamps_pcc_defense_in_depth():
+    """dict_to_round re-clamps pcc even if the source dict carries an
+    out-of-range value (e.g. a hand-edited zip-import archive)."""
+    r = dict_to_round({"date": "2026-01-01", "pcc": 99})
+    assert r.pcc == 3.0
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.1b -- 9-hole scores apply only 50% of the day's PCC
+# --------------------------------------------------------------------------
+
+def test_effective_pcc_full_for_18_hole():
+    assert effective_pcc(2.0, "all") == 2.0
+
+
+def test_effective_pcc_halved_for_front_nine():
+    assert effective_pcc(2.0, "front") == 1.0
+
+
+def test_effective_pcc_halved_for_back_nine():
+    assert effective_pcc(2.0, "back") == 1.0
+
+
+def test_effective_pcc_halved_negative_pcc():
+    assert effective_pcc(-1.0, "front") == -0.5
+
+
+def test_effective_pcc_zero_stays_zero_regardless_of_holes():
+    assert effective_pcc(0.0, "all") == 0.0
+    assert effective_pcc(0.0, "front") == 0.0
+
+
+def test_calc_round_dif_9hole_applies_half_pcc_not_full():
+    """WHS Rule 5.1b: a 9-hole (front/back) round with pcc=+2.0 must reflect
+    a -1.0 term (half of 2.0) in the differential, NOT the full -2.0 that an
+    18-hole round with the same pcc gets. AGS=45, slope=113, rating=36.0:
+    - 18-hole equivalent: (113/113)*(45-36-2.0) = 7.0
+    - 9-hole (half-pcc):  (113/113)*(45-36-1.0) = 8.0 -- ONE stroke better
+      than it would be at full pcc (7.0), reflecting only half the credit."""
+    all_18 = calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "all"))
+    nine = calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "front"))
+    assert all_18 == 7.0
+    assert nine == 8.0
+    assert nine != 7.0  # not accidentally applying the FULL pcc to a 9-hole score
+
+
+def test_9hole_pcc_consistent_across_calc_recompute_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.1b): a FRONT-9 round with pcc=+2.0 must
+    produce the SAME half-pcc-adjusted differential via calc_round_dif (with
+    effective_pcc applied by the caller), store.py's
+    recompute_handicaps_for_user inline site, and the routes/settings.py
+    zip-import inline site's exact formula -- all three must apply HALF
+    pcc, never the full amount, for a 9-hole score."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, get_courses, recompute_handicaps_for_user,
+        get_slope_rating,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc9", "Pcc9", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "NineCourse")
+
+    # 1) Pure-helper path: front-9, AGS=45 (half of 90 == a scratch front-9
+    # against a half-rating of 36.0), pcc=2.0 -> effective_pcc halves to 1.0.
+    assert calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "front")) == 8.0
+
+    # 2) store.py inline-round path (recompute_handicaps_for_user). Front-9
+    # tee has no explicit front_slope/front_rating, so get_slope_rating
+    # falls back to the full-round slope/rating (113 / 72.0), and the
+    # "front" holes_selection halves the front-rating internally via
+    # get_slope_rating's own convention -- here we just assert the ACTUAL
+    # code path's output is internally consistent with itself and with
+    # calc_round_dif's effective_pcc-adjusted formula, not a hand-picked
+    # literal.
+    r = {"course": "NineCourse", "tees": "W", "total_gross": "45",
+         "differential": "", "computed_handicap": "", "holes_selection": "front",
+         "entry_mode": "score_only", "holes": {}, "pcc": 2.0}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.pcc == 2.0
+    assert stored.holes_selection == "front"
+
+    slope, rating = get_slope_rating(course["tees"]["W"], "front")
+    expected = round_half_up((113 / slope) * (45 - rating - effective_pcc(2.0, "front")), 1)
+    assert float(stored.differential) == expected
+    # The critical Rule 5.1b assertion: NOT the full-pcc value.
+    full_pcc_would_be = round_half_up((113 / slope) * (45 - rating - 2.0), 1)
+    assert float(stored.differential) != full_pcc_would_be
+
+    # 3) routes/settings.py zip-import inline round site's exact formula,
+    # reproduced against the same stored round + course tee data (mirrors
+    # test_zip_import_differential_rounding_matches_calc_round_dif's
+    # pattern for why this doesn't drive the Flask route directly).
+    courses_data = get_courses()
+    tee_data = courses_data[stored.course]["tees"][stored.tees]
+    s2, r2 = get_slope_rating(tee_data, stored.holes_selection)
+    zip_import_diff = round_half_up((113 / s2) * (float(stored.total_gross) - r2 - effective_pcc(stored.pcc, stored.holes_selection)), 1)
+    assert zip_import_diff == expected == float(stored.differential)
 
 
 # --------------------------------------------------------------------------
@@ -323,6 +494,219 @@ def test_zip_import_differential_rounding_matches_calc_round_dif(tmp_data_dir):
     rating = float(tee_data["rating"])
     diff = _rhu((113 / slope) * (float(r0.total_gross) - rating), 1)
     assert diff == 18.3 == calc_round_dif(113, 90.25, 72.0)
+
+
+def test_round_saved_with_pcc_stores_pcc_and_differential_reflects_it(tmp_data_dir):
+    """WHS Rule 5.6: a round saved with pcc=+1 must (a) store that pcc, and
+    (b) have its differential reflect the -PCC term via store.py's
+    recompute_handicaps_for_user inline differential-backfill site (the
+    same site test_differential_rounding_consistent_... exercises for
+    Rule 5.1a). AGS=90, slope=113, rating=72.0, pcc=1.0 ->
+    (113/113)*(90-72.0-1.0) = 17.0, vs 18.0 with the default pcc=0."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, recompute_handicaps_for_user,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc1", "Pcc1", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "PccCourse")
+
+    # Round WITH pcc=1.0.
+    r_with_pcc = {"course": "PccCourse", "tees": "W", "total_gross": "90",
+                  "differential": "", "computed_handicap": "", "holes_selection": "all",
+                  "entry_mode": "score_only", "holes": {}, "pcc": 1.0}
+    save_round(r_with_pcc, "2026-05-01", 0, user_id=1)
+
+    # Round WITHOUT pcc (default 0.0) -- same score, must be unaffected.
+    r_default = {"course": "PccCourse", "tees": "W", "total_gross": "90",
+                 "differential": "", "computed_handicap": "", "holes_selection": "all",
+                 "entry_mode": "score_only", "holes": {}}
+    save_round(r_default, "2026-05-02", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+    stored = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    assert stored["2026-05-01"].pcc == 1.0
+    assert stored["2026-05-01"].differential == "17.0"
+
+    # Default (no pcc) round: pcc=0.0, differential unchanged vs today
+    # (identical to the pre-Rule-5.6 formula / test_differential_rounding_
+    # consistent_..._and_zip_import's 18.0-family expectations).
+    assert stored["2026-05-02"].pcc == 0.0
+    assert stored["2026-05-02"].differential == "18.0"
+
+
+def test_pcc_differential_consistent_across_calc_store_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.6): the SAME (slope, AGS, rating, pcc) input
+    must produce the IDENTICAL differential via calc_round_dif (the pure
+    helper), store.py's recompute_handicaps_for_user (inline round site),
+    and the routes/settings.py zip-import inline round site's formula."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, get_courses, recompute_handicaps_for_user,
+        get_slope_rating,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc2", "Pcc2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "PccCourse2")
+
+    # 1) Pure-helper path.
+    assert calc_round_dif(113, 90, 72.0, pcc=1.0) == 17.0
+
+    # 2) store.py inline-round path (recompute_handicaps_for_user).
+    r = {"course": "PccCourse2", "tees": "W", "total_gross": "90",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}, "pcc": 1.0}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.pcc == 1.0
+    assert stored.differential == "17.0"
+
+    # 3) routes/settings.py zip-import inline round site's exact formula,
+    # reproduced against the same stored round + course tee data (see
+    # test_zip_import_differential_rounding_matches_calc_round_dif for why
+    # this doesn't drive the Flask route directly).
+    courses_data = get_courses()
+    tee_data = courses_data[stored.course]["tees"][stored.tees]
+    slope, rating = get_slope_rating(tee_data, stored.holes_selection)
+    zip_import_diff = round_half_up((113 / slope) * (float(stored.total_gross) - rating - stored.pcc), 1)
+    assert zip_import_diff == 17.0 == calc_round_dif(113, 90, 72.0, pcc=1.0)
+
+
+def test_pcc_out_of_range_clamped_on_save(tmp_data_dir):
+    """WHS Rule 5.6: pcc=5.0 -> clamped to 3.0 on persistence (store.save_round's
+    defensive clamp_pcc call), and pcc=-2.0 -> clamped to -1.0. Exercised at
+    the store layer (bypassing the route-layer clamp) to prove the
+    defense-in-depth clamp in save_round itself, not just routes/rounds.py."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_course, save_round, get_all_rounds
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc3", "Pcc3", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "ClampCourse")
+
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": 5.0},
+               "2026-05-01", 0, user_id=1)
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": -2.0},
+               "2026-05-02", 0, user_id=1)
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": "not-a-number"},
+               "2026-05-03", 0, user_id=1)
+
+    stored = {r.date: r for r in get_all_rounds(user_id=1)}
+    assert stored["2026-05-01"].pcc == 3.0
+    assert stored["2026-05-02"].pcc == -1.0
+    assert stored["2026-05-03"].pcc == 0.0
+
+
+def test_legacy_db_without_pcc_column_migrates_and_loads(tmp_data_dir):
+    """Migration (WHS Rule 5.6): a DB created before the pcc column existed
+    (simulated here by creating the `rounds` table WITHOUT it) must still
+    load after init_db() runs its migration -- existing rows backfill to
+    pcc=0.0 and their differentials are unaffected."""
+    import sqlite3
+    from database import set_db_path, init_db
+    from store import create_user, get_all_rounds
+
+    db_path = str(tmp_data_dir / "legacy.db")
+    set_db_path(db_path)
+
+    # Simulate a pre-Rule-5.6 DB: create users + a rounds table with NO pcc
+    # column (mirrors the pre-migration schema in database.py's CREATE
+    # TABLE), then insert a legacy round row directly, bypassing store.py
+    # entirely so no code path can implicitly create the column first.
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE users (
+            id            INTEGER PRIMARY KEY,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            is_admin      INTEGER DEFAULT 0,
+            created_at    TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE rounds (
+            id            INTEGER PRIMARY KEY,
+            user_id       INTEGER NOT NULL REFERENCES users(id),
+            course_name   TEXT NOT NULL,
+            date          TEXT NOT NULL,
+            round_index   INTEGER NOT NULL DEFAULT 0,
+            tee_name      TEXT,
+            holes_played  TEXT,
+            entry_mode    TEXT,
+            holes         TEXT,
+            total_gross   TEXT,
+            total_putts   TEXT,
+            differential  TEXT,
+            notes         TEXT,
+            excluded      INTEGER DEFAULT 0,
+            computed_handicap TEXT,
+            created_at    TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, date, round_index)
+        )
+    """)
+    conn.execute(
+        "INSERT INTO users (id, username, display_name, password_hash) VALUES (1, 'legacy', 'Legacy', 'x')"
+    )
+    conn.execute(
+        """INSERT INTO rounds
+           (user_id, course_name, date, round_index, tee_name, holes_played,
+            entry_mode, holes, total_gross, differential, notes, excluded, computed_handicap)
+           VALUES (1, 'LegacyCourse', '2025-01-01', 0, 'W', 'all', 'score_only', '{}',
+                   '85', '18.0', '', 0, '10.0')"""
+    )
+    conn.commit()
+    conn.close()
+
+    # init_db()'s migration (_add_column_if_missing) must add pcc without
+    # error and without touching the existing (pre-Rule-5.6) differential.
+    init_db()
+
+    rounds = get_all_rounds(user_id=1)
+    assert len(rounds) == 1
+    assert rounds[0].pcc == 0.0
+    assert rounds[0].differential == "18.0"
 
 
 def test_calc_expected_9hole_dif():

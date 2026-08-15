@@ -256,5 +256,13 @@ def init_db() -> None:
     # play (100%)" (its actual pre-Rule-6.2 net behavior) rather than an
     # ambiguous/incorrect label.
     _add_column_if_missing(db, "matches", "format_key TEXT NOT NULL DEFAULT 'individual_match'")
+    # WHS Rule 5.6 / 5.1a: PCC (Playing Conditions Calculation) adjustment,
+    # an optional per-round input in [-1.0, +3.0] (see source.models.
+    # clamp_pcc), subtracted from (Adjusted Gross Score - Course Rating) in
+    # the Score Differential formula. Existing DBs predating this feature
+    # backfill to the non-breaking default 0.0 (PCC omitted -- the exact
+    # prior behavior), so every already-stored differential is unaffected
+    # and the DB loads without error.
+    _add_column_if_missing(db, "rounds", "pcc REAL NOT NULL DEFAULT 0")
     db.commit()
     db.close()
