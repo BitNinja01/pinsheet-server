@@ -15,10 +15,31 @@ dependencies = [
     "flask-login>=0.6",
     "flask-limiter>=3.0",
     "flask-wtf>=1.2",
+    # --- /api/v1 (issue #50) additions below; see eng-lead-apiv1.md §1 ---
+    # apiflask: OpenAPI 3.1 + Swagger/Redoc for the v1 surface (ADR-001).
+    # Upper-bounded (repo convention is normally floor-only) because apiflask
+    # has shipped breaking majors recently on a C4 surface.
+    # SBOM/supply-chain note: apiflask 3.x pulls marshmallow + flask-marshmallow +
+    # apispec + webargs (the schema stack v1 actually uses) AND pydantic[email]
+    # + flask-httpauth as inert transitive deps. v1 code is marshmallow-only;
+    # flask-httpauth MUST NOT be imported by any v1 module (auth stays on the
+    # existing Flask-Login request_loader). Track pydantic/flask-httpauth in
+    # SBOM/dependency-scan output as "transitive, unused, present for
+    # completeness" rather than silently ignoring them.
+    "apiflask>=3.1.1,<4.0",
+    # flask-cors: CVE floor, not a style choice. >=6.0.0 closes
+    # CVE-2024-6221/6839/6844/6866 (CORS bypass / private-network exposure).
+    # Do not accept a lower floor (ADR-005, RISK-3/T-09).
+    "flask-cors>=6.0.0,<7.0",
+    # opentelemetry-api/-sdk: no-op tracing scaffolding (ADR-003), OTEL_ENABLED
+    # gated, no exporter configured. Exact-pinned (no range) because API and
+    # SDK must move in lockstep per the OTel Python project's own policy.
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-flask>=1", "pytest-cov>=5"]
+dev = ["pytest>=8", "pytest-flask>=1", "pytest-cov>=5", "hypothesis>=6"]
 
 [tool.setuptools.packages.find]
 include = ["source", "source.*"]
