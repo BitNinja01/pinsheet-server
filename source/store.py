@@ -107,7 +107,10 @@ def rename_course(old_name: str, new_name: str) -> None:
     _log.info("course renamed: %r -> %r", old_name, new_name)
 
 
-def get_all_rounds(user_id: int = 1, limit: int = None) -> list[RoundData]:
+def get_all_rounds(user_id: int, limit: int = None) -> list[RoundData]:
+    # user_id is REQUIRED (no default). A default of 1 silently returned the
+    # first user's rounds for any caller that forgot to pass an id — a
+    # cross-user data-exposure footgun in a multi-user DB (eng-architect T6).
     db = get_db()
     query = "SELECT * FROM rounds WHERE user_id = ? ORDER BY date DESC, round_index DESC"
     if limit is not None:
@@ -229,6 +232,59 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
     return round_id
 
 
+def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> int:
+    """Update an existing round row in place, keyed by its primary id.
+
+    Used by the edit path (including date changes) so the round keeps its id.
+    A delete + INSERT-OR-REPLACE would mint a new id and orphan any
+    match_rounds rows that reference this round.
+
+    Returns the number of rows updated (0 if the round no longer exists or is
+    owned by another user), so callers can detect a lost-row race.
+    """
+    db = get_db()
+    total_putts = None
+    holes = golf_round.get("holes", {})
+    if holes:
+        def _to_int(v):
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return 0
+        total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    cur = db.execute(
+        """UPDATE rounds SET
+             course_name = ?, date = ?, round_index = ?, tee_name = ?,
+             holes_played = ?, entry_mode = ?, holes = ?, total_gross = ?,
+             total_putts = ?, differential = ?, notes = ?, excluded = ?,
+             computed_handicap = ?, differential_locked = ?
+           WHERE id = ? AND user_id = ?""",
+        (
+            golf_round.get("course", ""),
+            date,
+            index,
+            golf_round.get("tees", ""),
+            _norm_holes(golf_round.get("holes_played") or golf_round.get("holes_selection", "")),
+            golf_round.get("entry_mode", ""),
+            json.dumps(golf_round.get("holes", {})),
+            golf_round.get("total_gross", ""),
+            str(total_putts) if total_putts is not None else None,
+            golf_round.get("differential", ""),
+            golf_round.get("notes", ""),
+            1 if golf_round.get("excluded") else 0,
+            golf_round.get("computed_handicap", ""),
+            1 if golf_round.get("differential_locked") else 0,
+            round_id,
+            user_id,
+        ),
+    )
+    rowcount = cur.rowcount
+    db.commit()
+    db.close()
+    _log.info("round updated in place: id=%s -> %s #%s (rows=%s)", round_id, date, index, rowcount)
+    return rowcount
+
+
 def delete_round(date: str, index: str, user_id: int = 1) -> None:
     db = get_db()
     row = db.execute(
@@ -288,8 +344,23 @@ def _is_incomplete_round(r, course_data) -> bool:
     return scored < expected
 
 
+# WHS Rule 5.7: a Low Handicap Index is only established once the player
+# has accumulated this many acceptable (eligible) scores.
+WHS_LHI_MIN_SCORES = 20
+
+# WHS Rule 5.7: the LHI window -- only prior displayed Handicap Index values
+# within this many days of the round being processed are eligible.
+WHS_LHI_WINDOW_DAYS = 365
+
+
 def recompute_handicaps_for_user(user_id: int) -> int:
-    from calc.handicap import calc_handicap_index
+    from calc.handicap import (
+        calc_handicap_index,
+        apply_handicap_cap,
+        _is_eligible_diff_round,
+        exceptional_reduction,
+        WHS_HANDICAP_WINDOW,
+    )
 
     courses_data = get_courses()
     settings = load_settings(user_id)
@@ -300,8 +371,37 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         return 0
 
     chronological = list(reversed(all_rounds))
+    total = len(all_rounds)
     updated = 0
     db = get_db()
+
+    # WHS Rule 5.7 (Low Handicap Index): walked oldest -> newest alongside
+    # the main loop below. `prior_displayed` holds (date, displayed_hi) for
+    # every round that has had a Handicap Index calculated so far -- the
+    # *displayed* (i.e. Rule 5.8 capped) value, since Rule 5.7 defines LHI as
+    # the lowest Handicap Index the player actually HELD. `acceptable_count`
+    # tracks the number of acceptable (eligible) scores seen so far. Both are
+    # evaluated using only rounds strictly BEFORE the round currently being
+    # processed -- "the LHI used to process a given score is the one
+    # determined from the record PRIOR to that score."
+    prior_displayed: list[tuple[str, float]] = []
+    acceptable_count = 0
+
+    # WHS Rule 5.9 (Exceptional Score Reduction): `exceptional_reductions`
+    # holds the per-round reduction (0.0 / -1.0 / -2.0) for every ELIGIBLE
+    # round processed so far, oldest -> newest, appended ONLY for eligible
+    # rounds -- i.e. this list is parallel to the same "most recent 20
+    # eligible differentials" window that calc_handicap_index itself walks,
+    # not to raw round count. That means `exceptional_reductions[-window:]`
+    # always mirrors exactly the eligible differentials currently inside a
+    # given round's Handicap Index window, so a reduction naturally dilutes
+    # out once its exceptional round ages past the most-recent-20-eligible
+    # boundary. The reduction is recomputed deterministically each pass
+    # (not persisted to a column) since it's a pure function of the HI in
+    # effect when the round was played (the prior DISPLAYED HI, already
+    # tracked via `prior_displayed`) and that round's own differential --
+    # both already available sequentially at this point in the loop.
+    exceptional_reductions: list[float] = []
 
     for i, r in enumerate(chronological):
         if (not r.differential or r.differential == "0") and not r.differential_locked:
@@ -318,9 +418,68 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                             (str_diff, user_id, r.date, r.index),
                         )
                         updated += 1
+                    # Keep the in-memory object in sync with the DB write so
+                    # the handicap window below (and later iterations, since
+                    # `all_rounds[idx:]` shares this same object) sees the
+                    # fresh differential instead of a stale "0".
+                    r.differential = str_diff
 
-        window = chronological[max(0, i + 1 - 20):i + 1]
-        hi = calc_handicap_index(window, include_9hole)
+        # WHS Rule 5.2: calc_handicap_index requires most-recent-first input
+        # and does its own recent-20-eligible windowing internally. `r` is
+        # chronological[i] (oldest-first index i); its position in the
+        # original most-recent-first `all_rounds` is `idx` below, so
+        # `all_rounds[idx:]` is exactly "all rounds up to and including r,
+        # in most-recent-first order" -- built via index arithmetic on the
+        # already most-recent-first list instead of re-reversing a growing
+        # slice of `chronological` on every iteration.
+        idx = total - 1 - i
+        history_most_recent_first = all_rounds[idx:]
+        raw_hi = calc_handicap_index(history_most_recent_first, include_9hole)
+
+        # WHS Rule 5.9 (Exceptional Score Reduction): the HI "in effect when
+        # the round was played" is the most recent prior DISPLAYED HI
+        # (`prior_displayed[-1]`, i.e. the post-ESR, post-Rule-5.8-cap value
+        # -- `prior_displayed` has not yet had this round appended to it).
+        # If no HI has been established yet, the round cannot be
+        # exceptional. Only ELIGIBLE rounds consume a slot in the tracked
+        # window (mirrors calc_handicap_index's own windowing -- excluded/
+        # ineligible rounds never contribute a differential, so they must
+        # not contribute a reduction slot either).
+        hi_in_effect = prior_displayed[-1][1] if prior_displayed else None
+        if _is_eligible_diff_round(r, include_9hole):
+            exceptional_reductions.append(
+                exceptional_reduction(hi_in_effect, float(r.differential))
+            )
+
+        # Sum of active reductions = every exceptional round's reduction
+        # still within the most-recent-20-ELIGIBLE window ending at (and
+        # including) this round -- exactly the same window
+        # calc_handicap_index used to compute `raw_hi` above. Reductions are
+        # already negative/zero, so ADDING the sum lowers the HI (this is
+        # the mathematically-equivalent shortcut to applying the reduction
+        # to each of the 20 windowed differentials individually and
+        # re-averaging, since the reduction is uniform across the window).
+        active_reduction_sum = sum(exceptional_reductions[-WHS_HANDICAP_WINDOW:])
+        hi_after_esr = round(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
+
+        # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
+        # this round already has >= 20 acceptable scores; the cap then
+        # applies to this round's freshly-calculated (raw) HI using the
+        # lowest displayed HI held within the 365 days preceding this
+        # round's date (strictly prior rounds only -- see cutoff below).
+        # The 365-day period preceding is a CLOSED interval -- a prior HI
+        # dated exactly 365 days before this round's date is the boundary
+        # day of that period and must be INCLUDED (`>=`, not `>`); using
+        # strict `>` would silently shrink the window to 364 days.
+        low_hi = None
+        if acceptable_count >= WHS_LHI_MIN_SCORES:
+            cutoff = datetime.fromisoformat(r.date).date() - timedelta(days=WHS_LHI_WINDOW_DAYS)
+            candidates = [hi for d, hi in prior_displayed if datetime.fromisoformat(d).date() >= cutoff]
+            if candidates:
+                low_hi = min(candidates)
+
+        hi = apply_handicap_cap(hi_after_esr, low_hi) if hi_after_esr is not None else None
+
         if hi is not None:
             new_val = str(hi)
             if r.computed_handicap != new_val:
@@ -329,12 +488,16 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                     (str(hi), user_id, r.date, r.index),
                 )
                 updated += 1
+            prior_displayed.append((r.date, hi))
         elif r.computed_handicap:
             db.execute(
                 "UPDATE rounds SET computed_handicap = '' WHERE user_id = ? AND date = ? AND round_index = ?",
                 (user_id, r.date, r.index),
             )
             updated += 1
+
+        if _is_eligible_diff_round(r, include_9hole):
+            acceptable_count += 1
 
     db.commit()
     db.close()
@@ -608,9 +771,14 @@ def consume_invite_code(code: str, used_by: int) -> bool:
 
 
 def seed_plugin_state(plugin_name: str) -> None:
+    # Trust model: a newly discovered plugin is seeded DISABLED (enabled=0).
+    # Dropping a folder into plugins/ must NOT auto-run its code — an admin
+    # has to explicitly enable it in the admin UI first, which is the point at
+    # which they validate/vouch for the plugin. This is the provenance gate:
+    # "plugin present on disk" is not "plugin trusted to execute".
     db = get_db()
     db.execute(
-        "INSERT OR IGNORE INTO plugin_states (plugin_name, enabled) VALUES (?, 1)",
+        "INSERT OR IGNORE INTO plugin_states (plugin_name, enabled) VALUES (?, 0)",
         (plugin_name,),
     )
     db.commit()

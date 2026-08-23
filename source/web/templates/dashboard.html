@@ -108,13 +108,10 @@
             <div class="ps-eyebrow">The card</div>
             <div class="ps-serif" style="font-size: var(--ps-fs-score); margin-top: 2px;">Recent rounds</div>
         </div>
-        <div class="ps-filters">
-            <span class="ps-chip is-on">All</span>
-            <span class="ps-chip">Normal</span>
-            <span class="ps-chip">Tournament</span>
-            <span class="ps-chip">Qualifying</span>
-            <span class="ps-chip">Practice</span>
-        </div>
+        {# Round-type filter chips (Normal/Tournament/Qualifying/Practice) were
+           unwired static spans that did nothing on click (issue #47). Removed
+           until a per-round round-type dimension exists (issue #46); re-add with
+           a real `.ps-filters .ps-chip` handler + server-side filtering then. #}
     </div>
     {% if rounds %}
     <!-- Desktop table -->
