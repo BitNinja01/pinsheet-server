@@ -9,7 +9,7 @@ from flask_login import login_required, current_user
 from store import (
     save_settings, save_course, save_round,
     get_all_rounds, update_round_handicap, update_round_differential,
-    get_slope_rating,
+    get_slope_rating, reshape_course_data,
     create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
 from calc import calc_handicap_index
@@ -92,6 +92,9 @@ def register_settings_routes(app, limiter, csrf):
                             # (finding U1 / GH#68), but lenient: blank out any
                             # non-numeric value instead of rejecting the import.
                             _coerce_course_numerics(cdata, strict=False)
+                            # TUI-era exports carry per-hole tees and possibly
+                            # `index` stroke keys; store canonically.
+                            cdata = reshape_course_data(cdata)
                             save_course(cdata, cname)
                             courses_count += 1
                     elif "rounds/" in name and name.endswith(".json"):

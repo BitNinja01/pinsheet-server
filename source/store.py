@@ -79,6 +79,35 @@ def get_courses() -> dict:
     return result
 
 
+def reshape_course_data(course: dict) -> dict:
+    """Convert a legacy TUI-shaped course document to the canonical shape.
+
+    Legacy (TUI-era) courses store per-hole yardages inside each hole
+    (``holes[h]["tees"][tee] = yardage``) and older wizard data uses an
+    ``index`` stroke-index key. The canonical server shape stores per-hole
+    yardages at the tee level (``tees[tee]["yardages"][hole] = yardage``)
+    with holes holding only ``par`` + ``hole_index``.
+
+    Canonical documents pass through unchanged; a new dict is returned
+    (the input is never mutated).
+    """
+    out = json.loads(json.dumps(course))
+    holes = out.get("holes")
+    if isinstance(holes, dict):
+        for hkey, hdata in list(holes.items()):
+            if not isinstance(hdata, dict):
+                continue
+            if "index" in hdata and "hole_index" not in hdata:
+                hdata["hole_index"] = hdata.pop("index")
+            legacy_tees = hdata.pop("tees", None)
+            if legacy_tees:
+                for tee_name, yardage in legacy_tees.items():
+                    tee_data = out.setdefault("tees", {}).setdefault(tee_name, {})
+                    yardages = tee_data.setdefault("yardages", {})
+                    yardages.setdefault(str(hkey), str(yardage))
+    return out
+
+
 def save_course(course, course_name) -> None:
     db = get_db()
     db.execute(
