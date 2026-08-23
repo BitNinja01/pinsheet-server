@@ -45,7 +45,7 @@ def calc_adjusted_gross_score(round_holes, course_holes, course_handicap) -> int
 
     ``round_holes`` maps hole number -> HoleData|dict (with ``gross``).
     ``course_holes`` maps hole number -> dict with ``par`` and a stroke index
-    under either ``hole_index`` (legacy) or ``index`` (current).
+    under either ``hole_index`` (canonical) or ``index`` (legacy fallback).
 
     Returns the adjusted total, or ``None`` when no per-hole gross is available
     (the caller should then fall back to the raw total gross).

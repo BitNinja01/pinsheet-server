@@ -26,7 +26,6 @@ from calc import (
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
     calc_adjusted_gross_score,
-    calc_hole_scores,
     WHS_HANDICAP_WINDOW,
     current_and_previous_handicap_index,
 )
