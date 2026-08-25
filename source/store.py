@@ -667,13 +667,23 @@ def create_user(username: str, display_name: str, password: str) -> dict:
     return {"id": user_id, "username": username, "display_name": display_name, "is_admin": bool(is_admin)}
 
 
+# Fixed bcrypt hash used to normalize login timing for unknown usernames
+# (issue #77). Computed once at import; the password value is irrelevant since
+# no real login ever matches against it.
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"pinsheet-timing-normalizer", bcrypt.gensalt()).decode()
+
+
 def verify_user(username: str, password: str) -> dict | None:
     db = get_db()
     row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     db.close()
-    if not row or not row["password_hash"]:
-        return None
-    if bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+    # Issue #77 (CWE-208): always run one bcrypt.checkpw so an unknown username
+    # (no such row) takes the same ~time as a wrong password for a real user,
+    # closing the login timing side-channel. Mirrors the _SENTINEL_KEY_HASH
+    # pattern used for API keys.
+    stored_hash = row["password_hash"] if (row and row["password_hash"]) else _DUMMY_PASSWORD_HASH
+    password_ok = bcrypt.checkpw(password.encode(), stored_hash.encode())
+    if row and row["password_hash"] and password_ok:
         return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "is_admin": bool(row["is_admin"])}
     return None
 
