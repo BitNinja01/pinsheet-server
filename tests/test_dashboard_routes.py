@@ -468,8 +468,9 @@ def test_challenge_detail_computes_leaderboard(auth_client, capture_render):
 
     assert ctx["challenge"]["title"] == "HI Battle"
     board_by_user = {row["user_id"]: row for row in ctx["leaderboard"]}
-    # user 1 played 3 rounds in range, computed handicap == 8.0 (see stats golden values)
-    assert board_by_user[1]["value"] == 8.0
+    # user 1 played 3 rounds in range, computed handicap == 6.0 (see stats golden
+    # values). WHS Rule 5.2a: 3 differentials -> -2.0 adjustment (was 8.0).
+    assert board_by_user[1]["value"] == 6.0
     assert board_by_user[1]["round_count"] == 3
     # user 2 never played -> no value, no rank
     assert board_by_user[2]["value"] is None
@@ -485,9 +486,12 @@ def test_challenge_detail_leaderboard_orders_by_lower_handicap_first(auth_client
     higher_better=False for the "handicap" stat. A single-participant-with-
     a-value dataset can't distinguish correct sort direction from a flipped
     `reverse` bug; this seeds two distinct values and asserts order."""
-    _seed_three_rounds(user_id=1)  # user 1: diffs [8.0, 20.0, 30.0] -> best-1 HI == 8.0
+    # WHS Rule 5.2a: 3 differentials -> -2.0 adjustment. user 1: diffs
+    # [8.0, 20.0, 30.0] -> best-1 8.0, adjusted 6.0.
+    _seed_three_rounds(user_id=1)
     create_user("p2", "Player Two", "pass1234")
-    # user 2: worse (higher) diffs -> best-1 HI == 15.0, strictly worse than user 1's 8.0
+    # user 2: worse (higher) diffs -> best-1 15.0, adjusted 13.0 (5.2a: 3
+    # differentials -> -2.0), strictly worse than user 1's 6.0
     for i, diff in enumerate(["15.0", "16.0", "17.0"]):
         _save(f"2026-04-0{i + 1}", 0, _uniform_holes(delta=0), diff, computed_handicap="15.0", user_id=2)
 
@@ -502,9 +506,11 @@ def test_challenge_detail_leaderboard_orders_by_lower_handicap_first(auth_client
     ctx = capture_render["ctx"]
 
     board_by_user = {row["user_id"]: row for row in ctx["leaderboard"]}
-    assert board_by_user[1]["value"] == 8.0
-    assert board_by_user[2]["value"] == 15.0
-    # lower handicap is better -> user 1 (8.0) must rank ahead of user 2 (15.0)
+    # WHS Rule 5.2a: 3 differentials -> -2.0 adjustment (was 8.0).
+    assert board_by_user[1]["value"] == 6.0
+    # user 2 also has 3 differentials -> same -2.0 adjustment (was 15.0).
+    assert board_by_user[2]["value"] == 13.0
+    # lower handicap is better -> user 1 (6.0) must rank ahead of user 2 (13.0)
     assert [row["user_id"] for row in ctx["leaderboard"]] == [1, 2]
     assert ctx["leaderboard"][0]["user_id"] == 1
     assert ctx["leaderboard"][0].get("is_leader") is True
@@ -607,7 +613,8 @@ def test_dashboard_featured_challenge_summarizes_active_challenge(auth_client, c
     assert fc["title"] == "Featured HI Battle"
     assert fc["submitted_count"] == 1
     board_by_name = {row["display_name"]: row for row in fc["leaderboard"]}
-    assert board_by_name["Golfer"]["value"] == 8.0
+    # WHS Rule 5.2a: 3 differentials -> -2.0 adjustment (was 8.0).
+    assert board_by_name["Golfer"]["value"] == 6.0
     assert board_by_name["Golfer"]["is_you"] is True
     assert board_by_name["Golfer"].get("is_leader") is True
 
@@ -618,9 +625,12 @@ def test_dashboard_featured_challenge_leaderboard_orders_by_lower_handicap_first
     single-participant-with-a-value dataset (as above) can't catch a flipped
     `reverse=higher_better` sort bug; this seeds two distinct values."""
     _mark_welcome_shown(user_id=1)
-    _seed_three_rounds(user_id=1)  # user 1: best-1 HI == 8.0
+    # WHS Rule 5.2a: 3 differentials -> -2.0 adjustment. user 1: best-1 8.0,
+    # adjusted 6.0.
+    _seed_three_rounds(user_id=1)
     create_user("p2", "Player Two", "pass1234")
-    # user 2: worse (higher) diffs -> best-1 HI == 15.0
+    # user 2: worse (higher) diffs -> best-1 15.0, adjusted 13.0 (5.2a: 3
+    # differentials -> -2.0)
     for i, diff in enumerate(["15.0", "16.0", "17.0"]):
         _save(f"2026-04-0{i + 1}", 0, _uniform_holes(delta=0), diff, computed_handicap="15.0", user_id=2)
 
@@ -638,9 +648,11 @@ def test_dashboard_featured_challenge_leaderboard_orders_by_lower_handicap_first
     assert fc is not None
     assert fc["submitted_count"] == 2
     board_by_name = {row["display_name"]: row for row in fc["leaderboard"]}
-    assert board_by_name["Golfer"]["value"] == 8.0
-    assert board_by_name["Player Two"]["value"] == 15.0
-    # lower handicap is better -> "Golfer" (8.0) must rank ahead of "Player Two" (15.0)
+    # WHS Rule 5.2a: 3 differentials -> -2.0 adjustment (was 8.0).
+    assert board_by_name["Golfer"]["value"] == 6.0
+    # "Player Two" also has 3 differentials -> same -2.0 adjustment (was 15.0).
+    assert board_by_name["Player Two"]["value"] == 13.0
+    # lower handicap is better -> "Golfer" (6.0) must rank ahead of "Player Two" (13.0)
     assert [row["display_name"] for row in fc["leaderboard"]] == ["Golfer", "Player Two"]
     assert fc["leaderboard"][0].get("is_leader") is True
 
@@ -715,3 +727,30 @@ def test_profile_last_year_handicap_subtitle_when_round_near_one_year_old(auth_c
     assert resp.status_code == 200
     ctx = capture_render["ctx"]
     assert ctx["panels"]["handicap"].get("subtitle") == "1y 16.0"
+
+
+# ---------------------------------------------------------------------------
+# Regression: issue #47 — the "Recent rounds" round-type filter chips were
+# unwired static <span>s that did nothing on click. They were removed until a
+# per-round round-type dimension exists (blocked on #46). This test renders the
+# real profile HTML (no capture_render stub) and locks in that the dead chips
+# stay gone while the separately-wired chart-card range chips remain.
+# ---------------------------------------------------------------------------
+
+def test_profile_has_no_unwired_roundtype_filter_chips(auth_client):
+    _mark_welcome_shown()
+    _seed_three_rounds()
+    resp = auth_client.get("/profile")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # The dead round-type chips must not be reintroduced (#47). Covers the full
+    # original 5-chip set: the "All" active chip plus all four type labels.
+    for label in ("Normal", "Tournament", "Qualifying", "Practice"):
+        assert f'<span class="ps-chip">{label}</span>' not in html
+    assert '<span class="ps-chip is-on">All</span>' not in html
+
+    # The chart-card range chips (a different, wired .ps-filters block) must
+    # remain — guards against an over-broad removal of all chips.
+    assert 'data-range="12M"' in html
+    assert 'class="ps-chart-card"' in html

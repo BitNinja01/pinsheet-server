@@ -121,6 +121,7 @@
 :root, .ps-light {
     --ps-paper: #faf6ec;
     --ps-paper-2: #f1ebda;
+    --ps-hover: color-mix(in srgb, var(--ps-paper-2) 88%, var(--ps-ink));
     --ps-ink: #16110a;
     --ps-ink-2: #4a4239;
     --ps-ink-3: #8a8174;
@@ -137,6 +138,7 @@
 .ps-dark {
     --ps-paper: #131312;
     --ps-paper-2: #1c1c1a;
+    --ps-hover: color-mix(in srgb, var(--ps-paper-2) 88%, var(--ps-ink));
     --ps-ink: #ecebe6;
     --ps-ink-2: #a8a59d;
     --ps-ink-3: #6c685f;
@@ -185,6 +187,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 22px;
+}
+
+.ps-sidebar-version {
+    margin-top: auto;
+    font-family: var(--ps-font-mono);
+    font-size: var(--ps-fs-micro);
+    color: var(--ps-ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
 }
 
 .ps-mobile-header {
@@ -451,12 +462,51 @@ body {
 .ps-table td.r {
     font-variant-numeric: tabular-nums;
 }
+/* Solid accent borders on the left and right edges of a counting row. */
 .ps-table tbody tr.is-handicap td:first-child {
-    border-left: var(--ps-rule) solid var(--ps-accent);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    border-left: calc(var(--ps-rule) * 3) solid var(--ps-accent);
 }
-.ps-table tbody tr.is-handicap td {
-    background: color-mix(in srgb, var(--ps-accent) 7%, transparent);
+.ps-table tbody tr.is-handicap td:last-child {
+    border-right: calc(var(--ps-rule) * 3) solid var(--ps-accent);
+}
+/* Unify all text in a counting row to the accent color. !important
+   overrides the per-cell inline colors (date/tees/diff). Semantic
+   over/under score colors are preserved below. */
+.ps-table tbody tr.is-handicap td,
+.ps-table tbody tr.is-handicap td .ps-course,
+.ps-table tbody tr.is-handicap td .ps-score,
+.ps-table tbody tr.is-handicap td .ps-topar {
+    color: var(--ps-accent) !important;
+    font-weight: var(--ps-fw-strong) !important;
+}
+/* Preserve the semantic over-par (red) score color. */
+.ps-table tbody tr.is-handicap td .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+/* Uncounted rows: unify all text to white ink (no grey variation).
+   !important overrides the per-cell inline colors (date/tees/diff).
+   Semantic over/under score colors are preserved below. */
+.ps-table tbody tr.clickable-row:not(.is-handicap) td,
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar {
+    color: var(--ps-ink) !important;
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-under,
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-topar.is-under {
+    color: var(--ps-accent) !important;
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+/* Unify all rounds-list cell text to one size (scores match body). */
+.ps-table tbody tr.clickable-row td .ps-score {
+    font-size: var(--ps-fs-body);
+}
+/* Uncounted rows: sparkline matches the white text (counting rows keep accent). */
+.ps-table tbody tr.clickable-row:not(.is-handicap) td svg path {
+    stroke: var(--ps-ink);
+}
+.ps-table tbody tr.clickable-row:not(.is-handicap) td svg circle {
+    fill: var(--ps-ink);
 }
 /* Legend explaining the handicap highlight. */
 .hcap-legend {
@@ -477,19 +527,11 @@ body {
     border-left: var(--ps-rule) solid var(--ps-accent);
     background: color-mix(in srgb, var(--ps-accent) 12%, transparent);
 }
-/* Small dot marking a counted round in the Diff cell. */
-.hcap-dot {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--ps-accent);
-    margin-left: 5px;
-    vertical-align: middle;
-}
 .ps-table tbody tr.is-excluded td:first-child {
-    border-left: var(--ps-rule) solid var(--ps-warn);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    border-left: calc(var(--ps-rule) * 3) solid var(--ps-warn);
+}
+.ps-table tbody tr.is-excluded td:last-child {
+    border-right: calc(var(--ps-rule) * 3) solid var(--ps-warn);
 }
 .ps-badge.is-excluded {
     display: inline-block;
@@ -572,9 +614,6 @@ body {
     color: var(--ps-ink-3);
     margin-top: 2px;
     letter-spacing: var(--ps-tracking-mono);
-}
-.ps-table tbody tr:hover {
-    background: var(--ps-paper-2);
 }
 
 /* ── Score pill ────────────────────────────────────────────────────── */
@@ -1326,7 +1365,7 @@ select.hole-input { width: 3rem; appearance: none; }
     font-size: var(--ps-fs-body);
     vertical-align: middle;
 }
-.data-table tbody tr:hover { background: var(--ps-paper-2); }
+
 
 .stat-panel {
     background: var(--ps-paper-2);
@@ -1713,12 +1752,12 @@ select.hole-input { width: 3rem; appearance: none; }
     position: relative;
 }
 .round-card.is-handicap {
-    border-left: var(--ps-rule) solid var(--ps-accent);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    outline: calc(var(--ps-rule) * 3) solid var(--ps-accent);
+    outline-offset: -2px;
 }
 .round-card.is-excluded {
-    border-left: var(--ps-rule) solid var(--ps-warn);
-    padding-left: calc(var(--ps-sp-3) - 1px);
+    outline: calc(var(--ps-rule) * 3) solid var(--ps-warn);
+    outline-offset: -2px;
 }
 .round-card + .round-card { margin-top: 6px; }
 .round-card-header {
@@ -1772,6 +1811,45 @@ select.hole-input { width: 3rem; appearance: none; }
     font-size: var(--ps-fs-body);
     color: var(--ps-ink);
 }
+
+/* ── Rounds-list mobile card: mirror the desktop row unifications ── */
+/* Unify value font size: gross score down to body size (matches net/stats). */
+.round-card .round-card-score .ps-score {
+    font-size: var(--ps-fs-body);
+}
+/* Counting cards: accent + bold across all text (keeps the label/value
+   size hierarchy; semantic over/under scores preserved). */
+.round-card.is-handicap .round-card-date,
+.round-card.is-handicap .round-card-course,
+.round-card.is-handicap .round-card-meta,
+.round-card.is-handicap .round-card-score .ps-score,
+.round-card.is-handicap .round-card-score .ps-topar,
+.round-card.is-handicap .rcd-label,
+.round-card.is-handicap .rcd-value {
+    color: var(--ps-accent) !important;
+    font-weight: var(--ps-fw-strong) !important;
+}
+.round-card.is-handicap .round-card-score .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+.round-card.is-handicap svg path { stroke: var(--ps-accent); }
+.round-card.is-handicap svg circle { fill: var(--ps-accent); }
+/* Uncounted cards: unify greys to white ink (semantic scores + white
+   sparkline preserved). */
+.round-card:not(.is-handicap) .round-card-date,
+.round-card:not(.is-handicap) .round-card-meta,
+.round-card:not(.is-handicap) .round-card-score .ps-topar,
+.round-card:not(.is-handicap) .rcd-label {
+    color: var(--ps-ink) !important;
+}
+.round-card:not(.is-handicap) .round-card-score .ps-score.is-under {
+    color: var(--ps-accent) !important;
+}
+.round-card:not(.is-handicap) .round-card-score .ps-score.is-over {
+    color: var(--ps-warn) !important;
+}
+.round-card:not(.is-handicap) svg path { stroke: var(--ps-ink); }
+.round-card:not(.is-handicap) svg circle { fill: var(--ps-ink); }
 
 /* ─────────────────────────────────────────────────────────────────────
  * HOLE CARDS (round entry mobile)
@@ -2079,6 +2157,12 @@ select.hole-input { width: 3rem; appearance: none; }
 .ps-table tbody tr:nth-child(even) td,
 .rd-table tbody tr:nth-child(even) td {
     background: var(--ps-paper-2);
+}
+/* Hover must sit after the zebra rule: equal specificity, later source
+   order wins, so both odd and even rows get the hover background. */
+.ps-table tbody tr:hover td,
+.data-table tbody tr:hover td {
+    background: var(--ps-hover);
 }
 
 /* ─────────────────────────────────────────────────────────────────────

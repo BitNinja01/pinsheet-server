@@ -37,6 +37,63 @@ def _validate_hole_keys(holes) -> str | None:
     return None
 
 
+_COURSE_NUMERIC_TEE_FIELDS = (
+    "yardage", "rating", "slope",
+    "front_rating", "front_slope", "back_rating", "back_slope",
+)
+
+
+def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
+    """Validate tee/hole numeric fields on an incoming course payload.
+
+    Stored-XSS fix (finding U1 / GH#68): these fields are rendered in
+    course_detail.html without HTML-escaping-defeating filters, so any
+    attacker-controlled string (e.g. "<img src=x onerror=...>") accepted
+    here would be persisted verbatim and executed in every viewer's
+    session. Rejecting non-numeric values at the write path closes that
+    hole regardless of template behavior.
+
+    strict=True (API write path, courses.py): the first present,
+      non-empty, non-numeric value causes this to return an error message
+      describing the offending tee/field; the payload is left untouched
+      so the caller can 400 before anything is persisted.
+    strict=False (zip import path, settings.py): non-numeric values are
+      blanked out in place instead of rejected, so a single bad course in
+      a batch import doesn't fail the whole import; this always returns
+      None.
+
+    Blank/missing values are left as-is in both modes (blank is allowed).
+    """
+    tees = data.get("tees")
+    if not isinstance(tees, dict):
+        return None
+    for tee_name, tee in tees.items():
+        if not isinstance(tee, dict):
+            continue
+        for field in _COURSE_NUMERIC_TEE_FIELDS:
+            val = tee.get(field)
+            if val in (None, ""):
+                continue
+            try:
+                float(val)
+            except (TypeError, ValueError):
+                if strict:
+                    return f"tee '{tee_name}' field '{field}' must be numeric"
+                tee[field] = ""
+        yardages = tee.get("yardages")
+        if isinstance(yardages, dict):
+            for hole_num, yval in list(yardages.items()):
+                if yval in (None, ""):
+                    continue
+                try:
+                    float(yval)
+                except (TypeError, ValueError):
+                    if strict:
+                        return f"tee '{tee_name}' yardage for hole {hole_num} must be numeric"
+                    yardages[hole_num] = ""
+    return None
+
+
 def register_courses_routes(app, csrf):
     @app.route("/courses/new")
     @login_required
@@ -164,6 +221,10 @@ def register_courses_routes(app, csrf):
         if err:
             return jsonify({"error": err}), 400
 
+        err = _coerce_course_numerics(data)
+        if err:
+            return jsonify({"error": err}), 400
+
         course = {
             "location": location,
             "tees": data.get("tees", {}),
@@ -211,6 +272,10 @@ def register_courses_routes(app, csrf):
             return jsonify({"error": "City, state/province, and country are required"}), 400
 
         err = _validate_hole_keys(data.get("holes", {}))
+        if err:
+            return jsonify({"error": err}), 400
+
+        err = _coerce_course_numerics(data)
         if err:
             return jsonify({"error": err}), 400
 

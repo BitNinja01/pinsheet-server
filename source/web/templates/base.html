@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PinSheet</title>
     <link rel="stylesheet" href="/static/app.css">
-    {% if plugin_blocks.get("head") %}{{ plugin_blocks["head"]|safe }}{% endif %}
+    {# T7/VULN-05: no |safe here — plugin_blocks entries must be markupsafe.Markup
+       objects produced by source.plugin_api.add_block()'s allowlist validator.
+       A plain str (bypassing add_block) is auto-escaped by Jinja and rendered
+       as inert text instead of live HTML/JS. #}
+    {% if plugin_blocks.get("head") %}{{ plugin_blocks["head"] }}{% endif %}
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{{ 'ps-dark' if settings.get('theme', 'dark') != 'light' else 'ps-light' }}">
@@ -52,12 +56,13 @@
                 </nav>
                 {% endif %}
             </div>
+            <div class="ps-sidebar-version">PinSheet v{{ version }}</div>
         </aside>
         <main class="ps-main">
             {% block content %}{% endblock %}
         </main>
     </div>
     <script src="/static/app.js"></script>
-    {% if plugin_blocks.get("foot") %}{{ plugin_blocks["foot"]|safe }}{% endif %}
+    {% if plugin_blocks.get("foot") %}{{ plugin_blocks["foot"] }}{% endif %}
 </body>
 </html>

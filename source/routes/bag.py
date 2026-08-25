@@ -28,14 +28,12 @@ def register_bag_routes(app, csrf):
         slots = get_bag_slots(user_id)
         clubs_by_id = {c["id"]: c for c in clubs}
         ac_fields = ["brand", "model", "shaft_brand", "shaft", "grip"]
-        autocomplete_data = {f: get_distinct_club_field_values(f) for f in ac_fields}
+        autocomplete_data = {f: get_distinct_club_field_values(f, user_id) for f in ac_fields}
         return render_template("bag.html", **base_context(
             current_page="bag",
             clubs=clubs,
             clubs_by_id=clubs_by_id,
-            clubs_json=json.dumps(clubs_by_id),
             slots=slots,
-            slots_json=json.dumps(slots),
             bag_size=BAG_SIZE,
             cat_order=CAT_ORDER,
             autocomplete_data=autocomplete_data,
@@ -64,7 +62,9 @@ def register_bag_routes(app, csrf):
             "sw": data.get("sw", ""),
             "carry": data.get("carry"),
         }
-        save_club(club_data, current_user.id)
+        if not save_club(club_data, current_user.id):
+            # Cross-user id collision (issue #69) — refuse the overwrite.
+            return jsonify({"ok": False, "error": "forbidden"}), 403
         return jsonify({"ok": True, "id": club_id})
 
     @app.route("/bag/club/<club_id>/delete", methods=["POST"])

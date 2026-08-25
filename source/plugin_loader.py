@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import ast
 import importlib
 import logging
-import subprocess
 import sys
+import types
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,36 @@ def _plugins_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent / "plugins"
     return Path(__file__).parent.parent / "plugins"
+
+
+def _read_plugin_info_static(plugin_dir: Path) -> "dict | None":
+    """Read the `plugin_info` dict from a plugin's __init__.py via AST
+    parsing — this NEVER executes the plugin's code.
+
+    Security rationale (VULN-01/VULN-02, T1): the loader must be able to
+    list a *disabled* (or not-yet-enabled) plugin's identity (name/version/
+    description) for the admin UI without importing it — import is the
+    trust boundary crossing (arbitrary code execution) and must only ever
+    happen for plugins the owner has explicitly enabled.
+    """
+    init_path = plugin_dir / "__init__.py"
+    try:
+        source = init_path.read_text()
+        tree = ast.parse(source, filename=str(init_path))
+    except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+        return None
+
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "plugin_info" for t in node.targets):
+            continue
+        try:
+            value = ast.literal_eval(node.value)
+        except (ValueError, SyntaxError):
+            return None
+        return value if isinstance(value, dict) else None
+    return None
 
 
 def _wire_template_path(app: "Flask", plugin_name: str, plugin_path: Path) -> None:
@@ -38,6 +69,7 @@ def _wire_static_route(app: "Flask", plugin_name: str, plugin_path: Path) -> Non
     if not static_dir.exists():
         return
 
+    static_dir_resolved = static_dir.resolve()
     route = f"/plugins/{plugin_name}/static/<path:filename>"
     endpoint = f"_plugin_{plugin_name}_static"
 
@@ -47,17 +79,42 @@ def _wire_static_route(app: "Flask", plugin_name: str, plugin_path: Path) -> Non
 
     @app.route(route, endpoint=endpoint)
     def _serve(filename):
+        # T3 hardening (ADR-04): send_from_directory() already relies on
+        # Werkzeug's safe_join (blocks `../` traversal — pinned via
+        # werkzeug>=3.0 in requirements.txt/pyproject.toml). safe_join does
+        # NOT cover a symlink inside static_dir that points outside of it,
+        # so add an explicit realpath-containment assertion as defense in
+        # depth before ever touching the filesystem.
+        candidate = (static_dir / filename).resolve()
+        try:
+            candidate.relative_to(static_dir_resolved)
+        except ValueError:
+            _log.warning("plugin %s: rejected out-of-tree static path %r", plugin_name, filename)
+            from flask import abort
+            abort(404)
         return send_from_directory(static_dir, filename)
 
     _log.info("plugin %s: static route registered at %s", plugin_name, route)
 
 
 def _load_plugin(plugin_dir: Path) -> "object | None":
+    """Import a plugin module and validate its contract.
+
+    SECURITY: the caller MUST only invoke this for plugins that are already
+    confirmed enabled in `plugin_states`. Import executes arbitrary
+    top-level code in the plugin's __init__.py (VULN-02 / T1) — there must
+    be no path from "plugin exists on disk" to this function running
+    without an explicit owner enable-decision in between.
+    """
     folder_name = plugin_dir.name
 
+    # VULN-02 sub-vector (module shadowing): use append, NOT insert(0). A
+    # plugin folder named like a stdlib/source module (e.g. `os`, `store`)
+    # must NOT be able to shadow the real module by taking priority on
+    # sys.path — appending keeps real modules ahead of plugin dirs.
     plugins_parent = str(plugin_dir.parent)
     if plugins_parent not in sys.path:
-        sys.path.insert(0, plugins_parent)
+        sys.path.append(plugins_parent)
 
     try:
         mod = importlib.import_module(folder_name)
@@ -85,24 +142,28 @@ def _load_plugin(plugin_dir: Path) -> "object | None":
     return mod
 
 
-def _install_requirements(plugin_dir: Path) -> None:
-    req_path = plugin_dir / "requirements.txt"
-    if not req_path.exists():
-        return
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", str(req_path)],
-            capture_output=True, text=True, timeout=120,
-        )
-        if result.returncode == 0:
-            _log.info("plugin %s: requirements installed", plugin_dir.name)
-        else:
-            _log.warning("plugin %s: pip install failed — %s", plugin_dir.name, result.stderr.strip())
-    except Exception as exc:
-        _log.warning("plugin %s: pip install error — %s", plugin_dir.name, exc)
-
-
 def discover_plugins(app: "Flask") -> None:
+    """Discover plugins under plugins/ and load the enabled ones.
+
+    Hardened ordering (ADR-01, closes VULN-01/VULN-02 — "disabled" was not
+    previously a security boundary):
+
+        for each plugin directory:
+            1. read plugin_info STATICALLY (AST, no import) for admin listing
+            2. seed/read its enable-state (new plugins seed DISABLED —
+               provenance gate: an admin must validate + enable before any
+               code runs; default-deny if no state row exists)
+            3. if NOT enabled: stop here. Zero code executes. No import,
+               no dependency install, no template wiring, no static route.
+            4. only if enabled: import, wire templates/static, register()
+
+    Automatic `pip install -r requirements.txt` has been REMOVED entirely
+    (ADR-02 / VULN-01, T2 — unpinned, unverified pip install was a Critical
+    supply-chain RCE vector that ran even for disabled plugins). Installing
+    a plugin's dependencies is now an explicit, out-of-band owner action:
+
+        pip install -r plugins/<name>/requirements.txt
+    """
     plugins_dir = _plugins_dir()
     if not plugins_dir.exists():
         _log.info("plugins/ directory not found — skipping plugin discovery")
@@ -116,20 +177,38 @@ def discover_plugins(app: "Flask") -> None:
         if not entry.is_dir() or not (entry / "__init__.py").exists():
             continue
 
-        mod = _load_plugin(entry)
+        folder_name = entry.name
+
+        # Static, import-free metadata read — safe to do for every plugin
+        # directory regardless of enable-state (used for admin listing).
+        static_info = _read_plugin_info_static(entry)
+
+        # plugin_states/enable-gate is keyed by the folder name: the on-disk
+        # directory is the stable identity the admin vouches for when enabling.
+        # plugin_info["name"] is display metadata and may differ from the
+        # folder name (e.g. cartographer), so it must not gate loading.
+        seed_plugin_state(folder_name)
+        app._discovered_plugins.append(
+            types.SimpleNamespace(
+                plugin_info=static_info or {"name": folder_name, "version": "?"},
+                folder_name=folder_name,
+            )
+        )
+
+        # Default-DENY: if a plugin has no explicit enabled row, treat it as
+        # disabled. Combined with seed_plugin_state defaulting new rows to
+        # enabled=0, a freshly dropped-in plugin never executes until an admin
+        # enables it (provenance gate — admin validates before first run).
+        if not plugin_states.get(folder_name, False):
+            _log.info("plugin %s: not enabled — skipping import, dependency install, and wiring", folder_name)
+            continue
+
+        mod = _load_plugin(entry)  # import happens ONLY for enabled plugins
         if mod is None:
             continue
 
         _wire_template_path(app, mod.plugin_info["name"], entry)
         _wire_static_route(app, mod.plugin_info["name"], entry)
-        _install_requirements(entry)
-
-        seed_plugin_state(mod.plugin_info["name"])
-        app._discovered_plugins.append(mod)
-
-        if not plugin_states.get(mod.plugin_info["name"], True):
-            _log.info("plugin %s: disabled — skipping register()", mod.plugin_info["name"])
-            continue
 
         try:
             mod.register(app)

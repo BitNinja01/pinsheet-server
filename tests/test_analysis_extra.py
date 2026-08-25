@@ -3,7 +3,11 @@ import pytest
 
 from source.models import dict_to_round
 
-from calc.analysis import calc_penalty_stats, calc_momentum_recovery
+from calc.analysis import (
+    calc_penalty_stats,
+    calc_penalty_hole_breakdown,
+    calc_momentum_recovery,
+)
 
 
 def _round_with_holes(holes, course="Test GC", tees="White", date_="2026-01-01",
@@ -51,6 +55,36 @@ def test_penalty_stats_empty_list_returns_none():
     assert result["penalty_avg_vs_par"] is None
     assert result["clean_avg_vs_par"] is None
     assert result["worst_holes"] == []
+
+
+# ---- calc_penalty_hole_breakdown: clean / penalty / OB classification, sums to ~100% ----
+
+def test_penalty_hole_breakdown_classifies_and_sums_to_100():
+    holes = {
+        "1": {"gross": "4", "putts": "2", "fairway": "H", "gir": "H", "penalties": "0"},    # clean
+        "2": {"gross": "6", "putts": "2", "fairway": "H", "gir": "H", "penalties": "1"},    # penalty
+        "3": {"gross": "7", "putts": "2", "fairway": "OBR", "gir": "N", "penalties": "1"},  # OB (fairway) - beats penalty
+        "4": {"gross": "6", "putts": "2", "fairway": "N", "gir": "OBS", "penalties": "0"},  # OB (gir)
+        "5": {"gross": "0", "putts": "0", "fairway": "", "gir": "", "penalties": "0"},      # no gross -> skipped
+    }
+    r = _round_with_holes(holes)
+    empty_round = _round_with_holes({})
+
+    result = calc_penalty_hole_breakdown([r, empty_round])
+
+    assert result["total_holes"] == 4
+    assert result["clean_pct"] == pytest.approx(25.0)
+    assert result["penalty_pct"] == pytest.approx(25.0)
+    assert result["ob_pct"] == pytest.approx(50.0)
+    assert result["clean_pct"] + result["penalty_pct"] + result["ob_pct"] == pytest.approx(100.0)
+
+
+def test_penalty_hole_breakdown_empty_returns_none():
+    result = calc_penalty_hole_breakdown([])
+    assert result["total_holes"] == 0
+    assert result["clean_pct"] is None
+    assert result["penalty_pct"] is None
+    assert result["ob_pct"] is None
 
 
 # ---- calc_momentum_recovery: after_bogey / after_double + all 3 continue branches ----

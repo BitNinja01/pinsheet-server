@@ -4,7 +4,13 @@ import main as main_mod
 from main import app, User, limiter, csrf
 from source.routes import register_routes
 from database import set_db_path, init_db
-from store import create_user, get_clubs, get_bag_slots
+from store import (
+    create_user,
+    get_clubs,
+    get_bag_slots,
+    save_club,
+    get_distinct_club_field_values,
+)
 
 
 @pytest.fixture
@@ -86,6 +92,22 @@ class TestBagPage:
         client = test_app.test_client()
         resp = client.get("/bag", follow_redirects=True)
         assert b"login" in resp.data.lower() or b"Login" in resp.data
+
+    def test_club_field_cannot_break_out_of_script_block(self, logged_in_client):
+        # Regression for issue #71 (CWE-79): club free-text fields are embedded
+        # into a <script> block as JSON. Serializing with json.dumps + |safe left
+        # </script> unescaped, allowing script-context breakout. |tojson escapes
+        # </ to <\/ (\u003c), so the payload can never terminate the element.
+        evil = dict(DRIVER)
+        evil["brand"] = "</script><script>window.__xss=1</script>"
+        logged_in_client.post("/bag/club", json=evil)
+
+        html = logged_in_client.get("/bag").get_data(as_text=True)
+
+        # The literal breakout sequence must not survive into the response.
+        assert "</script><script>" not in html
+        # The payload is still present, but neutralized via unicode escaping.
+        assert "\\u003c/script\\u003e" in html or "<\\/script>" in html
 
 
 class TestBagSaveClub:
@@ -172,6 +194,52 @@ class TestBagDeleteClub:
 
         # A different user deleting an id they don't own must not remove it.
         assert len(get_clubs(1)) == 1
+
+
+class TestBagCrossUserSecurity:
+    def test_save_club_rejects_cross_user_overwrite(self, logged_in_client):
+        # Issue #69 (IDOR, CWE-639): the attacker is "player" (id 1). Seed a
+        # club owned by a different user, then try to overwrite it by id.
+        victim = create_user("victim", "Victim", "victimpass1")
+        assert save_club({**DRIVER, "id": "cvictim01", "brand": "VictimBrand"}, victim["id"]) is True
+
+        resp = logged_in_client.post(
+            "/bag/club", json={**DRIVER, "id": "cvictim01", "brand": "Hijacked"}
+        )
+        assert resp.status_code == 403
+
+        # Victim's row is untouched — still owned by victim, brand unchanged.
+        victim_clubs = get_clubs(victim["id"])
+        assert len(victim_clubs) == 1
+        assert victim_clubs[0]["brand"] == "VictimBrand"
+        # Attacker (id 1) did not acquire the club.
+        assert all(c["id"] != "cvictim01" for c in get_clubs(1))
+
+    def test_save_club_same_owner_update_still_allowed(self, logged_in_client):
+        # The ownership guard must not block a user editing their own club.
+        club_id = logged_in_client.post("/bag/club", json=DRIVER).get_json()["id"]
+        resp = logged_in_client.post(
+            "/bag/club", json={**DRIVER, "id": club_id, "brand": "Updated"}
+        )
+        assert resp.status_code == 200
+        clubs = get_clubs(1)
+        assert len(clubs) == 1 and clubs[0]["brand"] == "Updated"
+
+    def test_autocomplete_is_scoped_to_owner(self, logged_in_client):
+        # Issue #72 (CWE-200): autocomplete must expose only the caller's own
+        # field values, not every user's.
+        victim = create_user("victim2", "Victim2", "victimpass2")
+        save_club({**DRIVER, "id": "cvic2", "brand": "VictimOnlyBrand"}, victim["id"])
+        logged_in_client.post("/bag/club", json={**DRIVER, "brand": "AttackerBrand"})
+
+        # Store layer: each user sees only their own brand.
+        assert get_distinct_club_field_values("brand", 1) == ["AttackerBrand"]
+        assert get_distinct_club_field_values("brand", victim["id"]) == ["VictimOnlyBrand"]
+
+        # Route layer: the victim's brand does not leak into the attacker's page.
+        html = logged_in_client.get("/bag").get_data(as_text=True)
+        assert "AttackerBrand" in html
+        assert "VictimOnlyBrand" not in html
 
 
 class TestBagSaveSlots:

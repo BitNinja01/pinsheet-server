@@ -14,6 +14,58 @@ Plugins are lightweight Python packages dropped into a `plugins/` directory at t
 | `plugin_info` dict | Identity metadata (`name`, `version` required) |
 | `register(app)` function | Called at startup to wire into Flask |
 
+## 1a. Security Model (read this first)
+
+Placing a plugin directory under `plugins/` and enabling it grants that code the same privileges as
+the host process — there is no sandbox. The loader's job is to make sure that privilege is only ever
+granted to a plugin the owner has **explicitly enabled**, and to make the common mistakes (missing
+auth, unsafe HTML injection, cross-user data reads) hard to make by accident:
+
+- **Disabled means zero execution.** A plugin that is not enabled in `plugin_states` is never
+  imported, never has its dependencies installed, and never gets its templates/static routes wired.
+  Only its `plugin_info` (read via static parsing, without import) is available for the admin
+  listing UI.
+- **No automatic dependency installation.** `requirements.txt` is documentation only. Install a
+  plugin's dependencies yourself, deliberately: `pip install -r plugins/<name>/requirements.txt`.
+- **Routes must use `plugin_route`, not `app.route`.** Import from `source.plugin_api`:
+  `plugin_route(app, name, url)` force-applies `@login_required`, so an unauthenticated route can't
+  be shipped by omission. All four bundled stat plugins use this helper — see §18.
+- **Nav links must use `add_nav`, not `app._plugin_nav.append(...)` directly.** It validates that
+  `url` is an app-relative path (no `javascript:`, no `//host` open-redirect).
+- **`<head>`/`<foot>` injection must use `add_block`, not `app._plugin_blocks[...] = ...` directly.**
+  `base.html` no longer renders these with `|safe`; a plain string is now HTML-escaped by default.
+  `add_block` allowlists content to `<link rel="stylesheet" href="/plugins/<name>/static/...">` /
+  `<script src="/plugins/<name>/static/...">` pointing at the plugin's own static namespace, and
+  returns a `Markup` object so it renders unescaped.
+- **Data access for stat/read-only plugins is `source.request_data` only** — never `import store`.
+  `store.get_all_rounds()` now **requires** an explicit `user_id` (the old `user_id=1` default was
+  removed — it silently exposed the first user's data to any careless caller). Use
+  `request_data.get_all_rounds_for_user()`, which binds `current_user.id`. See §13 and §18.
+
+### Trust model & severity (why the loader is strict)
+
+A plugin system loads code from disk, so severity depends entirely on **who is allowed to author or
+supply a plugin**:
+
+| Deployment | What a plugin is | Import-exec / pip severity |
+|---|---|---|
+| Single-user, owner authors every plugin, never shares | your own code running on your own box | **Low / Informational** — not a vulnerability, it's the feature |
+| Plugins shared / downloaded (gist, forum, marketplace, a friend) | untrusted third-party code | **Critical** — dropping a folder = arbitrary code execution |
+| Multi-user hosted (this app *is* multi-user: shared DB keyed by `user_id`) | one admin's install decision exposes **all** users' data (hooks receive the raw `db_path`) | **High** — blast radius is every user, decided by one admin |
+
+The loader is written for the strict (untrusted/shared/multi-user) model because a *plugin system*
+exists to be extended by code the owner did not necessarily write. If your deployment is strictly the
+first row, treat the import/pip findings as Low — but the hardening costs you nothing and the
+**"disabled means disabled"** guarantee is a real bug fix at any trust level.
+
+**The core tradeoff — the admin validates the plugin.** A newly discovered plugin is seeded
+**disabled**; it executes nothing until an admin explicitly enables it in the admin UI. That enable
+action *is* the trust decision. This trades one-click drop-in convenience for a mandatory
+human-in-the-loop validation step — the right default when "present on disk" must not mean "trusted
+to run". Any older example in this document that predates §1a (raw `app.register_blueprint` /
+`@bp.route` without `@login_required`, `g.view_user`, direct `app._plugin_blocks[...] =`) is
+**superseded by the rules above** — use `plugin_route` / `current_user` / `add_block`.
+
 ## 2. Quick Start
 
 Create a minimal plugin in four steps.
@@ -27,7 +79,8 @@ mkdir -p plugins/hello_world/templates
 ### Step 2: Write `__init__.py`
 
 ```python
-from flask import Blueprint, render_template
+from flask import render_template
+from source.plugin_api import plugin_route, add_nav
 
 plugin_info = {
     "name": "hello_world",
@@ -36,26 +89,21 @@ plugin_info = {
     "author": "You",
 }
 
-hello_bp = Blueprint(
-    "hello_world", __name__,
-    template_folder="templates",
-    static_folder="static",
-)
-
-@hello_bp.route("/hello")
-def hello():
-    return render_template("hello.html", message="Hello from plugin!")
-
 def register(app):
-    app.register_blueprint(hello_bp)
-    app._plugin_nav.append({
-        "label": "Hello",
-        "url": "/hello",
-        "page_id": "hello",
-    })
+    @plugin_route(app, "hello_world", "/hello")   # auto-applies @login_required
+    def hello():
+        return render_template("hello.html", message="Hello from plugin!")
+
+    add_nav(app, label="Hello", url="/hello", page_id="hello")
 
 def unregister(app):
     pass
+```
+
+`plugin_route` registers directly on `app` (not a Blueprint) and force-wraps the view with
+`@login_required`, so the route can't accidentally ship unauthenticated. If you prefer Blueprints
+for a multi-route plugin (see §6), you are responsible for applying `@login_required` to every
+route yourself — `plugin_route` is the only mechanism that enforces it for you.
 ```
 
 ### Step 3: Write a template
@@ -285,11 +333,9 @@ def register(app):
     csrf.exempt(bp)  # exempt all routes in this blueprint
 ```
 
-Or exempt individual endpoints:
-
-```python
-app._csrf_exempt.add("achievements.unlock")
-```
+`app._csrf_exempt` does **not** exist (a prior revision of this doc referenced it in error — same
+documentation-drift class as the `g.view_user` correction in §13). Use the real `flask_wtf` API
+shown above (`csrf.exempt(bp)` or `csrf.exempt(view_func)`) for every CSRF exemption.
 
 ## 7. Database Access
 
@@ -501,21 +547,30 @@ The core `base.html` provides two injection points:
 
 ```html
 <!-- Inside <head>: -->
-{% if plugin_blocks.get("head") %}{{ plugin_blocks["head"]|safe }}{% endif %}
+{% if plugin_blocks.get("head") %}{{ plugin_blocks["head"] }}{% endif %}
 
 <!-- Before </body>: -->
-{% if plugin_blocks.get("foot") %}{{ plugin_blocks["foot"]|safe }}{% endif %}
+{% if plugin_blocks.get("foot") %}{{ plugin_blocks["foot"] }}{% endif %}
 ```
 
-A plugin populates these by modifying `app._plugin_blocks` in `register()`:
+**(T7/VULN-05 hardening — no `|safe` anymore.)** A plain Python string assigned directly to
+`app._plugin_blocks[...]` is now HTML-escaped by Jinja's autoescaping and renders as inert text, not
+live markup. Use `source.plugin_api.add_block()` instead — it allowlists content to a stylesheet
+`<link>` or an external `<script src>` pointing at your own plugin's static namespace, and returns a
+`Markup` object so it renders unescaped:
 
 ```python
+from source.plugin_api import add_block
+
 def register(app):
-    app._plugin_blocks["head"] = '<link rel="stylesheet" href="/plugins/achievements/static/achievements.css">'
-    app._plugin_blocks["foot"] = '<script src="/plugins/achievements/static/achievements.js"></script>'
+    add_block(app, "achievements", "head",
+        '<link rel="stylesheet" href="/plugins/achievements/static/achievements.css">')
+    add_block(app, "achievements", "foot",
+        '<script src="/plugins/achievements/static/achievements.js"></script>')
 ```
 
-These are rendered raw (marked `|safe`) so HTML is not escaped.
+Inline `<script>` bodies, arbitrary tags, and references to another plugin's or the core app's
+static paths are rejected (logged, `register()` continues — a rejected block just doesn't render).
 
 ### Extending base.html
 
@@ -538,24 +593,22 @@ All plugin templates should extend `base.html` to inherit the sidebar, user swit
 | `plugin_blocks` | `app._plugin_blocks` | Dict of `{"head": ..., "foot": ...}` |
 | `plugin_nav` | `app._plugin_nav` | List of `{"label": ..., "url": ..., "page_id": ...}` |
 | `plugin_info` | All loaded `plugin_info` dicts | `{"name": {...}, ...}` map |
-| `g.view_user` | Server | The user being viewed (may differ from logged-in user) |
-| `g.settings` | Server | Current user's settings |
-| `current_user` | Flask-Login | The authenticated user (see §13) |
+| `current_user` | Flask-Login | The authenticated user (see §13). There is no `g.view_user` — see §13 correction. |
 
 ## 10. Navigation Links
 
-Add sidebar links by appending to `app._plugin_nav` during `register()`:
+Add sidebar links with `source.plugin_api.add_nav()` during `register()` (T8 hardening — validates
+`url` is an app-relative path, rejecting `javascript:`/`//host` values that raw dict-append would
+have allowed):
 
 ```python
+from source.plugin_api import add_nav
+
 def register(app):
-    app._plugin_nav.append({
-        "label": "Achievements",
-        "url": "/achievements",
-        "page_id": "achievements",
-    })
+    add_nav(app, label="Achievements", url="/achievements", page_id="achievements")
 ```
 
-Each entry is a dict with three keys:
+Each entry has three keys:
 
 | Key | Type | Description |
 |---|---|---|
@@ -684,15 +737,42 @@ plugin_setting = settings.get("plugins.achievements.enabled", True)
 
 ## 13. Multi-User Considerations
 
-PinSheet is multi-user. It also has a "view as" feature (`?user=username` in the URL) that lets admins view other users' data. This means the `current_user` from Flask-Login may NOT be the data owner.
+**Correction (2026-08-09, VULN-03):** earlier revisions of this document described a `g.view_user`
+"view as" mechanism (`?user=username`) for admins to view other users' data. **`g.view_user` does
+not exist anywhere in `source/` and no "view as" feature is implemented.** That guidance was
+aspirational/stale documentation, not a real accessor — a plugin author who tried to build against
+it would either get `None` back every time (fails closed, but broken) or, worse, "fix" the missing
+reference by inventing their own unauthenticated `?user=` switch, which would be a textbook IDOR
+(CWE-639). This section now documents the **actual, working** pattern.
 
-### The golden rule
+PinSheet is multi-user: rounds/settings/etc. are stored in shared tables keyed by `user_id`. The
+real isolation boundary is `current_user.id` (Flask-Login) bound into the query at the data-access
+layer.
 
-**Never use `current_user` to scope data queries.** Always use the `user_id` passed by hooks or the `g.view_user` set by the server's `before_request` handler.
+### The golden rule — for the stat-plugin contract used in this repo
+
+Stat plugins (see §18) do not query the database at all. They call
+`source.request_data.get_all_rounds_for_user()`, which internally does
+`store.get_all_rounds(current_user.id)` — i.e. it is **always** scoped to whoever is logged in for
+the current request. **Never** import `store`/`database` directly and never call
+`store.get_all_rounds()` with no argument — that function defaults to `user_id=1` and will silently
+return the wrong user's data if you forget the argument (a real footgun that exists in the core
+store layer; flagged to eng-lead separately, out of plugin scope).
+
+```python
+# ✅ Correct — scoped to the logged-in user automatically
+from source.request_data import get_all_rounds_for_user
+rounds = list(get_all_rounds_for_user())
+
+# ❌ Wrong — bypasses the request_data layer, defaults to user_id=1
+import store
+rounds = store.get_all_rounds()
+```
 
 ### In hooks
 
-Hooks receive `user_id` explicitly:
+Hooks receive `user_id` explicitly and should use it for any DB write that isn't covered by
+`request_data`:
 
 ```python
 def on_round_saved(round_data, user_id, db_path):
@@ -705,19 +785,23 @@ def on_round_saved(round_data, user_id, db_path):
 
 ### In routes
 
-If you need the current data-owner in a route, use `g.view_user` (not `current_user`):
+Use Flask-Login's `current_user` (the actual, real authentication primitive) together with
+`request_data`, not a fictional `g.view_user`:
 
 ```python
+from flask_login import current_user
+from source.request_data import get_all_rounds_for_user
+
 @bp.route("/achievements")
 def achievements_page():
-    view_user = getattr(g, "view_user", None)
-    if view_user is None:
-        return "No user", 400
-    uid = view_user["id"]  # ✅ the user whose data we're viewing
+    rounds = list(get_all_rounds_for_user())  # ✅ scoped to current_user.id internally
     # ...
 ```
 
-The `current_user` is still available from Flask-Login for authentication checks (e.g. `.is_authenticated`, `.is_admin`), but should not be used for data scoping.
+If a route needs to resolve data for a user OTHER than `current_user` (e.g. an admin comparison
+view), that is a privileged operation that does not exist in the current plugin contract. Any
+future addition of cross-user viewing MUST gate on `current_user.is_admin` (the existing, real
+pattern — see `source/routes/admin.py`), never on unauthenticated client-supplied input.
 
 ### Query scoping patterns
 
@@ -725,8 +809,8 @@ The `current_user` is still available from Flask-Login for authentication checks
 # ✅ Correct: scoped by user_id
 db.execute("SELECT * FROM plugin_x WHERE user_id = ?", (user_id,))
 
-# ❌ Wrong: reads for logged-in user, ignoring ?user= parameter
-db.execute("SELECT * FROM plugin_x WHERE user_id = ?", (current_user.id,))
+# ❌ Wrong: unscoped — leaks every user's rows
+db.execute("SELECT * FROM plugin_x")
 ```
 
 ## 14. Error Handling & Logging
@@ -854,14 +938,23 @@ The three core plugins from PinSheet TUI need the following changes to run on th
 
 A complete, realistic plugin that adds free-text notes per round, stores them in its own table, displays them on a custom page, and hooks into round save.
 
+> **Security note (2026-08-09, secure-plugin hardening).** This example was
+> rewritten to use the secure plugin contract. Do NOT use the older pattern
+> (`app.register_blueprint` + raw `@bp.route`, `getattr(g, "view_user", ...)`,
+> or direct `app._plugin_blocks[...] = "<html>"`). Those bypass the mandatory
+> `@login_required` wrapping, reference a `g.view_user` that does not exist in
+> `source/`, and assign to a block that is now HTML-escaped by default. Use
+> `plugin_route`, `flask_login.current_user`, `add_nav`, and `add_block` as
+> shown below. See §13 for the contract reference.
+
 ### Directory structure
 
 ```
 plugins/notes/
   __init__.py
-  blueprint.py
+  routes.py
   templates/
-    notes.html
+    notes/notes.html
   static/
     notes.css
 ```
@@ -870,7 +963,6 @@ plugins/notes/
 
 ```python
 import sqlite3
-from .blueprint import bp
 
 plugin_info = {
     "name": "notes",
@@ -880,15 +972,11 @@ plugin_info = {
 }
 
 def register(app):
-    app.register_blueprint(bp)
-    app._plugin_nav.append({
-        "label": "Round Notes",
-        "url": "/notes",
-        "page_id": "notes",
-    })
-    app._plugin_blocks["head"] = (
-        '<link rel="stylesheet" href="/plugins/notes/static/notes.css">'
-    )
+    # register routes via the secure helper (forces @login_required) and
+    # nav/blocks via the validated helpers — never touch app.route /
+    # app._plugin_nav / app._plugin_blocks directly.
+    from .routes import register_routes
+    register_routes(app)
 
     db = sqlite3.connect(str(app.config["DB_PATH"]))
     db.execute("""
@@ -925,52 +1013,55 @@ def on_round_saved(round_data, user_id, db_path):
     db.close()
 ```
 
-### `plugins/notes/blueprint.py`
+### `plugins/notes/routes.py`
 
 ```python
 import sqlite3
-from flask import Blueprint, render_template, g, request, jsonify
-from flask_login import login_required
 
-bp = Blueprint("notes", __name__)
+from flask import render_template, request, jsonify, current_app, abort
+from flask_login import current_user
 
-@bp.route("/notes")
-@login_required
-def notes_list():
-    view_user = getattr(g, "view_user", None)
-    if view_user is None:
-        return "No user", 400
+from source.plugin_api import plugin_route, add_nav, add_block
 
-    db = sqlite3.connect(str(bp.app.config["DB_PATH"]))
-    db.row_factory = sqlite3.Row
-    rows = db.execute(
-        "SELECT * FROM plugin_notes WHERE user_id = ? ORDER BY round_date DESC",
-        (view_user["id"],),
-    ).fetchall()
-    db.close()
 
-    notes = [dict(r) for r in rows]
-    return render_template("notes.html",
-        notes=notes,
-        current_page="notes",
-    )
+def register_routes(app):
+    add_nav(app, label="Round Notes", url="/notes", page_id="notes")
+    add_block(app, "notes", "head",
+              '<link rel="stylesheet" href="/plugins/notes/static/notes.css">')
 
-@bp.route("/api/notes/<date>/<int:index>", methods=["PUT"])
-@login_required
-def update_note(date, index):
-    view_user = getattr(g, "view_user", None)
-    data = request.get_json()
-    db = sqlite3.connect(str(bp.app.config["DB_PATH"]))
-    db.execute(
-        """INSERT OR REPLACE INTO plugin_notes
-           (user_id, round_date, round_index, note, tags)
-           VALUES (?, ?, ?, ?, ?)""",
-        (view_user["id"], date, index,
-         data.get("note", ""), data.get("tags", "")),
-    )
-    db.commit()
-    db.close()
-    return jsonify({"ok": True})
+    @plugin_route(app, "notes", "/notes")
+    def notes_list():
+        # current_user is the authenticated owner (auth is force-applied by
+        # plugin_route). Scope every query to current_user.id — never trust
+        # a client-supplied user id, and there is no cross-user accessor.
+        db = sqlite3.connect(str(current_app.config["DB_PATH"]))
+        db.row_factory = sqlite3.Row
+        rows = db.execute(
+            "SELECT * FROM plugin_notes WHERE user_id = ? ORDER BY round_date DESC",
+            (current_user.id,),
+        ).fetchall()
+        db.close()
+        return render_template("notes/notes.html",
+                               notes=[dict(r) for r in rows], current_page="notes")
+
+    @plugin_route(app, "notes", "/api/notes/<date>/<int:index>", methods=["PUT"])
+    def update_note(date, index):
+        # validate untrusted path/body input; reject with 400 on bad input
+        if not date or not (0 <= index <= 17):
+            abort(400)
+        data = request.get_json(silent=True) or {}
+        note = str(data.get("note", ""))[:2000]
+        tags = str(data.get("tags", ""))[:500]
+        db = sqlite3.connect(str(current_app.config["DB_PATH"]))
+        db.execute(
+            """INSERT OR REPLACE INTO plugin_notes
+               (user_id, round_date, round_index, note, tags)
+               VALUES (?, ?, ?, ?, ?)""",
+            (current_user.id, date, index, note, tags),
+        )
+        db.commit()
+        db.close()
+        return jsonify({"ok": True})
 ```
 
 ### `plugins/notes/templates/notes.html`

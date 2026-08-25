@@ -23,8 +23,12 @@ def plugin_app(tmp_path, monkeypatch):
     monkeypatch.setattr(store_mod, "_DATA_DIR", data_dir)
 
     from source.store import seed_plugin_state, set_plugin_state
+    # New plugins seed DISABLED (provenance gate). Simulate an admin having
+    # validated + enabled the two we expect to load; leave disabled_test off.
     seed_plugin_state("minimal")
+    set_plugin_state("minimal", True)
     seed_plugin_state("with_everything")
+    set_plugin_state("with_everything", True)
     seed_plugin_state("disabled_test")
     set_plugin_state("disabled_test", False)
 
