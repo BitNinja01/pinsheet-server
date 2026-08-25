@@ -55,6 +55,18 @@ def logged_in_client(test_app):
     return c
 
 
+@pytest.fixture
+def non_admin_client(test_app):
+    """A logged-in, non-admin user. The first-created user is auto-admin, so an
+    admin is created first to force the second user (the one we log in) to be a
+    regular player."""
+    create_user("owner", "Owner", "pass1234")   # first user -> admin
+    create_user("guest", "Guest", "pass1234")   # second user -> non-admin
+    c = test_app.test_client()
+    c.post("/login", data={"username": "guest", "password": "pass1234"})
+    return c
+
+
 VALID_COURSE = {
     "name": "Pebble Valley",
     "location": {"city": "Testville", "state/province": "TS", "country": "Testland"},
@@ -389,6 +401,65 @@ class TestCourseEntry:
     def test_course_entry_page_loads(self, logged_in_client):
         resp = logged_in_client.get("/courses/new")
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Admin-only course management (issue #37)
+# ---------------------------------------------------------------------------
+
+class TestCourseAdminGate:
+    def test_non_admin_post_forbidden_and_store_unchanged(self, non_admin_client):
+        resp = non_admin_client.post("/api/courses", json=VALID_COURSE)
+        assert resp.status_code == 403
+        assert get_courses() == {}
+
+    def test_non_admin_put_forbidden_and_store_unchanged(self, non_admin_client):
+        save_course({
+            "location": {"city": "Testville", "state/province": "TS", "country": "Testland"},
+            "tees": {}, "holes": {}, "par": 72,
+        }, "Pebble Valley")
+        payload = dict(VALID_COURSE)
+        payload["location"] = {"city": "Hacked", "state/province": "TS", "country": "Testland"}
+        resp = non_admin_client.put("/api/courses/Pebble Valley", json=payload)
+        assert resp.status_code == 403
+        # Course must be untouched.
+        assert get_courses()["Pebble Valley"]["location"]["city"] == "Testville"
+
+    def test_non_admin_delete_forbidden_and_store_unchanged(self, non_admin_client):
+        save_course({
+            "location": {"city": "Testville", "state/province": "TS", "country": "Testland"},
+            "tees": {}, "holes": {}, "par": 72,
+        }, "Pebble Valley")
+        resp = non_admin_client.delete("/api/courses/Pebble Valley")
+        assert resp.status_code == 403
+        assert "Pebble Valley" in get_courses()
+
+    def test_non_admin_courses_new_redirects_to_list(self, non_admin_client):
+        resp = non_admin_client.get("/courses/new")
+        assert resp.status_code == 302
+        assert "/courses" in resp.headers["Location"]
+
+    def test_non_admin_cannot_enter_edit_mode(self, non_admin_client):
+        save_course({
+            "location": {"city": "Testville", "state/province": "TS", "country": "Testland"},
+            "tees": {}, "holes": {}, "par": 72,
+        }, "Pebble Valley")
+        resp = non_admin_client.get("/courses/Pebble Valley?edit=1")
+        assert resp.status_code == 200
+        # Editor controls must not render for a non-admin, even with ?edit=1.
+        assert b'id="btn-save-course"' not in resp.data
+        assert b'id="btn-edit-course"' not in resp.data
+
+    def test_non_admin_course_list_hides_add_button(self, non_admin_client):
+        resp = non_admin_client.get("/courses")
+        assert resp.status_code == 200
+        assert b"/courses/new" not in resp.data
+
+    def test_admin_post_still_succeeds(self, logged_in_client):
+        # logged_in_client's "player" is the first user -> admin.
+        resp = logged_in_client.post("/api/courses", json=VALID_COURSE)
+        assert resp.status_code == 200
+        assert "Pebble Valley" in get_courses()
 
 
 # ---------------------------------------------------------------------------

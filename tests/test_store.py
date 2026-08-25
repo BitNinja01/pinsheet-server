@@ -343,6 +343,32 @@ def test_slope_rating_front_9_fallback(make_course):
     assert rating == 71.5
 
 
+def test_slope_rating_blank_values_fall_back_to_defaults():
+    # A tee saved with blank slope/rating (the edit UI sends "" for an empty
+    # field) must not crash the differential calc — it falls back to defaults,
+    # matching the behaviour of a wholly-absent key.
+    slope, rating = get_slope_rating({"slope": "", "rating": ""}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_none_values_fall_back_to_defaults():
+    slope, rating = get_slope_rating({"slope": None, "rating": None}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_blank_front_falls_through_to_18hole_value():
+    # Blank front_slope/front_rating should use the 18-hole slope/rating, not
+    # the hard default.
+    slope, rating = get_slope_rating(
+        {"front_slope": "", "front_rating": "", "slope": "118", "rating": "70.1"},
+        "front",
+    )
+    assert slope == 118.0
+    assert rating == 70.1
+
+
 def test_draft_save_load_clear(db):
     draft = {"step": 1, "course": "test"}
     save_course_draft(draft, user_id=1)
