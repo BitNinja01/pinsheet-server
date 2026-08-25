@@ -1,8 +1,8 @@
 from calc.handicap import (
     calc_hole_scores,
     calc_course_handicap,
-    compute_adjusted_gross,
     calc_round_dif,
+    calc_adjusted_gross_score,
     calc_expected_9hole_dif,
     count_table_n,
     calc_effective_diffs,

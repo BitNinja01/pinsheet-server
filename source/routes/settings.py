@@ -8,11 +8,9 @@ from flask_login import login_required, current_user
 
 from store import (
     save_settings, save_course, save_round,
-    get_all_rounds, update_round_handicap, update_round_differential,
-    get_slope_rating, recompute_handicaps_for_user,
+    reshape_course_data, recompute_handicaps_for_user,
     create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
-from calc import calc_handicap_index, calc_round_dif, calc_course_handicap, compute_adjusted_gross
 from source.request_data import get_settings, get_courses, base_context
 from source.routes.courses import _coerce_course_numerics
 
@@ -92,6 +90,9 @@ def register_settings_routes(app, limiter, csrf):
                             # (finding U1 / GH#68), but lenient: blank out any
                             # non-numeric value instead of rejecting the import.
                             _coerce_course_numerics(cdata, strict=False)
+                            # TUI-era exports carry per-hole tees and possibly
+                            # `index` stroke keys; store canonically.
+                            cdata = reshape_course_data(cdata)
                             save_course(cdata, cname)
                             courses_count += 1
                     elif "rounds/" in name and name.endswith(".json"):
@@ -150,6 +151,7 @@ def register_settings_routes(app, limiter, csrf):
 
     @app.route("/settings/api-keys", methods=["POST"])
     @login_required
+    @limiter.limit("10 per minute")  # issue #75: throttle credential minting
     def api_keys_create():
         label = request.form.get("label", "").strip() or "Unnamed key"
         permissions = [p for p in request.form.getlist("permissions") if p in API_KEY_PERMISSIONS]

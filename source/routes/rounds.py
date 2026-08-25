@@ -25,7 +25,7 @@ from calc import (
     calc_scoring_average,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
-    compute_adjusted_gross,
+    calc_adjusted_gross_score,
     WHS_HANDICAP_WINDOW,
     current_and_previous_handicap_index,
 )
@@ -93,6 +93,30 @@ def _expected_hole_count(course, holes_sel):
     if holes_sel == "all":
         return len(course.get("holes", {})) or 18
     return 9
+
+
+MAX_HOLE_GROSS = 20  # sane per-hole ceiling (issue #80, CWE-20)
+
+
+def _sanitize_scores(data, course, holes_sel):
+    """Clamp score fields in place so a crafted or buggy client can't poison the
+    submitter's handicap with negative or absurd scores (issue #80, CWE-20).
+
+    Consistent with the app's lenient contract (malformed input must not 500):
+    non-numeric/blank gross stays unscored via _safe_int's 0 fallback rather
+    than erroring. Per-hole gross is clamped to [0, MAX_HOLE_GROSS]; a
+    score-only total is clamped to [0, MAX_HOLE_GROSS * holes_played].
+    """
+    for hole in (data.get("holes") or {}).values():
+        raw = hole.get("gross", "")
+        if raw in (None, ""):
+            continue
+        hole["gross"] = str(max(0, min(_safe_int(raw, 0), MAX_HOLE_GROSS)))
+    if data.get("entry_mode") == "score_only":
+        raw_total = data.get("gross_total", "")
+        if raw_total not in (None, ""):
+            max_total = MAX_HOLE_GROSS * _expected_hole_count(course, holes_sel)
+            data["gross_total"] = str(max(0, min(_safe_int(raw_total, 0), max_total)))
 
 
 def register_rounds_routes(app, csrf):
@@ -261,6 +285,8 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        _sanitize_scores(data, course, holes_sel)
+
         golf_round = {
             "date": date_val,
             "course": course_name,
@@ -323,8 +349,9 @@ def register_rounds_routes(app, csrf):
             else:
                 played_par = int(course.get("par", 0))
             course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-            hole_gross = {hn: _safe_int(hd.get("gross"), 0) for hn, hd in data["holes"].items()}
-            adjusted_gross = compute_adjusted_gross(hole_gross, course_holes, course_handicap)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         if skip_differential:
             differential = 0.0
@@ -710,6 +737,8 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        _sanitize_scores(data, course, holes_sel)
+
         golf_round = {
             "date": new_date,
             "course": course_name,
@@ -763,8 +792,9 @@ def register_rounds_routes(app, csrf):
             else:
                 played_par = int(course.get("par", 0))
             course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-            hole_gross = {hn: _safe_int(hd.get("gross"), 0) for hn, hd in data["holes"].items()}
-            adjusted_gross = compute_adjusted_gross(hole_gross, course_holes, course_handicap)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         # --- Differential: lock-aware ---
         diff_override = data.get("differential_override")  # float or None

@@ -10,6 +10,8 @@ def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -
         strokes_given = 1
     if course_handicap >= (hole_stroke_index + 18):
         strokes_given = 2
+    if course_handicap >= (hole_stroke_index + 36):
+        strokes_given = 3
 
     hole_net = hole_gross - strokes_given
     esc_gross = min(hole_gross, int(hole_par) + 2 + strokes_given)
@@ -20,37 +22,64 @@ def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> i
     return round(handicap * (course_slope / 113) + (course_rating - course_par))
 
 
-def compute_adjusted_gross(hole_gross: dict, course_holes: dict, course_handicap: int) -> int:
-    """WHS Rule 3 (Net Double Bogey) / Rule 12: sum each hole's ESC-capped
-    gross score to produce the Adjusted Gross Score (AGS) used for the Score
-    Differential -- (113/Slope)*(AGS - Rating). Each hole's gross is capped
-    to Net Double Bogey (par + strokes-received + 2) via `calc_hole_scores`,
-    the SAME per-hole logic the live round-save path (source/routes/rounds.py)
-    uses -- this is the single shared implementation both the live path and
-    the backfill/recompute/import paths (source/store.py,
-    source/routes/settings.py) must call, so the same detailed round can
-    never yield different differentials depending on entry path.
-
-    `hole_gross` maps hole-number-string -> raw gross (int). Holes missing
-    from `course_holes` (no par/stroke-index on record) fall back to their
-    raw gross uncapped -- there's no Net Double Bogey to compute without a
-    par, mirroring the live path's fallback.
-    """
-    total = 0
-    for hole_num, gross in hole_gross.items():
-        hc_hole = course_holes.get(hole_num, {})
-        if hc_hole:
-            par = int(hc_hole.get("par", 0))
-            stroke_index = int(hc_hole.get("hole_index", 999))
-            _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, int(gross))
-            total += esc_gross
-        else:
-            total += int(gross)
-    return total
-
-
 def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
     return round((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
+
+
+def _hole_gross_value(hole) -> int:
+    """Read a hole's gross from either a HoleData object or a plain dict."""
+    if hole is None:
+        return 0
+    raw = getattr(hole, "gross", None)
+    if raw is None and isinstance(hole, dict):
+        raw = hole.get("gross")
+    try:
+        return int(raw or 0)
+    except (ValueError, TypeError):
+        return 0
+
+
+def calc_adjusted_gross_score(round_holes, course_holes, course_handicap) -> int | None:
+    """WHS Adjusted Gross Score: sum of per-hole scores each capped at net
+    double bogey (par + 2 + strokes received).
+
+    ``round_holes`` maps hole number -> HoleData|dict (with ``gross``).
+    ``course_holes`` maps hole number -> dict with ``par`` and a stroke index
+    under either ``hole_index`` (canonical) or ``index`` (legacy fallback).
+
+    Returns the adjusted total, or ``None`` when no per-hole gross is available
+    (the caller should then fall back to the raw total gross).
+    """
+    if not round_holes or not course_holes:
+        return None
+    total = 0
+    any_scored = False
+    for hole_num, hole in round_holes.items():
+        gross = _hole_gross_value(hole)
+        hc = course_holes.get(str(hole_num)) or course_holes.get(hole_num) or {}
+        # Parse par defensively: course hole data comes from client JSON and may
+        # be blank or non-numeric. A hole we cannot parse a real par for is left
+        # UNCAPPED (raw gross) rather than crashing or capping against par 0,
+        # which would silently deflate the score.
+        par = None
+        if hc:
+            try:
+                par = int(hc.get("par"))
+            except (ValueError, TypeError):
+                par = None
+        if par and gross > 0:
+            try:
+                si = int(hc.get("hole_index", hc.get("index", 999)))
+            except (ValueError, TypeError):
+                si = 999
+            _, _, esc = calc_hole_scores(si, course_handicap, par, gross)
+            total += esc
+            any_scored = True
+        else:
+            total += gross
+            if gross > 0:
+                any_scored = True
+    return total if any_scored else None
 
 
 def calc_expected_9hole_dif(handicap_index: float) -> float:

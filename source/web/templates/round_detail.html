@@ -460,7 +460,7 @@
 {% endif %}
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 {% if edit_mode %}
 var _courses = {{ courses | tojson | safe }};
 

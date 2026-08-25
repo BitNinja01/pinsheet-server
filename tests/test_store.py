@@ -22,6 +22,7 @@ from store import (
     create_challenge, get_challenge, get_all_challenges,
     add_challenge_participant, remove_challenge_participant,
     get_challenge_participants, complete_challenge,
+    reshape_course_data,
 )
 
 
@@ -44,6 +45,84 @@ def test_init_db_creates_tables(db):
                      "challenges", "challenge_participants"):
         assert expected in names
     db.close()
+
+
+# --- reshape_course_data: legacy TUI shape -> canonical server shape ---
+
+LEGACY_COURSE = {
+    "name": "Bellevue Municipal",
+    "location": {"city": "Bellevue", "state": "WA"},
+    "par": 70,
+    "holes": {
+        "1": {"par": 4, "hole_index": 7, "tees": {"blue": 377, "white": 362}},
+        "2": {"par": 3, "index": 15, "tees": {"blue": 150, "white": 120}},
+    },
+    "tees": {
+        "blue": {"rating": 70.5, "slope": 121, "yardage": 6100},
+        "white": {"rating": 68.9, "slope": 118, "yardage": 5700},
+    },
+}
+
+
+def test_reshape_course_data_moves_legacy_per_hole_tees_to_canonical():
+    out = reshape_course_data(json.loads(json.dumps(LEGACY_COURSE)))
+    assert out["holes"]["1"] == {"par": 4, "hole_index": 7}
+    assert out["holes"]["2"] == {"par": 3, "hole_index": 15}
+    assert out["tees"]["blue"]["yardages"] == {"1": "377", "2": "150"}
+    assert out["tees"]["white"]["yardages"] == {"1": "362", "2": "120"}
+    assert "tees" not in out["holes"]["1"]
+    assert "tees" not in out["holes"]["2"]
+
+
+def test_reshape_course_data_renames_index_to_hole_index():
+    course = {
+        "holes": {"1": {"par": 5, "index": 11}},
+        "tees": {},
+    }
+    out = reshape_course_data(course)
+    assert out["holes"]["1"] == {"par": 5, "hole_index": 11}
+
+
+def test_reshape_course_data_is_idempotent_on_canonical():
+    canonical = {
+        "par": 72,
+        "holes": {"1": {"par": 5, "hole_index": 11}},
+        "tees": {"Husky": {"rating": 75.5, "slope": 143, "yardage": 7304,
+                          "yardages": {"1": "560"}}},
+    }
+    out = reshape_course_data(json.loads(json.dumps(canonical)))
+    assert out == canonical
+
+
+def test_reshape_course_data_canonical_yardages_win_over_legacy():
+    course = {
+        "holes": {"1": {"par": 4, "hole_index": 3, "tees": {"blue": 377}}},
+        "tees": {"blue": {"rating": 70.5, "slope": 121, "yardage": 6100,
+                          "yardages": {"1": "380"}}},
+    }
+    out = reshape_course_data(course)
+    assert out["tees"]["blue"]["yardages"]["1"] == "380"
+
+
+def test_reshape_course_data_preserves_unrelated_keys():
+    course = dict(LEGACY_COURSE)
+    course["holes_remaining"] = {"10": {"par": 4, "hole_index": 2}}
+    course["tees_remaining"] = {"blue": {"rating": 35.0, "slope": 120, "yardage": 3050}}
+    out = reshape_course_data(json.loads(json.dumps(course)))
+    assert "holes_remaining" in out
+    assert "tees_remaining" in out
+    assert out["location"] == {"city": "Bellevue", "state": "WA"}
+    assert out["par"] == 70
+    assert out["tees"]["blue"]["rating"] == 70.5
+    assert out["tees"]["blue"]["slope"] == 121
+    assert out["tees"]["blue"]["yardage"] == 6100
+
+
+def test_reshape_course_data_does_not_mutate_input():
+    course = json.loads(json.dumps(LEGACY_COURSE))
+    reshape_course_data(course)
+    assert "tees" in course["holes"]["1"]
+    assert course["tees"]["blue"].get("yardages") is None
 
 
 def test_differential_locked_column_exists(db):
@@ -262,6 +341,32 @@ def test_slope_rating_front_9_fallback(make_course):
     slope, rating = get_slope_rating(tee_dict, "front")
     assert slope == 128
     assert rating == 71.5
+
+
+def test_slope_rating_blank_values_fall_back_to_defaults():
+    # A tee saved with blank slope/rating (the edit UI sends "" for an empty
+    # field) must not crash the differential calc — it falls back to defaults,
+    # matching the behaviour of a wholly-absent key.
+    slope, rating = get_slope_rating({"slope": "", "rating": ""}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_none_values_fall_back_to_defaults():
+    slope, rating = get_slope_rating({"slope": None, "rating": None}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_blank_front_falls_through_to_18hole_value():
+    # Blank front_slope/front_rating should use the 18-hole slope/rating, not
+    # the hard default.
+    slope, rating = get_slope_rating(
+        {"front_slope": "", "front_rating": "", "slope": "118", "rating": "70.1"},
+        "front",
+    )
+    assert slope == 118.0
+    assert rating == 70.1
 
 
 def test_draft_save_load_clear(db):

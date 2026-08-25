@@ -79,6 +79,35 @@ def get_courses() -> dict:
     return result
 
 
+def reshape_course_data(course: dict) -> dict:
+    """Convert a legacy TUI-shaped course document to the canonical shape.
+
+    Legacy (TUI-era) courses store per-hole yardages inside each hole
+    (``holes[h]["tees"][tee] = yardage``) and older wizard data uses an
+    ``index`` stroke-index key. The canonical server shape stores per-hole
+    yardages at the tee level (``tees[tee]["yardages"][hole] = yardage``)
+    with holes holding only ``par`` + ``hole_index``.
+
+    Canonical documents pass through unchanged; a new dict is returned
+    (the input is never mutated).
+    """
+    out = json.loads(json.dumps(course))
+    holes = out.get("holes")
+    if isinstance(holes, dict):
+        for hkey, hdata in list(holes.items()):
+            if not isinstance(hdata, dict):
+                continue
+            if "index" in hdata and "hole_index" not in hdata:
+                hdata["hole_index"] = hdata.pop("index")
+            legacy_tees = hdata.pop("tees", None)
+            if legacy_tees:
+                for tee_name, yardage in legacy_tees.items():
+                    tee_data = out.setdefault("tees", {}).setdefault(tee_name, {})
+                    yardages = tee_data.setdefault("yardages", {})
+                    yardages.setdefault(str(hkey), str(yardage))
+    return out
+
+
 def save_course(course, course_name) -> None:
     db = get_db()
     db.execute(
@@ -362,7 +391,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         WHS_HANDICAP_WINDOW,
         calc_round_dif,
         calc_course_handicap,
-        compute_adjusted_gross,
+        calc_adjusted_gross_score,
     )
 
     courses_data = get_courses()
@@ -420,7 +449,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                     # otherwise a detailed round with a blow-up hole is
                     # over-counted relative to the SAME round entered live
                     # (rounds.py applies this cap inline via
-                    # compute_adjusted_gross). Score-only rounds have no
+                    # calc_adjusted_gross_score). Score-only rounds have no
                     # per-hole data to cap, so they correctly keep raw
                     # total_gross as the Adjusted Gross Score (AGS).
                     course_holes = course_data.get("holes", {})
@@ -436,9 +465,8 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                         adj_hi = hi_before / 2 if r.holes_selection != "all" else hi_before
                         played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
                         course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                        adjusted_gross = compute_adjusted_gross(
-                            {hn: h.gross for hn, h in r.holes.items()}, course_holes, course_handicap,
-                        )
+                        ags = calc_adjusted_gross_score(r.holes, course_holes, course_handicap)
+                        adjusted_gross = float(r.total_gross) if ags is None else ags
                     else:
                         adjusted_gross = float(r.total_gross)
                     diff = calc_round_dif(slope, adjusted_gross, rating)
@@ -579,16 +607,34 @@ def recompute_all_handicaps() -> None:
     )
 
 
+def _num(*candidates):
+    """First candidate that parses as a float; last candidate is the default.
+
+    Tee slope/rating can be stored as a blank string (the edit UI sends "" for
+    an empty field) or be missing entirely. A blank/None/non-numeric value must
+    fall back to the default rather than crash the differential calc.
+    """
+    default = candidates[-1]
+    for c in candidates[:-1]:
+        if c is None or c == "":
+            continue
+        try:
+            return float(c)
+        except (ValueError, TypeError):
+            continue
+    return float(default)
+
+
 def get_slope_rating(tee_data: dict, holes_sel: str) -> tuple[float, float]:
     if holes_sel == "front":
-        slope  = float(tee_data.get("front_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("front_rating", tee_data.get("rating", 72.0)))
+        slope  = _num(tee_data.get("front_slope"),  tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("front_rating"), tee_data.get("rating"), 72.0)
     elif holes_sel == "back":
-        slope  = float(tee_data.get("back_slope",  tee_data.get("slope",  113)))
-        rating = float(tee_data.get("back_rating", tee_data.get("rating", 72.0)))
+        slope  = _num(tee_data.get("back_slope"),  tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("back_rating"), tee_data.get("rating"), 72.0)
     else:
-        slope  = float(tee_data.get("slope",  113))
-        rating = float(tee_data.get("rating", 72.0))
+        slope  = _num(tee_data.get("slope"),  113)
+        rating = _num(tee_data.get("rating"), 72.0)
     return slope, rating
 
 
@@ -669,13 +715,23 @@ def create_user(username: str, display_name: str, password: str) -> dict:
     return {"id": user_id, "username": username, "display_name": display_name, "is_admin": bool(is_admin)}
 
 
+# Fixed bcrypt hash used to normalize login timing for unknown usernames
+# (issue #77). Computed once at import; the password value is irrelevant since
+# no real login ever matches against it.
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"pinsheet-timing-normalizer", bcrypt.gensalt()).decode()
+
+
 def verify_user(username: str, password: str) -> dict | None:
     db = get_db()
     row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     db.close()
-    if not row or not row["password_hash"]:
-        return None
-    if bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+    # Issue #77 (CWE-208): always run one bcrypt.checkpw so an unknown username
+    # (no such row) takes the same ~time as a wrong password for a real user,
+    # closing the login timing side-channel. Mirrors the _SENTINEL_KEY_HASH
+    # pattern used for API keys.
+    stored_hash = row["password_hash"] if (row and row["password_hash"]) else _DUMMY_PASSWORD_HASH
+    password_ok = bcrypt.checkpw(password.encode(), stored_hash.encode())
+    if row and row["password_hash"] and password_ok:
         return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "is_admin": bool(row["is_admin"])}
     return None
 
@@ -1089,8 +1145,24 @@ def get_clubs(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def save_club(club_data: dict, user_id: int) -> None:
+def save_club(club_data: dict, user_id: int) -> bool:
+    """Insert or update a club for ``user_id``.
+
+    Ownership guard (issue #69, CWE-639): the client controls the ``id`` primary
+    key, so an INSERT OR REPLACE could otherwise overwrite another user's club
+    row and reassign it. Reject when the id already exists under a different
+    owner. Returns True if saved, False if rejected as a cross-user write.
+    """
     db = get_db()
+    existing = db.execute(
+        "SELECT user_id FROM clubs WHERE id = ?", (club_data["id"],)
+    ).fetchone()
+    if existing is not None and existing["user_id"] != user_id:
+        db.close()
+        _log.warning(
+            "save_club rejected: club %s is owned by another user", club_data["id"]
+        )
+        return False
     db.execute(
         """INSERT OR REPLACE INTO clubs (id, user_id, category, club, number, brand, model, loft, lie, length, shaft_flex, shaft_brand, shaft, grip, sw, carry)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -1116,6 +1188,7 @@ def save_club(club_data: dict, user_id: int) -> None:
     db.commit()
     db.close()
     _log.info("club saved: %s", club_data["id"])
+    return True
 
 
 def delete_club(club_id: str, user_id: int) -> None:
@@ -1154,13 +1227,18 @@ def save_bag_slots(slot_ids: list, user_id: int) -> None:
     _log.info("bag slots saved for user_id=%s", user_id)
 
 
-def get_distinct_club_field_values(field: str) -> list[str]:
+def get_distinct_club_field_values(field: str, user_id: int) -> list[str]:
+    # Issue #72 (CWE-200): scope to the caller's own clubs — without WHERE
+    # user_id this leaked every user's brand/model/shaft/grip to any /bag
+    # visitor. `field` stays allowlist-checked against SAFE (not user input in
+    # the SQL text); user_id is bound as a parameter.
     SAFE = {"brand", "model", "shaft_brand", "shaft", "grip"}
     if field not in SAFE:
         return []
     db = get_db()
     rows = db.execute(
-        f"SELECT DISTINCT {field} FROM clubs WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}"
+        f"SELECT DISTINCT {field} FROM clubs WHERE user_id = ? AND {field} IS NOT NULL AND {field} != '' ORDER BY {field}",
+        (user_id,),
     ).fetchall()
     db.close()
     return [r[field] for r in rows]

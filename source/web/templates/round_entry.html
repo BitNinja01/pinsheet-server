@@ -111,7 +111,7 @@ span.flatpickr-weekday {
 </style>
 {% endblock %}
 {% block content %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 window._courses = {{ courses|tojson }};
 </script>
 

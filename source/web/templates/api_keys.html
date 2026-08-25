@@ -71,7 +71,7 @@
                 <td>
                     {% if not k.revoked_at %}
                     <form method="POST" action="{{ url_for('api_keys_revoke', key_id=k.id) }}"
-                          onsubmit="return confirm('Revoke this key? Calls using it will stop working immediately.');">
+                          data-confirm="Revoke this key? Calls using it will stop working immediately.">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn-danger">Revoke</button>
                     </form>

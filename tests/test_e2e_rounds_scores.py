@@ -596,7 +596,7 @@ def test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole(
     HIGHEST-stroke-index hole -- i.e. genuinely "no stroke received" for a
     bogey-level course handicap) must produce the SAME Score Differential
     whether it is scored live (POST /api/rounds, which applies the Net
-    Double Bogey/ESC cap inline via compute_adjusted_gross) or later
+    Double Bogey/ESC cap inline via calc_adjusted_gross_score) or later
     reprocessed by recompute_handicaps_for_user (source/store.py). Before
     the R12 fix, the recompute path derived the differential from raw
     total_gross and diverged from the live-saved value for any round with a
@@ -608,7 +608,7 @@ def test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole(
     the same code path live-entry and recompute both take once a player has
     playing history (not just the course_handicap==0/no-prior-HI edge
     case)."""
-    from calc.handicap import calc_handicap_index, calc_course_handicap, compute_adjusted_gross, calc_round_dif
+    from calc.handicap import calc_handicap_index, calc_course_handicap, calc_adjusted_gross_score, calc_round_dif
 
     # 3 warm-up score-only rounds (bogey-level golfer, ~90 raw gross on this
     # par-73 course) establish a real prior Handicap Index.
@@ -642,8 +642,8 @@ def test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole(
     assert course_handicap < 18, "fixture must NOT award hole 18 a stroke (genuine no-stroke blow-up)"
 
     raw_total = sum(gross_map[n] for n in PARS)
-    hole_gross = {str(n): gross_map[n] for n in PARS}
-    esc_total = compute_adjusted_gross(hole_gross, COURSE["holes"], course_handicap)
+    hole_gross = {str(n): {"gross": str(gross_map[n])} for n in PARS}
+    esc_total = calc_adjusted_gross_score(hole_gross, COURSE["holes"], course_handicap)
     assert esc_total < raw_total, "fixture must actually trigger the Net Double Bogey cap"
 
     esc_differential = calc_round_dif(128, esc_total, 71.5)
