@@ -9,7 +9,7 @@ from store import (
     load_settings, save_settings,
     get_courses, save_course, delete_course, rename_course,
     get_all_rounds, save_round, delete_round, update_round_handicap,
-    recompute_all_handicaps,
+    recompute_all_handicaps, recompute_handicaps_for_user,
     get_slope_rating,
     save_course_draft, load_course_draft, clear_course_draft,
     save_round_draft, load_round_draft, clear_round_draft,
@@ -787,3 +787,104 @@ def test_unlink_round_closes_connection_on_error(monkeypatch):
     with pytest.raises(sqlite3.OperationalError):
         unlink_round(1, 1, 1)
     assert fake.closed is True
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 12 / Rule 3 (Net Double Bogey): recompute_handicaps_for_user must
+# derive the Score Differential from the ESC-adjusted gross for detailed
+# rounds, not raw total_gross -- otherwise a blow-up hole is over-counted
+# relative to the SAME round entered live (source/routes/rounds.py).
+# --------------------------------------------------------------------------
+
+# 18-hole par map matching the fixture used by test_e2e_rounds_scores.py --
+# par-3s at 4/8/12/16, par-5s at 2/6/10/14/18, rest par-4. TOTAL_PAR == 73.
+_R12_PARS = {n: (3 if n in (4, 8, 12, 16) else 5 if n in (2, 6, 10, 14, 18) else 4)
+             for n in range(1, 19)}
+_R12_TOTAL_PAR = sum(_R12_PARS.values())  # 73
+
+
+def _r12_course():
+    return {
+        "par": str(_R12_TOTAL_PAR),
+        "holes": {str(n): {"par": _R12_PARS[n], "hole_index": n} for n in range(1, 19)},
+        "tees": {"White": {"slope": 128, "rating": 71.5}},
+    }
+
+
+def _r12_holes_with_blowup(blowup_hole="1", blowup_gross=10):
+    """Bogey (par+1) on every hole except `blowup_hole`, which gets
+    `blowup_gross` -- a detailed round with one blow-up hole and no strokes
+    received (course_handicap 0, no prior HI)."""
+    holes = {}
+    for n, par in _R12_PARS.items():
+        hn = str(n)
+        gross = blowup_gross if hn == blowup_hole else par + 1
+        holes[hn] = {"gross": str(gross), "putts": "2"}
+    return holes
+
+
+def test_recompute_uses_esc_adjusted_gross_not_raw_total(db):
+    """A detailed round with a blow-up hole (par 4, gross 10, no stroke
+    received) must have its Score Differential computed from the
+    ESC-adjusted gross (that hole capped to Net Double Bogey == par+2 == 6),
+    NOT the raw total_gross. This is the R12 bug: before the fix, this
+    round's recompute-path differential was 21.6 (raw); after the fix it is
+    18.1 (ESC, using the course_handicap==0 "no prior HI established yet"
+    fallback -- there is no round before this one in the fixture).
+
+    NOTE: this is a store.py-unit-level check of that fallback specifically,
+    not a live-vs-recompute equality check -- the live POST /api/rounds path
+    only attempts the ESC adjustment once calc_handicap_index can return a
+    value (WHS needs >= 3 acceptable scores), so it skips ESC entirely (not
+    even a course_handicap==0 cap) for a player's first 1-2 rounds. See
+    tests/test_e2e_rounds_scores.py::
+    test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole
+    for the true live-vs-recompute equality check, exercised once a real
+    prior Handicap Index exists (the common case R12 targets)."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course(), "GC")
+
+    holes = _r12_holes_with_blowup()
+    raw_total = sum(int(h["gross"]) for h in holes.values())
+    assert raw_total == 96  # bogey-all-18 (91) minus hole-1 bogey (5) plus blowup (10)
+
+    r = {"course": "GC", "tees": "White", "total_gross": str(raw_total),
+         "differential": "0", "computed_handicap": "",
+         "holes_selection": "all", "entry_mode": "detailed", "holes": holes}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    raw_differential = round((113 / 128) * (raw_total - 71.5), 1)
+    esc_total = raw_total - 10 + 6  # hole 1 blowup (10) capped to par+2 (6)
+    esc_differential = round((113 / 128) * (esc_total - 71.5), 1)
+
+    assert raw_differential == 21.6
+    assert esc_differential == 18.1
+    assert saved.differential == str(esc_differential), (
+        f"recompute wrote raw-total_gross differential {saved.differential!r} "
+        f"(raw would be {raw_differential!r}) instead of the ESC-adjusted "
+        f"{esc_differential!r} -- WHS Rule 3 (Net Double Bogey) / Rule 12 "
+        f"violation."
+    )
+    assert saved.differential != str(raw_differential)
+
+
+def test_recompute_score_only_round_still_uses_raw_total(db):
+    """A score-only round (no per-hole data) has nothing to ESC-cap -- the
+    recompute path must keep using raw total_gross as the Adjusted Gross
+    Score, unchanged by the R12 fix."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course(), "GC")
+
+    r = {"course": "GC", "tees": "White", "total_gross": "96",
+         "differential": "0", "computed_handicap": "",
+         "holes_selection": "all", "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    expected = round((113 / 128) * (96 - 71.5), 1)
+    assert saved.differential == str(expected)

@@ -54,6 +54,35 @@ def _safe_int(val, default=0):
         return default
 
 
+def _prior_displayed_hi(rounds, before_date: str, before_index) -> float:
+    """The Handicap Index IN EFFECT for a round dated `before_date`/`before_index`
+    = the most recent CHRONOLOGICALLY-PRIOR round's DISPLAYED (Rule 5.8-capped /
+    5.9-ESR-adjusted) Handicap Index, i.e. its stored computed_handicap. Returns
+    0.0 when none is established yet.
+
+    Mirrors recompute_handicaps_for_user's `prior_displayed[-1]` so the ESC
+    (Rule 3 / Rule 12) adjusted gross is computed on the same basis regardless of
+    entry path. `rounds` is most-recent-first (date DESC, index DESC), so the
+    first entry that is strictly before (before_date, before_index) AND carries a
+    real computed_handicap is the correct in-effect HI. Filtering by date is
+    essential: a BACKDATED round must not take a chronologically-later round's HI
+    as its "prior" (that would diverge from a full recompute).
+    """
+    bidx = _safe_int(before_index, -1)
+    for r in rounds:
+        r_idx = _safe_int(getattr(r, "index", -1), -1)
+        is_prior = r.date < before_date or (r.date == before_date and r_idx < bidx)
+        if not is_prior:
+            continue
+        ch = getattr(r, "computed_handicap", None)
+        if ch and ch not in ("0", ""):
+            try:
+                return float(ch)
+            except (ValueError, TypeError):
+                continue
+    return 0.0
+
+
 def _scored_hole_count(holes):
     """Number of holes with a real (positive) gross entered."""
     return sum(1 for h in holes.values() if _safe_int(h.get("gross"), 0) > 0)
@@ -293,24 +322,36 @@ def register_rounds_routes(app, csrf):
         skip_differential = incomplete or no_score
 
         all_rounds_for_user = get_all_rounds_for_user()
+        # The index this round WILL occupy (next_round_index gap-fills the lowest
+        # free slot, so it is NOT necessarily the highest for its date) -- needed
+        # up-front so the ESC prior-HI basis uses the round's true chronological
+        # position among same-date rounds.
+        index = next_round_index(date_val, current_user.id)
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
-            # get_all_rounds_for_user() is most-recent-first -- satisfies
-            # calc_handicap_index's WHS Rule 5.2 ordering contract.
-            current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
-            if current_hi is not None:
-                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
-                course_holes = course.get("holes", {})
-                if holes_sel != "all" and course_holes:
-                    hole_nums = sorted(course_holes.keys(), key=int)
-                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
-                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
-                else:
-                    played_par = int(course.get("par", 0))
-                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
-                if ags is not None:
-                    adjusted_gross = ags
+            # WHS Rule 3 (Net Double Bogey) / Rule 12: the ESC-adjusted gross
+            # (and hence the Score Differential) must be identical regardless of
+            # entry path. Derive the ESC course handicap from the HI IN EFFECT
+            # -- the prior DISPLAYED (Rule 5.8-capped / 5.9-ESR-adjusted)
+            # Handicap Index, i.e. the most recent chronologically-prior round's
+            # stored computed_handicap (0.0 if none established yet) -- exactly
+            # as recompute_handicaps_for_user and the zip-import path do. A fresh
+            # raw calc_handicap_index() here omits the cap/ESR and diverges, and
+            # skipping ESC entirely when no HI exists diverges from the backfill
+            # paths (which apply it with course_handicap derived from HI 0.0).
+            hi_before = _prior_displayed_hi(all_rounds_for_user, date_val, index)
+            adj_hi = hi_before / 2 if holes_sel != "all" else hi_before
+            course_holes = course.get("holes", {})
+            if holes_sel != "all" and course_holes:
+                hole_nums = sorted(course_holes.keys(), key=int)
+                half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+            else:
+                played_par = int(course.get("par", 0))
+            course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         if skip_differential:
             differential = 0.0
@@ -330,7 +371,7 @@ def register_rounds_routes(app, csrf):
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        index = next_round_index(date_val, current_user.id)
+        # index computed above (before the ESC block) so both share one value
         round_id = save_round(golf_round, date_val, index, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
@@ -734,22 +775,26 @@ def register_rounds_routes(app, csrf):
                 r for r in all_rounds_for_user
                 if not (r.date == date and str(r.index) == str(index))
             ]
-            # Filter preserves all_rounds_for_user's most-recent-first order
-            # (WHS ordering contract).
-            current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
-            if current_hi is not None:
-                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
-                course_holes = course.get("holes", {})
-                if holes_sel != "all" and course_holes:
-                    hole_nums = sorted(course_holes.keys(), key=int)
-                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
-                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
-                else:
-                    played_par = int(course.get("par", 0))
-                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
-                if ags is not None:
-                    adjusted_gross = ags
+            # WHS Rule 3 / Rule 12 (see POST): ESC course handicap from the
+            # prior DISPLAYED HI (0.0 if none), always applied -- matches the
+            # recompute/import basis so the differential is entry-path-invariant.
+            # Chronological position: same index when the date is unchanged;
+            # a date change relocates the round to the slot next_round_index will
+            # assign on the new date (lowest free, not necessarily the end).
+            before_idx = _safe_int(index, 0) if new_date == date else next_round_index(new_date, current_user.id)
+            hi_before = _prior_displayed_hi(rounds_before, new_date, before_idx)
+            adj_hi = hi_before / 2 if holes_sel != "all" else hi_before
+            course_holes = course.get("holes", {})
+            if holes_sel != "all" and course_holes:
+                hole_nums = sorted(course_holes.keys(), key=int)
+                half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+            else:
+                played_par = int(course.get("par", 0))
+            course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         # --- Differential: lock-aware ---
         diff_override = data.get("differential_override")  # float or None
