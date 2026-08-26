@@ -29,13 +29,14 @@ from calc import (
     calc_playing_handicap,
     calc_hole_scores,
     calc_9hole_dif,
+    calc_strokes_given,
     WHS_HANDICAP_WINDOW,
     WHS_MAX_HANDICAP_INDEX,
     current_and_previous_handicap_index,
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
-from source.models import dict_to_round, dict_to_course, clamp_pcc, effective_pcc
+from source.models import dict_to_round, dict_to_course, clamp_pcc, effective_pcc, invalid_tee_numeric_reason
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
@@ -288,6 +289,19 @@ def register_rounds_routes(app, csrf):
 
         course = get_courses().get(course_name, {})
         tees = course.get("tees", {}).get(tees_name, {})
+
+        # CV-001 defense in depth: a course tee with a non-positive
+        # slope/rating (e.g. legacy data saved before
+        # routes/courses.py:_coerce_course_numerics started rejecting "0")
+        # would otherwise reach calc_round_dif's `113 / tee_slope` division
+        # and 500 with a ZeroDivisionError. store.get_slope_rating already
+        # falls back safely (never returns slope/rating <= 0) as a second
+        # backstop, but a direct user-initiated round save surfaces this
+        # as an actionable 400 instead of silently substituting a
+        # slope/rating the player didn't actually play.
+        tee_err = invalid_tee_numeric_reason(tees)
+        if tee_err:
+            return jsonify({"error": f"course tee '{tees_name}': {tee_err}"}), 400
 
         holes_sel = data.get("holes_played", "18")
         if holes_sel == "front9":
@@ -563,12 +577,9 @@ def register_rounds_routes(app, csrf):
             is_par3 = par == 3
 
             hole_index = int(course_holes.get(hn, {}).get("hole_index", 999))
-            strokes = 0
-            if course_handicap is not None:
-                if hole_index <= course_handicap:
-                    strokes += 1
-                if hole_index <= course_handicap - 18:
-                    strokes += 1
+            # WHS Rule 6.2b stroke allocation (0/1/2) via the single shared
+            # helper -- do not re-inline the +18 logic (drift risk).
+            strokes = calc_strokes_given(hole_index, course_handicap) if course_handicap is not None else 0
             net = gross - strokes
             net_diff = net - par
             yds = tee_data.get("yardages", {}).get(hn, "")
@@ -785,6 +796,13 @@ def register_rounds_routes(app, csrf):
         tees_name = data.get("tees", "")
         course = get_courses().get(course_name, {})
         tees = course.get("tees", {}).get(tees_name, {})
+
+        # CV-001 defense in depth (see api_rounds_post for full rationale):
+        # reject a non-positive tee slope/rating with a clean 400 instead
+        # of letting it reach calc_round_dif's `113 / tee_slope` division.
+        tee_err = invalid_tee_numeric_reason(tees)
+        if tee_err:
+            return jsonify({"error": f"course tee '{tees_name}': {tee_err}"}), 400
 
         holes_sel = data.get("holes_played", "18")
         if holes_sel == "front9":

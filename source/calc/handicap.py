@@ -42,7 +42,19 @@ def round_half_up(value: float, ndigits: int = 1) -> float:
     return float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
-def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
+def calc_strokes_given(hole_stroke_index, course_handicap) -> int:
+    """WHS stroke allocation (Rule 6.2b): a player receives 1 stroke on a
+    hole once their Course Handicap reaches/exceeds that hole's Stroke
+    Index, a 2nd stroke once it reaches/exceeds Stroke Index + 18, and a
+    3rd stroke once it reaches/exceeds Stroke Index + 36 (Course
+    Handicaps above 36 are reachable under the Rule 5.3 54.0 max index on
+    hard/high-slope courses). The +18/+36 branches only fire once Course
+    Handicap exceeds 18 -- e.g. high-Handicap-Index players on
+    hard/high-slope courses -- so they are easy to omit by accident when a
+    Course Handicap consumer only hand-rolls the single-stroke branch.
+    Single source of truth for the 0/1/2/3 stroke rule; shared by
+    `calc_hole_scores` and `calc.scoring.calc_per_hole_stats`'s
+    strokes-received stat so they can't drift apart."""
     strokes_given = 0
     if course_handicap >= hole_stroke_index:
         strokes_given = 1
@@ -50,7 +62,11 @@ def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -
         strokes_given = 2
     if course_handicap >= (hole_stroke_index + 36):
         strokes_given = 3
+    return strokes_given
 
+
+def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -> tuple:
+    strokes_given = calc_strokes_given(hole_stroke_index, course_handicap)
     hole_net = hole_gross - strokes_given
     esc_gross = min(hole_gross, int(hole_par) + 2 + strokes_given)
     return hole_gross, hole_net, esc_gross

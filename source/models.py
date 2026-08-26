@@ -163,6 +163,96 @@ def effective_pcc(pcc: float, holes_selection: str) -> float:
     return pcc * 0.5 if holes_selection != "all" else pcc
 
 
+def safe_float(val, default=0.0):
+    """Parse a float, tolerating blank/missing/non-numeric input.
+
+    Blank ("") tee numeric fields (rating, slope, front_/back_ variants)
+    are explicitly allowed by routes/courses.py:_coerce_course_numerics
+    ("Blank/missing values are left as-is"), so a present-but-blank value
+    must fall back to `default` the same as a missing key -- NOT crash on
+    float(""). A plain `dict.get(field, default)` does not catch this
+    because the default only applies when the key is absent, not when its
+    value is "".
+    """
+    if val in (None, ""):
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_positive_float(*candidates, default: float) -> float:
+    """Return the first candidate that parses to a finite, STRICTLY
+    POSITIVE float; falls through to the next candidate (mirroring a
+    missing/blank cascade) and finally to `default` if none qualify.
+
+    "0" (and negative values) parse fine as a float -- `safe_float` alone
+    would happily return 0.0 -- but a non-positive slope/rating is
+    domain-invalid for the WHS formulas that divide by slope
+    (`calc_round_dif`: `113 / tee_slope`; `calc_course_handicap`:
+    `slope / 113` is safe, but a 0/negative slope or rating still
+    corrupts the Course Handicap / Score Differential). Blank, missing,
+    non-numeric, AND non-positive values are all treated the same way
+    here: "invalid, try the next fallback."
+    """
+    for c in candidates:
+        parsed = safe_float(c, None)
+        if parsed is not None and parsed > 0:
+            return parsed
+    return default
+
+
+_POSITIVE_ONLY_TEE_FIELDS = (
+    "rating", "slope", "front_rating", "front_slope", "back_rating", "back_slope",
+)
+
+
+def invalid_tee_numeric_reason(tee: dict) -> str | None:
+    """Return a human-readable reason if a PRESENT (non-blank) tee
+    slope/rating (or front_/back_ variant) is non-numeric or non-positive,
+    else None. Blank/missing fields are allowed (not this function's
+    concern -- see `safe_float`/`safe_positive_float`).
+
+    Shared write-path guard for course save (routes/courses.py) and round
+    save (routes/rounds.py): "0" is a valid float but a domain-invalid
+    slope/rating (calc_round_dif divides by slope -- slope<=0 is a
+    ZeroDivisionError waiting to happen at round-save time), so it must be
+    rejected with a clean validation error rather than silently accepted.
+    """
+    for field in _POSITIVE_ONLY_TEE_FIELDS:
+        val = tee.get(field)
+        if val in (None, ""):
+            continue
+        try:
+            parsed = float(val)
+        except (TypeError, ValueError):
+            return f"field '{field}' must be numeric"
+        if parsed <= 0:
+            return f"field '{field}' must be a positive number"
+    return None
+
+
+def _safe_optional_float(val):
+    """Blank-safe optional numeric tee-override parse (front_/back_
+    rating): None for missing/blank input (no override -- the base
+    slope/rating field applies), and -- unlike a raw float()/int() cast --
+    never raises on non-numeric garbage either; falls back to None (no
+    override) instead of crashing course-load-time. Mirrors `safe_float`'s
+    blank/non-numeric handling, scoped to the "optional override" fields
+    where None (not a hardcoded default) is the correct fallback."""
+    if val in (None, ""):
+        return None
+    return safe_float(val, None)
+
+
+def _safe_optional_int(val):
+    """Same contract as `_safe_optional_float` (front_/back_ slope), but
+    returns an int (or None)."""
+    parsed = _safe_optional_float(val)
+    return int(parsed) if parsed is not None else None
+
+
 def dict_to_hole(d: dict) -> HoleData:
     return HoleData(
         gross=_safe_int(d.get("gross"), 0),
@@ -208,15 +298,26 @@ def dict_to_round(d: dict) -> RoundData:
 def dict_to_course(name: str, d: dict) -> CourseData:
     tees_data = {}
     for tname, tdata in d.get("tees", {}).items():
+        # DA-002: blank ("") is explicitly allowed by _coerce_course_numerics
+        # ("Blank/missing values are left as-is"), so a present-but-blank
+        # slope/rating must fall back to a sane default (not crash
+        # course-load-time on float("")/int("")) the same way `rating`
+        # already did -- `slope` previously stored the raw un-parsed value
+        # (violating TeeData.slope: int) and was only masked downstream by
+        # scoring.py's `float(first_tee.slope or "113")` idiom. Use
+        # `safe_float` for both base fields, and the blank/non-numeric-safe
+        # `_safe_optional_float` for the front_/back_ override fields (a
+        # blank/garbage override correctly falls back to None -- "no
+        # override, use the base field" -- rather than crashing).
         tees_data[tname] = TeeData(
-            slope=tdata.get("slope", 113),
-            rating=float(tdata.get("rating", 72.0)),
+            slope=safe_float(tdata.get("slope"), 113),
+            rating=safe_float(tdata.get("rating"), 72.0),
             yardage=str(tdata.get("yardage", "0")),
             yardages=tdata.get("yardages", {}),
-            front_slope=int(tdata["front_slope"]) if tdata.get("front_slope") not in (None, "") else None,
-            front_rating=float(tdata["front_rating"]) if tdata.get("front_rating") not in (None, "") else None,
-            back_slope=int(tdata["back_slope"]) if tdata.get("back_slope") not in (None, "") else None,
-            back_rating=float(tdata["back_rating"]) if tdata.get("back_rating") not in (None, "") else None,
+            front_slope=_safe_optional_int(tdata.get("front_slope")),
+            front_rating=_safe_optional_float(tdata.get("front_rating")),
+            back_slope=_safe_optional_int(tdata.get("back_slope")),
+            back_rating=_safe_optional_float(tdata.get("back_rating")),
         )
     holes_data = {}
     for hn, hdata in d.get("holes", {}).items():

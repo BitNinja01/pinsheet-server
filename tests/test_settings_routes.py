@@ -468,6 +468,63 @@ class TestSettingsImport:
         # window and therefore the first to get a computed_handicap.
         assert rounds[0].computed_handicap not in ("", None)
 
+    def test_import_recompute_slope_zero_legacy_course_does_not_crash(self, logged_in_client):
+        """CV-001 zip-import path: settings.py's post-import recompute loop
+        (~line 120-121) inlines the same `113 / tee_slope` division as
+        store.py's recompute_handicaps_for_user and calc_round_dif -- it
+        does NOT call calc_round_dif directly, so it would be just as
+        vulnerable to a ZeroDivisionError on a slope="0" tee if it divided
+        BEFORE calling get_slope_rating. Verified by reading the code:
+        `slope, rating = get_slope_rating(tee_data, r.holes_selection)`
+        (line 120) runs immediately before `113 / slope` (line 121), so
+        `get_slope_rating`'s `safe_positive_float` fallback already
+        protects this call site -- prove it end-to-end.
+
+        The bad-slope course is seeded via `store.save_course` directly
+        (bypassing courses.json import, which would otherwise sanitize
+        slope="0" to "" via `_coerce_course_numerics(strict=False)` before
+        this recompute loop ever runs) to simulate legacy/pre-fix data
+        that predates the write-time guard, then only rounds.json is
+        imported against it.
+        """
+        from store import save_course
+
+        save_course(
+            {
+                "location": {},
+                "tees": {"White": {"slope": "0", "rating": "70", "yardage": "6000"}},
+                "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+                "par": "72",
+            },
+            "LegacyZeroSlopeGC",
+        )
+
+        rounds_payload = {
+            "2026-06-01": {
+                "0": {
+                    "course": "LegacyZeroSlopeGC", "tees": "White", "holes_selection": "all",
+                    "total_gross": "80", "differential": "0", "computed_handicap": "", "holes": {},
+                },
+            }
+        }
+        zip_bytes = _make_zip({"rounds/2026.json": json.dumps(rounds_payload)})
+
+        # Must not 500 (ZeroDivisionError) -- a clean 200 import response.
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "export.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+
+        rounds = get_all_rounds(1)
+        assert len(rounds) == 1
+        diff = float(rounds[0].differential)
+        # slope correctly falls back to 113 (no base slope to use):
+        # diff = round((113/113) * (80 - 70), 1) = 10.0 -- sane, not a
+        # ZeroDivisionError and not an absurd inflated value.
+        assert diff == 10.0
+
     def test_import_requires_login(self, test_app):
         client = test_app.test_client()
         resp = client.get("/settings/import", follow_redirects=True)

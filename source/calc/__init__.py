@@ -1,5 +1,6 @@
 from calc.handicap import (
     calc_hole_scores,
+    calc_strokes_given,
     calc_course_handicap,
     calc_playing_handicap,
     WHS_HANDICAP_ALLOWANCES,

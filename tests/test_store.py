@@ -369,6 +369,148 @@ def test_slope_rating_blank_front_falls_through_to_18hole_value():
     assert rating == 70.1
 
 
+def test_slope_rating_blank_values_fall_back_no_crash():
+    """WHS R13 follow-up: blank ("") slope/rating is explicitly allowed by
+    routes/courses.py:_coerce_course_numerics ("Blank/missing values are
+    left as-is"). `get_slope_rating` previously did
+    `float(tee_data.get("slope", 113))` directly -- since the key IS
+    present (just blank), the default never applied and float("") raised
+    ValueError, crashing every round-save / differential-calc call site
+    (rounds, matches, dashboard, settings). Assert blank falls back to the
+    sane default instead of crashing.
+    """
+    slope, rating = get_slope_rating({"slope": "", "rating": ""}, "all")
+    assert (slope, rating) == (113, 72.0)
+
+    slope, rating = get_slope_rating(
+        {"slope": "", "rating": "", "front_slope": "", "front_rating": ""}, "front"
+    )
+    assert (slope, rating) == (113, 72.0)
+
+    # Real (non-blank) base slope/rating still used when front_/back_
+    # variants are blank -- blank must fall back to the base field, not
+    # skip straight to the hardcoded default.
+    slope, rating = get_slope_rating(
+        {"slope": 131, "rating": 76.0, "back_slope": "", "back_rating": ""}, "back"
+    )
+    assert (slope, rating) == (131, 76.0)
+
+
+def test_slope_rating_zero_slope_never_returned():
+    """CV-001 (Critical): "0" is NOT blank -- it parses to a real float, but
+    slope=0 is domain-invalid (calc_round_dif divides `113 / tee_slope`,
+    a ZeroDivisionError -> 500 at round-save time). `get_slope_rating`
+    must never return a slope <= 0; a literal "0" (or negative) slope
+    falls back the same as a missing/blank one.
+    """
+    slope, rating = get_slope_rating({"slope": "0", "rating": "70"}, "all")
+    assert slope != 0
+    assert slope == 113  # no base slope to fall back to -> hardcoded default
+    assert rating == 70.0  # rating itself was valid, untouched
+
+    slope, rating = get_slope_rating({"slope": "-5", "rating": "70"}, "all")
+    assert slope > 0
+    assert slope == 113
+
+    # front_slope "0" must fall back to the (valid) base slope, not to 0.
+    slope, rating = get_slope_rating({"slope": "125", "front_slope": "0", "rating": "70"}, "front")
+    assert slope == 125
+
+
+def test_slope_rating_zero_rating_never_returned():
+    """DA-001 (Major): a rating of 0 poisons the Score Differential
+    (`adjusted_gross_score - tee_rating` is hugely inflated when rating
+    collapses to 0), corrupting the WHS Rule 5.2 Handicap Index -- not
+    just a display stat. `get_slope_rating` must never return a rating
+    <= 0.
+    """
+    slope, rating = get_slope_rating({"slope": "125", "rating": "0"}, "all")
+    assert rating != 0
+    assert rating == 72.0  # no base rating to fall back to -> hardcoded default
+
+    # front_rating "0" must fall back to the (valid) base rating, not to 0.
+    slope, rating = get_slope_rating({"slope": "125", "rating": "76.0", "front_rating": "0"}, "front")
+    assert rating == 76.0
+
+
+def test_recompute_handicaps_rating_zero_tee_does_not_poison_differential(db):
+    """DA-001 end-to-end: a round played on a rating="0" tee must not
+    produce an absurdly inflated Score Differential during
+    recompute_handicaps_for_user -- get_slope_rating's rating<=0 fallback
+    (-> base rating, else 72.0) must be honored by the recompute path
+    (store.py:~413), not just by callers that re-derive slope/rating
+    independently.
+    """
+    from store import create_user, save_course, save_round, recompute_handicaps_for_user, get_all_rounds
+
+    user = create_user("recomputeuser", "Recompute User", "pass1234")
+    course = {
+        "location": {},
+        "tees": {"White": {"yardage": "6000", "rating": "0", "slope": "125"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": "72",
+    }
+    save_course(course, "ZeroRatingGC")
+    golf_round = {
+        "date": "2026-01-01",
+        "course": "ZeroRatingGC",
+        "tees": "White",
+        "holes_played": "18",
+        "holes_selection": "all",
+        "total_gross": "80",
+        "differential": "0",
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=user["id"])
+    recompute_handicaps_for_user(user["id"])
+    rounds = get_all_rounds(user_id=user["id"])
+    diff = float(rounds[0].differential)
+    # With rating correctly falling back to 72.0 (no base rating to use):
+    # diff = round((113/125) * (80 - 72), 1) = 7.2 -- nowhere near the
+    # absurd ~72-strokes-inflated value rating=0 would have produced
+    # (round((113/125) * (80 - 0), 1) == 72.3).
+    assert 0 < diff < 20
+
+
+def test_recompute_handicaps_slope_zero_tee_does_not_crash_or_poison_differential(db):
+    """CV-001 end-to-end: `recompute_handicaps_for_user` (store.py:~412-413)
+    inlines the same `113 / tee_slope` division as `calc_round_dif`
+    directly (it does NOT call `calc_round_dif`), so a slope="0" tee is
+    just as capable of raising ZeroDivisionError there as at round-save
+    time. This is safe ONLY because `get_slope_rating` (called
+    immediately before the division, line ~412) already applies
+    `safe_positive_float` and never returns slope<=0 -- prove it: no
+    exception, and a sane (not ZeroDivisionError-adjacent-absurd)
+    differential, mirroring the rating=0 recompute test above.
+    """
+    from store import create_user, save_course, save_round, recompute_handicaps_for_user, get_all_rounds
+
+    user = create_user("reslopeuser", "Recompute Slope User", "pass1234")
+    course = {
+        "location": {},
+        "tees": {"White": {"yardage": "6000", "rating": "70", "slope": "0"}},
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "par": "72",
+    }
+    save_course(course, "ZeroSlopeGC")
+    golf_round = {
+        "date": "2026-01-01",
+        "course": "ZeroSlopeGC",
+        "tees": "White",
+        "holes_played": "18",
+        "holes_selection": "all",
+        "total_gross": "80",
+        "differential": "0",
+    }
+    save_round(golf_round, "2026-01-01", 0, user_id=user["id"])
+    # Must not raise ZeroDivisionError.
+    recompute_handicaps_for_user(user["id"])
+    rounds = get_all_rounds(user_id=user["id"])
+    diff = float(rounds[0].differential)
+    # With slope correctly falling back to 113 (no base slope to use):
+    # diff = round((113/113) * (80 - 70), 1) = 10.0.
+    assert diff == 10.0
+
+
 def test_draft_save_load_clear(db):
     draft = {"step": 1, "course": "test"}
     save_course_draft(draft, user_id=1)
