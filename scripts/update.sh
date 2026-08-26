@@ -8,7 +8,7 @@ cd "$DIR"
 git pull
 
 # Install core dependencies (new deps land here, e.g. flask-talisman #105)
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt
 
 # Update plugin sub-repos
 for plugin in "$DIR"/plugins/*/; do
