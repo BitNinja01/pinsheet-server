@@ -7,6 +7,9 @@ sudo systemctl stop "$SVC"
 cd "$DIR"
 git pull
 
+# Install core dependencies (new deps land here, e.g. flask-talisman #105)
+pip install -r requirements.txt --quiet
+
 # Update plugin sub-repos
 for plugin in "$DIR"/plugins/*/; do
     name="$(basename "$plugin")"
