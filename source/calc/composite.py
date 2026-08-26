@@ -25,10 +25,13 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
     (empty, or the "0" exclusion sentinel) are skipped when scanning for the
     two most recent held values.
 
-    Falls back to a fresh raw `calc_handicap_index()` call ONLY when NO
-    round in `rounds` has an established HI yet (WHS Rule 5.2
-    pre-establishment, e.g. fewer than 3 eligible scores) -- there is
-    nothing capped/stored to diverge from in that case.
+    When no round has an established HI yet (WHS Rule 5.2 pre-establishment,
+    e.g. fewer than 3 eligible scores) returns (None, None) -- there is no
+    Handicap Index to show. No fresh raw `calc_handicap_index()` fallback:
+    the stored `computed_handicap` written by `recompute_handicaps_for_user`
+    is the single source of truth for every displayed HI, and a raw
+    recalculation would return None in that same pre-establishment case
+    anyway while risking divergence from the capped/ESR-adjusted value.
     """
     found = []
     for r in rounds:
@@ -41,24 +44,8 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
         if len(found) >= 2:
             break
 
-    if found:
-        current = found[0]
-        previous = found[1] if len(found) >= 2 else None
-        return current, previous
-
-    from calc.handicap import calc_handicap_index, WHS_MAX_HANDICAP_INDEX
-    # WHS Rule 5.3: calc_handicap_index returns the raw, unclamped Rule
-    # 5.2/5.2a value (the 54.0 maximum is applied as the FINAL step at
-    # displayed-value sites, after any Rule 5.8 cap -- see that function's
-    # docstring). This IS a displayed value (the dashboard hero "Handicap"
-    # panel), so clamp both the current and previous fallback values here.
-    # No lower clamp -- plus/negative Handicap Indexes are preserved.
-    current = calc_handicap_index(rounds, include_9hole)
-    previous = calc_handicap_index(rounds[1:], include_9hole)
-    if current is not None:
-        current = min(current, WHS_MAX_HANDICAP_INDEX)
-    if previous is not None:
-        previous = min(previous, WHS_MAX_HANDICAP_INDEX)
+    current = found[0] if found else None
+    previous = found[1] if len(found) >= 2 else None
     return current, previous
 
 
