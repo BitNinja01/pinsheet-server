@@ -1,6 +1,7 @@
 from datetime import date
 from flask import render_template, request, redirect, url_for, g
 from flask_login import login_required, current_user
+from auth_keys import require_permission
 from store import (
     create_match, add_match_player, get_match, get_match_players,
     get_match_rounds, get_round_by_id, get_users, get_all_rounds,
@@ -197,8 +198,11 @@ def register_matches_routes(app):
             is_participant=is_participant, format_label=_format_label(match),
         ))
 
+    # Linking mutates a round's match association + net score — a round write,
+    # so gate it on rounds:write like the other round mutations.
     @app.route("/matches/<int:match_id>/link-round", methods=["GET", "POST"])
     @login_required
+    @require_permission("rounds:write")
     def match_link_round(match_id):
         match = get_match(match_id)
         if not match:
