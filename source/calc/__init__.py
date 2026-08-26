@@ -116,6 +116,7 @@ from calc.seasons import (
 from calc.composite import (
     compute_stat_bundle,
     StatBundle,
+    stat_arrow,
     last_n_rounds,
     best_n_rounds,
     current_and_previous_handicap_index,

@@ -8,7 +8,7 @@ from store import get_user_by_id, save_settings, get_slope_rating, get_all_match
 from calc import (
     calc_last_year_handicap, get_best_n_rounds,
     calc_handicap_values_in_range, calc_career_low_handicap,
-    compute_stat_bundle, StatBundle, last_n_rounds, best_n_rounds,
+    compute_stat_bundle, StatBundle, stat_arrow, last_n_rounds, best_n_rounds,
     calc_course_handicap,
     compute_rankings, compute_board_meta, STAT_META, BOARD_STATS,
     WHS_HANDICAP_WINDOW,
@@ -148,11 +148,17 @@ def _build_profile_context():
             "higher_better": p.higher_better,
             "color": p.color,
             "blank_text": p.blank_text,
+            "delta": stat_arrow(p.value, p.secondary, p.higher_better, p.suffix),
         }
 
     last_year_hi = calc_last_year_handicap(rounds, include_9hole)
+    hcp_1y_delta = None
     if last_year_hi is not None:
         panels["handicap"]["subtitle"] = f"1y {last_year_hi:.1f}"
+        hcp_panel = bundle.panels["handicap"]
+        hcp_1y_delta = stat_arrow(
+            hcp_panel.value, last_year_hi, hcp_panel.higher_better, hcp_panel.suffix
+        )
 
     rounds_data = []
     for r in all_rounds[:20]:
@@ -310,7 +316,7 @@ def _build_profile_context():
 
     return {
         "panels": panels, "rounds": rounds_data,
-        "last_year_hi": last_year_hi,
+        "last_year_hi": last_year_hi, "hcp_1y_delta": hcp_1y_delta,
         "season_label": season_label,
         "hi_movement": hi_movement, "career_low": career_low, "hi_insight": hi_insight,
         "chart": chart, "chart_data_json": chart_data_json,
