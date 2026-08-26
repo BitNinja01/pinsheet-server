@@ -37,30 +37,35 @@ them one at a time.
 
 ### 1. Record-by-exception shorthand: capturing only the misses
 
-The most distinctive data-entry decision is that the five per-hole stats are
-recorded *by exception*. As `docs/STATS.md` states directly, "only misses are
-written down, blanks are hits." A blank fairway cell means the fairway was hit; a
-blank green-in-regulation (GIR) cell means the green was hit in regulation. You
-only write a code — `L`, `R`, `OBL`, `S`, `LO`, and so on — when something went
-wrong, and the code carries the *direction* of the miss, not merely its
-occurrence.
+The most distinctive data decision is that the five per-hole stats follow the
+paper scorecard's *record-by-exception* convention — on paper, only misses are
+written down and blanks mean hits. The app splits that convention across two
+layers. **The calculation layer keeps the by-exception semantics**: a blank
+stored value is a positive signal, and reading that code is the clearest way to
+understand the design intent. In `source/calc/approach.py`, `calc_fir_percent`
+counts a fairway as hit when `not h.fairway or h.fairway == "H"` — that is, an
+empty value is treated identically to an explicit "hit" marker. The same
+pattern recurs in `calc_gir_percent` and across the calc package (`approach.py`,
+`scoring.py`). Absence is not missing data; absence is a positive signal.
 
-This convention is visible throughout the calculation layer, and reading that
-code is the clearest way to understand the design intent. In
-`source/calc/approach.py`, `calc_fir_percent` counts a fairway as hit when
-`not h.fairway or h.fairway == "H"` — that is, an empty value is treated
-identically to an explicit "hit" marker. The same pattern recurs in
-`calc_gir_percent` and across `source/calc/scoring.py`. Absence is not missing
-data; absence is a positive signal.
+**The entry layer does not** work by exception. The round-entry shorthand
+requires an explicit code for fairway and GIR on every hole — `H` for a hit,
+`N` for not-applicable, a direction code for a miss — and a blank fails
+client-side validation (`validateShorthand` in `source/web/static/app.js`).
+You write a code on every hole, not only on misses; the code either confirms
+the hit or carries the *direction* of the miss, not merely its occurrence.
 
-**What this optimizes for.** The implementation strongly suggests the goal is
-fast, low-friction transcription of a paper scorecard — a golfer copying a round
-into the app writes almost nothing for a well-played hole. On a good round the
-fairway and GIR columns are mostly empty, so entry collapses to scores and putts.
-This is a sound fit for the "analogue golf" premise: the scorecard is the source
-of truth, and the app's job is to ingest it quickly. (The precise motivation is
-not documented in a design note in the repo, so this reading is inferred from the
-data model and the calculation code, not from recorded intent.)
+**What this optimizes for.** The split buys two things at once. The
+by-exception *interpretation* keeps the data model faithful to the paper source
+of truth: a fairway cell holding a miss code is exactly what the golfer wrote
+on the card, and `N` carves out "not applicable" from the overloaded meaning of
+blank. This is a sound fit for the "analogue golf" premise: the scorecard is
+the source of truth, and the app's job is to ingest it faithfully. (The precise
+motivation is not documented in a design note in the repo, so this reading is
+inferred from the data model and the calculation code, not from recorded
+intent.) The trade-off of that faithfulness is that entry is not "type scores
+and putts only": every hole's fairway and GIR get an explicit code, so even a
+well-played round means typing `H H` on most holes.
 
 Encoding the miss *direction* in the same cell is a second, subtler win. Because
 a miss code already distinguishes left from right, short from long, in-bounds from
@@ -68,18 +73,21 @@ out-of-bounds, the shorthand does double duty: it is both the "did you hit it"
 flag and the raw material for the miss-tendency and scrambling-by-direction stats
 in `docs/STATS.md`. One character on paper becomes several derived metrics.
 
-**What it costs.** The convention trades explicitness for speed, and that has real
-consequences. A blank cell is structurally indistinguishable from a cell the user
-simply forgot to fill in — the system cannot tell "hit the fairway" from "didn't
-record the fairway," because both are the empty string. The code leans into this
-by *defining* blank as hit rather than trying to detect the ambiguity, which is
-the only internally-consistent choice available, but it means the accuracy of the
-"positive" stats rests entirely on disciplined data entry. There is also a
-sentinel-value cost: par-3 fairways and non-applicable cells need an explicit `N`
-code (see the `h.fairway == "N"` and `gir == "N"` guards in
-`source/calc/scoring.py` and `approach.py`) precisely because blank is already
-taken to mean "hit." The scheme spends a special value to carve out
-"not-applicable" from the overloaded meaning of emptiness.
+**What it costs.** The by-exception interpretation trades explicit storage for
+an economical notation, and that has real consequences. At the data layer, a
+blank cell is structurally indistinguishable from a cell the user simply forgot
+to fill in — the system cannot tell "hit the fairway" from "didn't record the
+fairway," because both are the empty string. The code leans into this by
+*defining* blank as hit rather than trying to detect the ambiguity, which is the
+only internally-consistent choice available, but it means the accuracy of the
+"positive" stats rests entirely on disciplined data entry — and the entry
+layer's explicit-code requirement (`H`/`N`/direction) is what makes that
+discipline enforceable at the point of input. There is also a sentinel-value
+cost: par-3 fairways and non-applicable cells need an explicit `N` code (see
+the `h.fairway == "N"` and `gir == "N"` guards in `source/calc/approach.py`)
+precisely because blank is already taken to mean "hit." The scheme spends a
+special value to carve out "not-applicable" from the overloaded meaning of
+emptiness.
 
 ### 2. The WHS handicap index: why best-8-of-20, and why all the extra rules
 
@@ -299,9 +307,8 @@ first-layer convenience decision, not something the convention gave for free.
 ### 6. Multi-user with read-only enforcement
 
 PinSheet is multi-user in an asymmetric way that is easy to misread. Any logged-in
-golfer can *view* any other golfer's dashboard, stats, and rounds — the README
-describes the `?user=` view switcher, and the leaderboard code in
-`source/routes/dashboard.py` freely reads other users' rounds via
+golfer can *view* aggregated numbers from every other golfer — the leaderboard
+code in `source/routes/dashboard.py` freely reads other users' rounds via
 `get_all_rounds(uid)` to build shared standings and challenge tables. Viewing is
 communal. Writing is not.
 

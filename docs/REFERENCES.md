@@ -38,9 +38,10 @@ The Handicap Index math in this repo (best-8-of-last-20 differentials, Course Ha
 | Jinja2 (3.1.x) | https://jinja.palletsprojects.com/ | Verified (fetch) |
 | Waitress (3.0.x) | https://docs.pylonsproject.org/projects/waitress/en/stable/ | Verified (fetch) |
 | bcrypt | https://pypi.org/project/bcrypt/ | Verified (fetch) |
-| Flask-Login (0.7.x) | https://flask-login.readthedocs.io/en/latest/ | Verified (fetch) |
+| Flask-Login (0.6.x) | https://flask-login.readthedocs.io/en/latest/ | Verified (fetch) |
 | Flask-WTF (1.2.x) | https://flask-wtf.readthedocs.io/en/1.2.x/ | Verified (fetch) |
 | Flask-Limiter (4.x) | https://flask-limiter.readthedocs.io/en/stable/ | Verified (fetch) |
+| Flask-Talisman (CSP / security headers) | https://pypi.org/project/Flask-Talisman/ | Verified (search) |
 | Chart.js | https://www.chartjs.org/docs/latest/ | Verified (fetch) |
 | Werkzeug (WSGI toolkit, Flask dependency) | https://werkzeug.palletsprojects.com/ | Verified (search) |
 
@@ -72,12 +73,12 @@ Repo-relative paths. Each doc topic maps to the source file(s) that are its grou
 | **Bundled plugins directory** | `plugins/` (drop-in packages) | `docs/PLUGINS.md`, `README.md` (Plugins) |
 | **Auth (login / register / reset / invite codes)** | `source/routes/auth.py`, `source/store.py` (invite/user helpers) | `README.md` (Multi-User) |
 | **CSRF + rate-limiting wiring** | `source/extensions.py` (`init_app`), uses Flask-WTF `CSRFProtect` + Flask-Limiter | `README.md` (Tech Stack) |
-| **API-key permission scaffold** (present, not wired to endpoints) | `source/auth_keys.py` (`@require_permission`) | — |
+| **API-key scope enforcement** | `source/auth_keys.py` (`@require_permission`, wired on rounds/stats/courses routes) | — |
 | **Per-request data caching** | `source/request_data.py` (`get_settings`, `get_courses`, `get_all_rounds_for_user`) | — |
 | **Web routes / blueprints** | `source/routes/*.py` (`admin`, `auth`, `bag`, `courses`, `dashboard`, `matches`, `rounds`, `settings`, `stats`) | — |
 | **Templates (Jinja2)** | `source/web/templates/*.html` | `README.md` (Tech Stack) |
 | **Front-end assets** | `source/web/static/app.css`, `source/web/static/app.js`, `flatpickr.*` | — |
-| **Stat catalog + chart data (Chart.js)** | `source/web/stats/catalog.py`, `source/web/stats/charts.py` | `docs/STATS.md` |
+| **Stat catalog + chart data (Chart.js)** | `source/web/catalog.py`, `source/web/charts.py` | `docs/STATS.md` |
 | **Setup / run / CLI args / server bootstrap** | `source/main.py` (waitress + dev server, `--host/--port/--data`, browser open) | `README.md` (Quick Start, Installation, Run) |
 | **Deployment (systemd) & scripts** | `scripts/install-service.sh`, `scripts/pinsheet.service`, `scripts/update.sh`, `scripts/dist.sh` | `README.md` (Deployment, Updating) |
 | **Dependency pins / project metadata** | `pyproject.toml`, `requirements.txt` | `README.md` (Tech Stack) |
@@ -93,8 +94,8 @@ One line per source of truth: change trigger → files/docs to update.
 - **WHS / Rules of Handicapping change** → update `source/calc/handicap.py` (and `source/calc/composite.py` for trend/current-index), then re-check the Handicap and Trends sections of `docs/STATS.md` and the handicap explanation in `docs/ARCHITECTURE.md`.
 - **User-facing flow / UI labels / routes change** → re-verify `docs/TUTORIAL.md` (it walks a live end-to-end path: register → welcome → add course → enter round → view stats) against the actual `source/routes/*` and templates.
 - **Per-hole shorthand codes change** (fairway/GIR/OB tokens) → update `source/models.py`, `source/calc/analysis.py` (`_OB_CODES`), and round-entry parsing in `source/routes/rounds.py`; then re-check the Per-Hole Stats section of `docs/STATS.md`.
-- **A derived stat is added / renamed / removed** → update the relevant `source/calc/*.py` module and `source/web/stats/catalog.py`; then re-check `docs/STATS.md`.
-- **Dashboard chart added / changed** → update `source/web/stats/charts.py` + templates/`app.js`; then re-check the Trends section of `docs/STATS.md` and the Chart.js note in `README.md`.
+- **A derived stat is added / renamed / removed** → update the relevant `source/calc/*.py` module and `source/web/catalog.py`; then re-check `docs/STATS.md`.
+- **Dashboard chart added / changed** → update `source/web/charts.py` + templates/`app.js`; then re-check the Trends section of `docs/STATS.md` and the Chart.js note in `README.md`.
 - **DB schema / storage layout change** → update `source/database.py` and `source/store.py` (and `source/models.py` if dataclasses change); then re-check the Data Model / Data Storage sections of `docs/STATS.md` and `README.md`.
 - **Plugin API / hooks / contract change** → update `source/plugin_loader.py`, `source/plugin.py`, `source/plugin_api.py`; then re-check `docs/PLUGINS.md`.
 - **Auth / invite-code / rate-limit / CSRF behavior change** → update `source/routes/auth.py`, `source/extensions.py`, `source/store.py`; then re-check the Multi-User and Tech Stack sections of `README.md`.
