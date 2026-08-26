@@ -1,0 +1,91 @@
+# Data Model & Stats Reference
+
+Reference for PinSheet Server's data model and the 50+ derived stats it computes. For setup and usage, see the [README](../README.md).
+
+## Data Model
+
+### Course Data
+
+Courses are entered once via the course entry wizard and referenced by rounds. A course has one or more tee sets:
+
+**Course-level**
+- Name, Location (city, state, country)
+- Per-hole par and handicap index
+
+**Per tee set** (one or more per course)
+- Tee name / color
+- Course rating and slope (18-hole)
+- Front 9 and back 9 rating and slope
+- Per-hole yardage, total yardage
+
+### Per-Hole Stats (Recorded on Scorecard)
+
+Five stats are captured manually each hole. On the paper scorecard you record by exception — only misses are written down, hits left blank. When transcribing into the app, each hole's fairway and GIR take an explicit code (`H` = hit); a blank cell fails validation.
+
+Fairway and GIR share one validated code set: `H` / `L` / `R` / `S` / `LO` / `N` / `OBL` / `OBR` / `OBS` / `OBLO`.
+
+1. **Score** — total strokes for the hole
+2. **Fairway** — `H` hit; miss direction on a miss (`L` / `R`, out-of-bounds `OBL` / `OBR`); `N` = N/A (par 3)
+3. **Green in Regulation (GIR)** — `H` hit; miss direction on a miss (`L` left / `R` right / `S` short / `LO` long, out-of-bounds `OBL` / `OBR` / `OBS` / `OBLO`)
+4. **Putts** — number of putts on the green
+5. **Penalties** — penalty strokes taken on the hole
+
+### Per-Round Metadata
+
+- Date, course and tees played
+- Holes played: full 18, front 9, or back 9
+- Entry mode: hole-by-hole detail or score-only (total gross)
+
+## Derived Stats
+
+### Scoring
+- **Scoring average** — mean score across all rounds (all, last 20, 10, 5)
+- **Scoring average by hole type** — average on par 3s, 4s, and 5s
+- **Score to par per round** — total score minus total par
+- **Par or better %** — percentage of holes where score ≤ par
+- **Score distribution** — % eagle/birdie/par/bogey/double+/triple+
+- **Blow-up rate** — % of holes at quad bogey (+4) or worse
+- **Clean card %** — % of rounds with zero doubles or worse
+- **Consistency** — standard deviation of scoring average
+- **Score components** — strokes above expected from fairway vs rough
+
+### Penalties
+- Avg penalties per round; avg vs par on penalty holes vs clean holes
+- Worst penalty holes (holes with highest avg penalties)
+
+### Fairways
+- **Fairway hit %** — fairways hit / total eligible holes (excludes par 3s)
+- **Miss tendency** — % of misses left vs right
+- **Scoring by fairway result** — avg score when fairway hit vs missed
+- **Scoring by miss side** — avg score missing left vs right
+
+### Greens
+- **GIR %** — greens hit in regulation / total holes
+- **GIR by hole type** — GIR % on par 3s, 4s, 5s
+- **Approach miss direction** — % of misses left / right / short / long
+- **GIR from fairway vs rough** — approach success from fairway vs rough
+- **Scoring by GIR result** — avg score when GIR hit vs missed
+
+### Putting
+- **Putts per round**; **Putts per GIR hole**
+- **1-putt / 2-putt / 3-putt / 4-putt+ %**
+- **Putts by hole type** — avg putts on par 3s, 4s, 5s
+
+### Short Game
+- **Scrambling %** — par or better when GIR missed
+- **Scrambling by miss direction** — up-and-down % by left/right/short/long
+- **Scrambling by hole type**
+
+### Momentum
+- **Next-hole avg after bogey or worse**
+- **Recovery rate** — par or better after double bogey+
+
+### Handicap
+- **Handicap index** — WHS formula: best 8 of last 20 differentials
+- **Course handicap** — index adjusted for specific course/tees
+- **Playing to handicap rate** — % of rounds at or below handicap
+
+### Trends
+- **Rolling averages** (last 5, 10, 20) for: scoring, FIR %, GIR %, putts, scramble %, handicap index
+- **Personal bests** — best gross, best differential, most fairways, most GIR, fewest putts
+- **Best and nemesis holes** — highest/lowest avg vs par
