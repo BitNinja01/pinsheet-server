@@ -682,3 +682,222 @@ def test_live_save_consistent_with_recompute_after_cap(client):
     recomputed = float(get_all_rounds(1)[0].computed_handicap)
 
     assert live_stored == recomputed
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 12 / Rule 3 (Net Double Bogey): live-save vs recompute must agree
+# on the ESC-adjusted Score Differential for a detailed round with a
+# blow-up hole (source/store.py recompute_handicaps_for_user must not fall
+# back to raw total_gross when per-hole data is available).
+# --------------------------------------------------------------------------
+
+def test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole(client):
+    """A detailed round with a blow-up hole (par 5, gross 10, on the
+    HIGHEST-stroke-index hole -- i.e. genuinely "no stroke received" for a
+    bogey-level course handicap) must produce the SAME Score Differential
+    whether it is scored live (POST /api/rounds, which applies the Net
+    Double Bogey/ESC cap inline via calc_adjusted_gross_score) or later
+    reprocessed by recompute_handicaps_for_user (source/store.py). Before
+    the R12 fix, the recompute path derived the differential from raw
+    total_gross and diverged from the live-saved value for any round with a
+    hole over Net Double Bogey.
+
+    A real (non-zero, non-fallback) prior Handicap Index is established
+    first from 3 warm-up rounds, so the blow-up round's course_handicap --
+    and therefore its ESC cap -- comes from an ACTUAL prior HI, exercising
+    the same code path live-entry and recompute both take once a player has
+    playing history (not just the course_handicap==0/no-prior-HI edge
+    case)."""
+    from calc.handicap import calc_handicap_index, calc_course_handicap, calc_adjusted_gross_score, calc_round_dif
+
+    # 3 warm-up score-only rounds (bogey-level golfer, ~90 raw gross on this
+    # par-73 course) establish a real prior Handicap Index.
+    for i in range(3):
+        client.post("/api/rounds", json={
+            "date": f"2026-04-{1 + i:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only",
+            "gross_total": "90", "holes": {}})
+
+    prior_rounds = get_all_rounds(1)  # most-recent-first, the 3 warm-up rounds
+    assert len(prior_rounds) == 3
+
+    # Blow-up hole: gross 10 on hole 18 (par 5, hole_index 18 -- the HIGHEST
+    # stroke index on this course, so the last hole to receive a stroke).
+    gross_map = {n: PARS[n] + 1 for n in PARS}
+    gross_map[18] = 10
+
+    resp = client.post("/api/rounds", json={
+        "date": "2026-04-04", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes(gross_map)})
+    assert resp.status_code == 200
+    live_differential = resp.get_json()["differential"]
+
+    # Independently derive the expected course handicap / ESC-adjusted
+    # differential from the SAME prior record, using the production
+    # functions directly (not by re-reading the app's own output) -- this is
+    # the real-data cross-check, not a tautology.
+    current_hi = calc_handicap_index(prior_rounds, include_9hole=True)
+    assert current_hi is not None
+    course_handicap = calc_course_handicap(current_hi, TOTAL_PAR, 128, 71.5)
+    assert course_handicap < 18, "fixture must NOT award hole 18 a stroke (genuine no-stroke blow-up)"
+
+    raw_total = sum(gross_map[n] for n in PARS)
+    hole_gross = {str(n): {"gross": str(gross_map[n])} for n in PARS}
+    esc_total = calc_adjusted_gross_score(hole_gross, COURSE["holes"], course_handicap)
+    assert esc_total < raw_total, "fixture must actually trigger the Net Double Bogey cap"
+
+    esc_differential = calc_round_dif(128, esc_total, 71.5)
+    raw_differential = calc_round_dif(128, raw_total, 71.5)
+    assert esc_differential != raw_differential
+
+    assert live_differential == esc_differential, (
+        "live path (rounds.py) must apply the Net Double Bogey/ESC cap, not raw total_gross"
+    )
+
+    recompute_handicaps_for_user(1)
+    recomputed = get_all_rounds(1)[0]
+    assert float(recomputed.differential) == live_differential, (
+        f"recompute produced {recomputed.differential!r} but live-save "
+        f"produced {live_differential!r} for the SAME round -- WHS Rule 3 "
+        f"(Net Double Bogey) / Rule 12 violation. (raw-total_gross formula "
+        f"would have given {raw_differential!r})"
+    )
+    assert float(recomputed.differential) != raw_differential
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 12 path-agreement — live-save == recompute regardless of the
+# player's HI state (regression guards for the two divergences the C4
+# adversary gate surfaced: new-player pre-establishment, and cap/ESR active).
+# --------------------------------------------------------------------------
+
+def test_esc_live_equals_recompute_new_player_first_detailed_round(client):
+    """A brand-new player's very first detailed round (no HI established yet)
+    must get the same ESC-adjusted differential from live-save as from a
+    recompute pass. Pre-fix, live skipped ESC (raw gross) while recompute
+    applied it with course_handicap=0 -> divergence."""
+    blow = {18: 10}  # par-5 hole 18, big blow-up -> Net Double Bogey caps it
+    resp = client.post("/api/rounds", json={
+        "date": "2026-08-01", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes(blow)})
+    live = resp.get_json()["differential"]
+    recompute_handicaps_for_user(1)
+    stored = _rounds_on("2026-08-01")[0].differential
+    assert str(live) == str(stored)
+    # non-vacuous: the blow-up hole was actually capped (ESC < raw)
+    raw_total = sum(int(h["gross"]) for h in _holes(blow).values())
+    assert float(live) < round((113 / 128) * (raw_total - 71.5), 1)
+
+
+def test_esc_live_equals_recompute_when_cap_active(client):
+    """With a Rule 5.8 cap active, the ESC course handicap must come from the
+    displayed (capped) HI on both paths. Pre-fix, live used a fresh raw
+    calc_handicap_index (uncapped) -> divergence once the cap bit."""
+    for i in range(20):
+        client.post("/api/rounds", json={
+            "date": f"2025-{(i // 28) + 1:02d}-{(i % 28) + 1:02d}",
+            "course": "Test GC", "tees": "White", "holes_played": "18",
+            "entry_mode": "score_only", "gross_total": "79", "holes": {}})
+    client.post("/api/rounds", json={  # spike to trigger the cap
+        "date": "2025-12-15", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only", "gross_total": "115", "holes": {}})
+    resp = client.post("/api/rounds", json={
+        "date": "2026-08-02", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    live = resp.get_json()["differential"]
+    recompute_handicaps_for_user(1)
+    stored = _rounds_on("2026-08-02")[0].differential
+    assert str(live) == str(stored)
+
+
+def test_esc_live_equals_recompute_backdated_round(client):
+    """A backdated detailed round (dated BEFORE existing rounds) must use the
+    HI in effect at ITS date, not a later round's HI. Regression for the
+    date-ordering bug: _prior_displayed_hi must filter to strictly-prior rounds."""
+    for i in range(5):  # establish some 2026-03 history
+        client.post("/api/rounds", json={
+            "date": f"2026-03-{i + 1:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only", "gross_total": "80", "holes": {}})
+    resp = client.post("/api/rounds", json={  # backdated to January
+        "date": "2026-01-15", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    live = resp.get_json()["differential"]
+    recompute_handicaps_for_user(1)
+    stored = _rounds_on("2026-01-15")[0].differential
+    assert str(live) == str(stored)
+
+
+def test_esc_live_equals_recompute_on_edit_put(client):
+    """Editing a detailed round (PUT) must produce the same ESC differential a
+    recompute would -- PUT uses the same prior-displayed-HI basis as POST."""
+    for i in range(4):
+        client.post("/api/rounds", json={
+            "date": f"2026-06-{i + 1:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only", "gross_total": "82", "holes": {}})
+    client.post("/api/rounds", json={
+        "date": "2026-06-10", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes()})
+    # edit it to add a blow-up hole
+    resp = client.put("/api/rounds/2026-06-10/0", json={
+        "date": "2026-06-10", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    assert resp.status_code == 200
+    live = _rounds_on("2026-06-10")[0].differential
+    recompute_handicaps_for_user(1)
+    stored = _rounds_on("2026-06-10")[0].differential
+    assert str(live) == str(stored)
+
+
+def test_esc_live_equals_recompute_same_date_index_gap(client):
+    """next_round_index gap-fills the lowest free slot, so a same-date round can
+    reuse a freed LOWER index than an existing sibling. The ESC prior-HI basis
+    must use the round's TRUE index (not a sentinel that assumes append), so
+    live == recompute. Regression for the same-date index-gap divergence."""
+    for i in range(4):  # establish HI
+        client.post("/api/rounds", json={
+            "date": f"2026-09-{i + 1:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only", "gross_total": "81", "holes": {}})
+    # two rounds on the same date D: indices 0 and 1
+    client.post("/api/rounds", json={"date": "2026-09-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only", "gross_total": "80", "holes": {}})
+    client.post("/api/rounds", json={"date": "2026-09-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only", "gross_total": "84", "holes": {}})
+    # delete index 0 -> frees the lower slot
+    client.delete("/api/rounds/2026-09-20/0")
+    # new detailed round on D reuses freed index 0 (lower than sibling index 1)
+    resp = client.post("/api/rounds", json={"date": "2026-09-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    assert resp.status_code == 200
+    live = _rounds_on("2026-09-20")[0].differential if _rounds_on("2026-09-20")[0].index == 0 \
+        else [r for r in _rounds_on("2026-09-20") if r.index == 0][0].differential
+    recompute_handicaps_for_user(1)
+    stored = [r for r in _rounds_on("2026-09-20") if r.index == 0][0].differential
+    assert str(live) == str(stored)
+
+
+def test_esc_live_equals_recompute_put_date_change_index_gap(client):
+    """PUT that MOVES a detailed round onto a date with a freed/gapped lower
+    index must use the round's real target slot for the ESC prior-HI basis, so
+    live == recompute. Covers the PUT + date-change + index-gap combination."""
+    for i in range(4):  # establish HI
+        client.post("/api/rounds", json={
+            "date": f"2026-10-{i + 1:02d}", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "score_only", "gross_total": "83", "holes": {}})
+    # target date D with two rounds (0,1), then free index 0
+    client.post("/api/rounds", json={"date": "2026-10-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only", "gross_total": "80", "holes": {}})
+    client.post("/api/rounds", json={"date": "2026-10-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "score_only", "gross_total": "85", "holes": {}})
+    client.delete("/api/rounds/2026-10-20/0")
+    # a detailed round on a DIFFERENT date, then move it onto D (lands on freed idx 0)
+    client.post("/api/rounds", json={"date": "2026-10-25", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    resp = client.put("/api/rounds/2026-10-25/0", json={
+        "date": "2026-10-20", "course": "Test GC", "tees": "White",
+        "holes_played": "18", "entry_mode": "detailed", "holes": _holes({18: 10})})
+    assert resp.status_code == 200
+    moved = [r for r in _rounds_on("2026-10-20") if r.entry_mode == "detailed"][0]
+    live = moved.differential
+    recompute_handicaps_for_user(1)
+    stored = [r for r in _rounds_on("2026-10-20") if r.entry_mode == "detailed"][0].differential
+    assert str(live) == str(stored)

@@ -1,8 +1,13 @@
 from calc.handicap import (
     calc_hole_scores,
     calc_course_handicap,
+    calc_playing_handicap,
+    WHS_HANDICAP_ALLOWANCES,
     calc_round_dif,
+    calc_adjusted_gross_score,
+    round_half_up,
     calc_expected_9hole_dif,
+    calc_9hole_dif,
     count_table_n,
     calc_effective_diffs,
     get_best_n_rounds,

@@ -9,14 +9,14 @@ from store import (
     load_round_draft, save_round_draft, clear_round_draft,
     load_course_draft, save_course_draft, clear_course_draft,
     get_slope_rating, save_round, update_round, delete_round,
-    get_matches_for_user, link_round,
+    get_matches_for_user, link_round, get_match,
     recompute_all_handicaps,
     recompute_handicaps_for_user,
     set_round_excluded,
     next_round_index,
 )
 from calc import (
-    calc_round_dif, calc_handicap_index, calc_round_vs_par,
+    calc_round_dif, round_half_up, calc_handicap_index, calc_round_vs_par,
     calc_avg_vs_par, calc_round_vs_rating, calc_avg_vs_rating,
     calc_par_or_better_percent, calc_big_number_rate, calc_fir_percent,
     calc_gir_percent, calc_putts_per_round, calc_one_putt_percent,
@@ -25,14 +25,17 @@ from calc import (
     calc_scoring_average,
     get_best_n_rounds, last_n_rounds,
     calc_course_handicap,
+    calc_adjusted_gross_score,
+    calc_playing_handicap,
     calc_hole_scores,
+    calc_9hole_dif,
     WHS_HANDICAP_WINDOW,
     WHS_MAX_HANDICAP_INDEX,
     current_and_previous_handicap_index,
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
-from source.models import dict_to_round, dict_to_course
+from source.models import dict_to_round, dict_to_course, clamp_pcc, effective_pcc
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 
@@ -55,6 +58,45 @@ def _safe_int(val, default=0):
         return default
 
 
+def _prior_displayed_hi_or_none(rounds, before_date: str, before_index) -> float | None:
+    """The Handicap Index IN EFFECT for a round dated `before_date`/`before_index`
+    = the most recent CHRONOLOGICALLY-PRIOR round's DISPLAYED (Rule 5.8-capped /
+    5.9-ESR-adjusted) Handicap Index, i.e. its stored computed_handicap. Returns
+    None when none is established yet.
+
+    Mirrors recompute_handicaps_for_user's `prior_displayed[-1]` so the ESC
+    (Rule 3 / Rule 12) adjusted gross and the 9-hole differential combine are
+    computed on the same basis regardless of entry path. `rounds` is
+    most-recent-first (date DESC, index DESC), so the first entry that is
+    strictly before (before_date, before_index) AND carries a real
+    computed_handicap is the correct in-effect HI. Filtering by date is
+    essential: a BACKDATED round must not take a chronologically-later round's HI
+    as its "prior" (that would diverge from a full recompute).
+    """
+    bidx = _safe_int(before_index, -1)
+    for r in rounds:
+        r_idx = _safe_int(getattr(r, "index", -1), -1)
+        is_prior = r.date < before_date or (r.date == before_date and r_idx < bidx)
+        if not is_prior:
+            continue
+        ch = getattr(r, "computed_handicap", None)
+        if ch and ch not in ("0", ""):
+            try:
+                return float(ch)
+            except (ValueError, TypeError):
+                continue
+    return None
+
+
+def _prior_displayed_hi(rounds, before_date: str, before_index) -> float:
+    """0.0-collapsed variant of `_prior_displayed_hi_or_none`: the ESC
+    (Rule 3 / Rule 12) path derives the course handicap from HI 0.0 when no
+    prior displayed Handicap Index exists yet, so this returns 0.0 (not None)
+    in that case. Preserves the exact float contract for `adj_hi = hi_before / 2`."""
+    hi = _prior_displayed_hi_or_none(rounds, before_date, before_index)
+    return 0.0 if hi is None else hi
+
+
 def _scored_hole_count(holes):
     """Number of holes with a real (positive) gross entered."""
     return sum(1 for h in holes.values() if _safe_int(h.get("gross"), 0) > 0)
@@ -65,6 +107,30 @@ def _expected_hole_count(course, holes_sel):
     if holes_sel == "all":
         return len(course.get("holes", {})) or 18
     return 9
+
+
+MAX_HOLE_GROSS = 20  # sane per-hole ceiling (issue #80, CWE-20)
+
+
+def _sanitize_scores(data, course, holes_sel):
+    """Clamp score fields in place so a crafted or buggy client can't poison the
+    submitter's handicap with negative or absurd scores (issue #80, CWE-20).
+
+    Consistent with the app's lenient contract (malformed input must not 500):
+    non-numeric/blank gross stays unscored via _safe_int's 0 fallback rather
+    than erroring. Per-hole gross is clamped to [0, MAX_HOLE_GROSS]; a
+    score-only total is clamped to [0, MAX_HOLE_GROSS * holes_played].
+    """
+    for hole in (data.get("holes") or {}).values():
+        raw = hole.get("gross", "")
+        if raw in (None, ""):
+            continue
+        hole["gross"] = str(max(0, min(_safe_int(raw, 0), MAX_HOLE_GROSS)))
+    if data.get("entry_mode") == "score_only":
+        raw_total = data.get("gross_total", "")
+        if raw_total not in (None, ""):
+            max_total = MAX_HOLE_GROSS * _expected_hole_count(course, holes_sel)
+            data["gross_total"] = str(max(0, min(_safe_int(raw_total, 0), max_total)))
 
 
 def register_rounds_routes(app, csrf):
@@ -233,6 +299,16 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        _sanitize_scores(data, course, holes_sel)
+
+        # WHS Rule 5.6 / 5.1a: PCC (Playing Conditions Calculation) is an
+        # OPTIONAL per-round input (a single-user app can't compute the
+        # handicap authority's field-wide PCC itself) -- default 0.0 (no
+        # adjustment, current/prior behavior) if omitted, clamped to
+        # [-1.0, +3.0] (WHS Rule 5.6's own bound) if provided, non-numeric
+        # input defaults to 0.0. See clamp_pcc for the full contract.
+        pcc = clamp_pcc(data.get("pcc", 0))
+
         golf_round = {
             "date": date_val,
             "course": course_name,
@@ -244,6 +320,7 @@ def register_rounds_routes(app, csrf):
             "notes": data.get("notes", ""),
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
+            "pcc": pcc,
         }
 
         total_gross = 0
@@ -268,46 +345,60 @@ def register_rounds_routes(app, csrf):
         skip_differential = incomplete or no_score
 
         all_rounds_for_user = get_all_rounds_for_user()
+        # The index this round WILL occupy (next_round_index gap-fills the lowest
+        # free slot, so it is NOT necessarily the highest for its date) -- needed
+        # up-front so the ESC prior-HI basis uses the round's true chronological
+        # position among same-date rounds.
+        index = next_round_index(date_val, current_user.id)
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
-            # get_all_rounds_for_user() is most-recent-first -- satisfies
-            # calc_handicap_index's WHS Rule 5.2 ordering contract.
-            current_hi = calc_handicap_index(all_rounds_for_user, get_settings().get("include_9hole", True))
-            # WHS Rule 5.3: Course Handicap (Rule 6.1) derives from the
-            # issued Handicap Index, so clamp the raw calc_handicap_index()
-            # value to the 54.0 maximum before it feeds calc_course_handicap
-            # (no lower clamp).
-            if current_hi is not None:
-                current_hi = min(current_hi, WHS_MAX_HANDICAP_INDEX)
-                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
-                course_holes = course.get("holes", {})
-                if holes_sel != "all" and course_holes:
-                    hole_nums = sorted(course_holes.keys(), key=int)
-                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
-                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
-                else:
-                    played_par = int(course.get("par", 0))
-                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                adjusted_total = 0
-                for hole_num, hole_data in data["holes"].items():
-                    hc_hole = course_holes.get(hole_num, {})
-                    if hc_hole:
-                        par = int(hc_hole.get("par", 0))
-                        stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = _safe_int(hole_data.get("gross"), 0)
-                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
-                        adjusted_total += esc_gross
-                    else:
-                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
-                adjusted_gross = adjusted_total
+            # WHS Rule 3 (Net Double Bogey) / Rule 12: the ESC-adjusted gross
+            # (and hence the Score Differential) must be identical regardless of
+            # entry path. Derive the ESC course handicap from the HI IN EFFECT
+            # -- the prior DISPLAYED (Rule 5.8-capped / 5.9-ESR-adjusted)
+            # Handicap Index, i.e. the most recent chronologically-prior round's
+            # stored computed_handicap (0.0 if none established yet) -- exactly
+            # as recompute_handicaps_for_user and the zip-import path do. A fresh
+            # raw calc_handicap_index() here omits the cap/ESR and diverges, and
+            # skipping ESC entirely when no HI exists diverges from the backfill
+            # paths (which apply it with course_handicap derived from HI 0.0).
+            hi_before = _prior_displayed_hi(all_rounds_for_user, date_val, index)
+            adj_hi = hi_before / 2 if holes_sel != "all" else hi_before
+            course_holes = course.get("holes", {})
+            if holes_sel != "all" and course_holes:
+                hole_nums = sorted(course_holes.keys(), key=int)
+                half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+            else:
+                played_par = int(course.get("par", 0))
+            course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         if skip_differential:
             differential = 0.0
             # Exactly "0" is the sentinel that excludes a round from the
             # handicap calc (str(0.0) == "0.0" would NOT be excluded).
             golf_round["differential"] = "0"
+        elif holes_sel != "all":
+            # WHS 9-hole combine: base 9-hole Score Differential plus the
+            # expected 9-hole adjustment keyed on the prior DISPLAYED HI (the
+            # or_none variant -- a None prior means no established HI yet, so
+            # the raw base is used; the 0.0-collapsed `hi_before` above is
+            # NOT the right basis for the combine). WHS Rule 5.1b: only 50%
+            # of the day's PCC applies to a 9-hole score (effective_pcc).
+            differential = calc_9hole_dif(
+                slope, adjusted_gross, rating,
+                _prior_displayed_hi_or_none(all_rounds_for_user, date_val, index),
+                effective_pcc(pcc, holes_sel),
+            )
+            golf_round["differential"] = str(differential)
         else:
-            differential = calc_round_dif(slope, adjusted_gross, rating)
+            # WHS Rule 5.1b: 9-hole scores apply only 50% of the day's PCC --
+            # effective_pcc halves `pcc` when holes_sel != "all" ("front"/
+            # "back"), passes it through unchanged for "all" (18-hole).
+            differential = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential"] = str(differential)
 
         golf_round_typed = dict_to_round(golf_round)
@@ -326,7 +417,7 @@ def register_rounds_routes(app, csrf):
             golf_round["computed_handicap"] = str(new_hi)
             golf_round_typed.computed_handicap = str(new_hi)
 
-        index = next_round_index(date_val, current_user.id)
+        # index computed above (before the ESC block) so both share one value
         round_id = save_round(golf_round, date_val, index, current_user.id)
         fire_hook("on_round_saved", round_data=golf_round, user_id=current_user.id, db_path=app.config["DB_PATH"])
 
@@ -369,7 +460,14 @@ def register_rounds_routes(app, csrf):
                 else:
                     played_par = int(course.get("par", 0))
                 ch = calc_course_handicap(adj_hi, played_par, slope, rating)
-                net = total_gross - ch
+                # WHS Rule 6.2 / Appendix C: reduce to a Playing Handicap
+                # using the match's allowance percent (default 100 -- same
+                # as the pre-Rule-6.2 full-Course-Handicap net) before
+                # subtracting from gross.
+                match = get_match(match_id)
+                allowance = match.get("allowance_percent", 100) if match else 100
+                ph = calc_playing_handicap(ch, allowance)
+                net = total_gross - ph
                 link_round(match_id, current_user.id, round_id, float(net))
             except (ValueError, TypeError, Exception) as exc:
                 _log.warning("match linking failed — %s", exc)
@@ -698,6 +796,18 @@ def register_rounds_routes(app, csrf):
 
         slope, rating = get_slope_rating(tees, holes_sel)
 
+        _sanitize_scores(data, course, holes_sel)
+
+        # WHS Rule 5.6 / 5.1a: same optional/clamped PCC contract as the
+        # POST path (see clamp_pcc), but defaulting to the round's EXISTING
+        # pcc (not 0.0) when the field is omitted entirely -- mirrors the
+        # `excluded` field's default-to-prior-value pattern immediately
+        # below, so an edit made from a form that doesn't surface a PCC
+        # input (e.g. the current round_detail.html quick-edit form) can't
+        # silently wipe a PCC set at creation time. A request that DOES send
+        # "pcc" (including explicit pcc=0) always wins.
+        pcc = clamp_pcc(data.get("pcc", old_round.pcc))
+
         golf_round = {
             "date": new_date,
             "course": course_name,
@@ -710,6 +820,7 @@ def register_rounds_routes(app, csrf):
             "holes": data.get("holes", {}),
             "gross_total": data.get("gross_total", ""),
             "excluded": data.get("excluded", old_round.excluded),
+            "pcc": pcc,
         }
 
         total_gross = 0
@@ -728,41 +839,36 @@ def register_rounds_routes(app, csrf):
         )
         skip_differential = incomplete or total_gross <= 0
 
+        # The prior-round scan for this round, shared by the ESC block below
+        # (detailed rounds only) and the 9-hole differential combine -- the
+        # round being edited is excluded so it can't act as its own "prior".
+        rounds_before = [
+            r for r in all_rounds_for_user
+            if not (r.date == date and str(r.index) == str(index))
+        ]
+        # Chronological position: same index when the date is unchanged;
+        # a date change relocates the round to the slot next_round_index will
+        # assign on the new date (lowest free, not necessarily the end).
+        before_idx = _safe_int(index, 0) if new_date == date else next_round_index(new_date, current_user.id)
+
         adjusted_gross = total_gross
         if data.get("entry_mode") != "score_only" and data.get("holes"):
-            rounds_before = [
-                r for r in all_rounds_for_user
-                if not (r.date == date and str(r.index) == str(index))
-            ]
-            # Filter preserves all_rounds_for_user's most-recent-first order
-            # (WHS ordering contract).
-            current_hi = calc_handicap_index(rounds_before, get_settings().get("include_9hole", True))
-            # WHS Rule 5.3: Course Handicap derives from the issued
-            # Handicap Index -- clamp the raw value before it feeds
-            # calc_course_handicap (no lower clamp).
-            if current_hi is not None:
-                current_hi = min(current_hi, WHS_MAX_HANDICAP_INDEX)
-                adj_hi = current_hi / 2 if holes_sel != "all" else current_hi
-                course_holes = course.get("holes", {})
-                if holes_sel != "all" and course_holes:
-                    hole_nums = sorted(course_holes.keys(), key=int)
-                    half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
-                    played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
-                else:
-                    played_par = int(course.get("par", 0))
-                course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
-                adjusted_total = 0
-                for hole_num, hole_data in data["holes"].items():
-                    hc_hole = course_holes.get(hole_num, {})
-                    if hc_hole:
-                        par = int(hc_hole.get("par", 0))
-                        stroke_index = int(hc_hole.get("hole_index", 999))
-                        gross = _safe_int(hole_data.get("gross"), 0)
-                        _, _, esc_gross = calc_hole_scores(stroke_index, course_handicap, par, gross)
-                        adjusted_total += esc_gross
-                    else:
-                        adjusted_total += _safe_int(hole_data.get("gross"), 0)
-                adjusted_gross = adjusted_total
+            # WHS Rule 3 / Rule 12 (see POST): ESC course handicap from the
+            # prior DISPLAYED HI (0.0 if none), always applied -- matches the
+            # recompute/import basis so the differential is entry-path-invariant.
+            hi_before = _prior_displayed_hi(rounds_before, new_date, before_idx)
+            adj_hi = hi_before / 2 if holes_sel != "all" else hi_before
+            course_holes = course.get("holes", {})
+            if holes_sel != "all" and course_holes:
+                hole_nums = sorted(course_holes.keys(), key=int)
+                half = hole_nums[:9] if holes_sel == "front" else hole_nums[9:18]
+                played_par = sum(int(course_holes[hn].get("par", 0)) for hn in half)
+            else:
+                played_par = int(course.get("par", 0))
+            course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+            ags = calc_adjusted_gross_score(data["holes"], course_holes, course_handicap)
+            if ags is not None:
+                adjusted_gross = ags
 
         # --- Differential: lock-aware ---
         diff_override = data.get("differential_override")  # float or None
@@ -770,13 +876,28 @@ def register_rounds_routes(app, csrf):
         client_locked = data.get("differential_locked", False)
 
         if send_override and diff_override is not None:
-            # User explicitly provided a new manual value — lock it
-            differential = round(float(diff_override), 1)
+            # User explicitly provided a new manual value — lock it.
+            # WHS Rule 5.1a: round the Score Differential to the nearest tenth
+            # with .5 UP (round_half_up), matching every other differential
+            # site -- a user-entered 18.25 must store as 18.3, not 18.2.
+            differential = round_half_up(float(diff_override), 1)
             golf_round["differential_locked"] = True
             golf_round["differential"] = str(differential)
         elif send_override and diff_override is None:
-            # User cleared the lock — recompute
-            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
+            # User cleared the lock — recompute. WHS Rule 5.1b: halve pcc for
+            # a 9-hole score (effective_pcc), full pcc for "all" (18-hole).
+            if skip_differential:
+                differential = 0.0
+            elif holes_sel != "all":
+                # WHS 9-hole combine (see POST) keyed on the prior DISPLAYED
+                # HI from this PUT's own prior scan.
+                differential = calc_9hole_dif(
+                    slope, adjusted_gross, rating,
+                    _prior_displayed_hi_or_none(rounds_before, new_date, before_idx),
+                    effective_pcc(pcc, holes_sel),
+                )
+            else:
+                differential = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
         elif old_round.differential_locked:
@@ -785,8 +906,20 @@ def register_rounds_routes(app, csrf):
             golf_round["differential_locked"] = True
             golf_round["differential"] = str(differential)
         else:
-            # Normal recompute
-            differential = 0.0 if skip_differential else calc_round_dif(slope, adjusted_gross, rating)
+            # Normal recompute. WHS Rule 5.1b: same effective_pcc halving as
+            # the cleared-lock branch above.
+            if skip_differential:
+                differential = 0.0
+            elif holes_sel != "all":
+                # WHS 9-hole combine (see POST) keyed on the prior DISPLAYED
+                # HI from this PUT's own prior scan.
+                differential = calc_9hole_dif(
+                    slope, adjusted_gross, rating,
+                    _prior_displayed_hi_or_none(rounds_before, new_date, before_idx),
+                    effective_pcc(pcc, holes_sel),
+                )
+            else:
+                differential = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(pcc, holes_sel))
             golf_round["differential_locked"] = False
             golf_round["differential"] = "0" if skip_differential else str(differential)
 

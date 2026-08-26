@@ -9,7 +9,7 @@ from store import (
     load_settings, save_settings,
     get_courses, save_course, delete_course, rename_course,
     get_all_rounds, save_round, delete_round, update_round_handicap,
-    recompute_all_handicaps,
+    recompute_all_handicaps, recompute_handicaps_for_user,
     get_slope_rating,
     save_course_draft, load_course_draft, clear_course_draft,
     save_round_draft, load_round_draft, clear_round_draft,
@@ -22,6 +22,7 @@ from store import (
     create_challenge, get_challenge, get_all_challenges,
     add_challenge_participant, remove_challenge_participant,
     get_challenge_participants, complete_challenge,
+    reshape_course_data,
 )
 
 
@@ -44,6 +45,84 @@ def test_init_db_creates_tables(db):
                      "challenges", "challenge_participants"):
         assert expected in names
     db.close()
+
+
+# --- reshape_course_data: legacy TUI shape -> canonical server shape ---
+
+LEGACY_COURSE = {
+    "name": "Bellevue Municipal",
+    "location": {"city": "Bellevue", "state": "WA"},
+    "par": 70,
+    "holes": {
+        "1": {"par": 4, "hole_index": 7, "tees": {"blue": 377, "white": 362}},
+        "2": {"par": 3, "index": 15, "tees": {"blue": 150, "white": 120}},
+    },
+    "tees": {
+        "blue": {"rating": 70.5, "slope": 121, "yardage": 6100},
+        "white": {"rating": 68.9, "slope": 118, "yardage": 5700},
+    },
+}
+
+
+def test_reshape_course_data_moves_legacy_per_hole_tees_to_canonical():
+    out = reshape_course_data(json.loads(json.dumps(LEGACY_COURSE)))
+    assert out["holes"]["1"] == {"par": 4, "hole_index": 7}
+    assert out["holes"]["2"] == {"par": 3, "hole_index": 15}
+    assert out["tees"]["blue"]["yardages"] == {"1": "377", "2": "150"}
+    assert out["tees"]["white"]["yardages"] == {"1": "362", "2": "120"}
+    assert "tees" not in out["holes"]["1"]
+    assert "tees" not in out["holes"]["2"]
+
+
+def test_reshape_course_data_renames_index_to_hole_index():
+    course = {
+        "holes": {"1": {"par": 5, "index": 11}},
+        "tees": {},
+    }
+    out = reshape_course_data(course)
+    assert out["holes"]["1"] == {"par": 5, "hole_index": 11}
+
+
+def test_reshape_course_data_is_idempotent_on_canonical():
+    canonical = {
+        "par": 72,
+        "holes": {"1": {"par": 5, "hole_index": 11}},
+        "tees": {"Husky": {"rating": 75.5, "slope": 143, "yardage": 7304,
+                          "yardages": {"1": "560"}}},
+    }
+    out = reshape_course_data(json.loads(json.dumps(canonical)))
+    assert out == canonical
+
+
+def test_reshape_course_data_canonical_yardages_win_over_legacy():
+    course = {
+        "holes": {"1": {"par": 4, "hole_index": 3, "tees": {"blue": 377}}},
+        "tees": {"blue": {"rating": 70.5, "slope": 121, "yardage": 6100,
+                          "yardages": {"1": "380"}}},
+    }
+    out = reshape_course_data(course)
+    assert out["tees"]["blue"]["yardages"]["1"] == "380"
+
+
+def test_reshape_course_data_preserves_unrelated_keys():
+    course = dict(LEGACY_COURSE)
+    course["holes_remaining"] = {"10": {"par": 4, "hole_index": 2}}
+    course["tees_remaining"] = {"blue": {"rating": 35.0, "slope": 120, "yardage": 3050}}
+    out = reshape_course_data(json.loads(json.dumps(course)))
+    assert "holes_remaining" in out
+    assert "tees_remaining" in out
+    assert out["location"] == {"city": "Bellevue", "state": "WA"}
+    assert out["par"] == 70
+    assert out["tees"]["blue"]["rating"] == 70.5
+    assert out["tees"]["blue"]["slope"] == 121
+    assert out["tees"]["blue"]["yardage"] == 6100
+
+
+def test_reshape_course_data_does_not_mutate_input():
+    course = json.loads(json.dumps(LEGACY_COURSE))
+    reshape_course_data(course)
+    assert "tees" in course["holes"]["1"]
+    assert course["tees"]["blue"].get("yardages") is None
 
 
 def test_differential_locked_column_exists(db):
@@ -262,6 +341,32 @@ def test_slope_rating_front_9_fallback(make_course):
     slope, rating = get_slope_rating(tee_dict, "front")
     assert slope == 128
     assert rating == 71.5
+
+
+def test_slope_rating_blank_values_fall_back_to_defaults():
+    # A tee saved with blank slope/rating (the edit UI sends "" for an empty
+    # field) must not crash the differential calc — it falls back to defaults,
+    # matching the behaviour of a wholly-absent key.
+    slope, rating = get_slope_rating({"slope": "", "rating": ""}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_none_values_fall_back_to_defaults():
+    slope, rating = get_slope_rating({"slope": None, "rating": None}, "all")
+    assert slope == 113.0
+    assert rating == 72.0
+
+
+def test_slope_rating_blank_front_falls_through_to_18hole_value():
+    # Blank front_slope/front_rating should use the 18-hole slope/rating, not
+    # the hard default.
+    slope, rating = get_slope_rating(
+        {"front_slope": "", "front_rating": "", "slope": "118", "rating": "70.1"},
+        "front",
+    )
+    assert slope == 118.0
+    assert rating == 70.1
 
 
 def test_draft_save_load_clear(db):
@@ -682,3 +787,176 @@ def test_unlink_round_closes_connection_on_error(monkeypatch):
     with pytest.raises(sqlite3.OperationalError):
         unlink_round(1, 1, 1)
     assert fake.closed is True
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 12 / Rule 3 (Net Double Bogey): recompute_handicaps_for_user must
+# derive the Score Differential from the ESC-adjusted gross for detailed
+# rounds, not raw total_gross -- otherwise a blow-up hole is over-counted
+# relative to the SAME round entered live (source/routes/rounds.py).
+# --------------------------------------------------------------------------
+
+# 18-hole par map matching the fixture used by test_e2e_rounds_scores.py --
+# par-3s at 4/8/12/16, par-5s at 2/6/10/14/18, rest par-4. TOTAL_PAR == 73.
+_R12_PARS = {n: (3 if n in (4, 8, 12, 16) else 5 if n in (2, 6, 10, 14, 18) else 4)
+             for n in range(1, 19)}
+_R12_TOTAL_PAR = sum(_R12_PARS.values())  # 73
+
+
+def _r12_course():
+    return {
+        "par": str(_R12_TOTAL_PAR),
+        "holes": {str(n): {"par": _R12_PARS[n], "hole_index": n} for n in range(1, 19)},
+        "tees": {"White": {"slope": 128, "rating": 71.5}},
+    }
+
+
+def _r12_holes_with_blowup(blowup_hole="1", blowup_gross=10):
+    """Bogey (par+1) on every hole except `blowup_hole`, which gets
+    `blowup_gross` -- a detailed round with one blow-up hole and no strokes
+    received (course_handicap 0, no prior HI)."""
+    holes = {}
+    for n, par in _R12_PARS.items():
+        hn = str(n)
+        gross = blowup_gross if hn == blowup_hole else par + 1
+        holes[hn] = {"gross": str(gross), "putts": "2"}
+    return holes
+
+
+def test_recompute_uses_esc_adjusted_gross_not_raw_total(db):
+    """A detailed round with a blow-up hole (par 4, gross 10, no stroke
+    received) must have its Score Differential computed from the
+    ESC-adjusted gross (that hole capped to Net Double Bogey == par+2 == 6),
+    NOT the raw total_gross. This is the R12 bug: before the fix, this
+    round's recompute-path differential was 21.6 (raw); after the fix it is
+    18.1 (ESC, using the course_handicap==0 "no prior HI established yet"
+    fallback -- there is no round before this one in the fixture).
+
+    NOTE: this is a store.py-unit-level check of that fallback specifically,
+    not a live-vs-recompute equality check -- the live POST /api/rounds path
+    only attempts the ESC adjustment once calc_handicap_index can return a
+    value (WHS needs >= 3 acceptable scores), so it skips ESC entirely (not
+    even a course_handicap==0 cap) for a player's first 1-2 rounds. See
+    tests/test_e2e_rounds_scores.py::
+    test_live_and_recompute_agree_on_esc_adjusted_differential_with_blowup_hole
+    for the true live-vs-recompute equality check, exercised once a real
+    prior Handicap Index exists (the common case R12 targets)."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course(), "GC")
+
+    holes = _r12_holes_with_blowup()
+    raw_total = sum(int(h["gross"]) for h in holes.values())
+    assert raw_total == 96  # bogey-all-18 (91) minus hole-1 bogey (5) plus blowup (10)
+
+    r = {"course": "GC", "tees": "White", "total_gross": str(raw_total),
+         "differential": "0", "computed_handicap": "",
+         "holes_selection": "all", "entry_mode": "detailed", "holes": holes}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    raw_differential = round((113 / 128) * (raw_total - 71.5), 1)
+    esc_total = raw_total - 10 + 6  # hole 1 blowup (10) capped to par+2 (6)
+    esc_differential = round((113 / 128) * (esc_total - 71.5), 1)
+
+    assert raw_differential == 21.6
+    assert esc_differential == 18.1
+    assert saved.differential == str(esc_differential), (
+        f"recompute wrote raw-total_gross differential {saved.differential!r} "
+        f"(raw would be {raw_differential!r}) instead of the ESC-adjusted "
+        f"{esc_differential!r} -- WHS Rule 3 (Net Double Bogey) / Rule 12 "
+        f"violation."
+    )
+    assert saved.differential != str(raw_differential)
+
+
+def test_recompute_score_only_round_still_uses_raw_total(db):
+    """A score-only round (no per-hole data) has nothing to ESC-cap -- the
+    recompute path must keep using raw total_gross as the Adjusted Gross
+    Score, unchanged by the R12 fix."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course(), "GC")
+
+    r = {"course": "GC", "tees": "White", "total_gross": "96",
+         "differential": "0", "computed_handicap": "",
+         "holes_selection": "all", "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    expected = round((113 / 128) * (96 - 71.5), 1)
+    assert saved.differential == str(expected)
+
+
+# --------------------------------------------------------------------------
+# WHS 9-hole Score Differential combine: recompute_handicaps_for_user must
+# fill a missing ("0") 9-hole differential with the base 9-hole differential
+# plus the expected 9-hole adjustment keyed on the prior displayed HI
+# (handicap_index * 0.52 + 1.197), matching the TUI's expected-score
+# equation.
+# --------------------------------------------------------------------------
+
+
+def _r12_course_with_front():
+    """_r12_course plus front-9 tee slope/rating so get_slope_rating("front")
+    resolves to 128 / 35.7 instead of falling back to the 18-hole values."""
+    course = _r12_course()
+    course["tees"]["White"]["front_slope"] = 128
+    course["tees"]["White"]["front_rating"] = 35.7
+    return course
+
+
+def test_recompute_backfills_9hole_round_with_combine(db):
+    """A 9-hole score-only round with the "0" differential sentinel must be
+    backfilled with base + prior_hi * 0.52 + 1.197, where prior_hi is the
+    computed_handicap the recompute assigns to the last chronologically-prior
+    round (read AFTER recompute -- the recompute may adjust it). base =
+    round((113/128)*(45-35.7), 1) = 8.2."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course_with_front(), "GC")
+
+    for d, diff, ch in (("2026-05-01", "10.0", "10.0"),
+                        ("2026-05-02", "12.0", "12.0"),
+                        ("2026-05-03", "11.0", "11.0")):
+        save_round({"course": "GC", "tees": "White", "total_gross": "90",
+                    "differential": diff, "computed_handicap": ch,
+                    "holes_selection": "all", "entry_mode": "score_only", "holes": {}},
+                   d, 0, user_id=1)
+
+    save_round({"course": "GC", "tees": "White", "total_gross": "45",
+                "differential": "0", "computed_handicap": "",
+                "holes_selection": "front", "entry_mode": "score_only", "holes": {}},
+               "2026-06-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)
+    nine_hole = next(r for r in saved if r.holes_selection == "front")
+    prior = next(r for r in saved if r.date < "2026-06-01")
+
+    base = round((113 / 128) * (45 - 35.7), 1)
+    assert base == 8.2
+    assert float(prior.computed_handicap) > 0, "the fixture must establish a HI"
+    expected = round(base + float(prior.computed_handicap) * 0.52 + 1.197, 1)
+    assert nine_hole.differential == str(expected)
+    assert nine_hole.differential != "0"
+
+
+def test_recompute_backfills_9hole_round_without_prior_hi_uses_raw_base(db):
+    """No prior rounds -> no established HI -> the 9-hole differential is the
+    raw base 9-hole Score Differential (no combine term)."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course_with_front(), "GC")
+
+    save_round({"course": "GC", "tees": "White", "total_gross": "45",
+                "differential": "0", "computed_handicap": "",
+                "holes_selection": "front", "entry_mode": "score_only", "holes": {}},
+               "2026-06-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    base = round((113 / 128) * (45 - 35.7), 1)
+    assert saved.differential == str(base)

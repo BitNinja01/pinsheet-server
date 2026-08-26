@@ -88,12 +88,13 @@ def _make_course(client, name="Test GC", par=72, slope=120, rating=70.0):
 
 
 def _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only",
-                 course="Test GC", tees="White", holes=None, match_id=None, notes=""):
+                 course="Test GC", tees="White", holes=None, match_id=None, notes="", pcc=None,
+                 holes_played="18"):
     payload = {
         "date": date,
         "course": course,
         "tees": tees,
-        "holes_played": "18",
+        "holes_played": holes_played,
         "entry_mode": entry_mode,
         "gross_total": gross_total,
         "notes": notes,
@@ -101,6 +102,8 @@ def _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_o
     }
     if match_id is not None:
         payload["match_id"] = match_id
+    if pcc is not None:
+        payload["pcc"] = pcc
     return client.post("/api/rounds", json=payload)
 
 
@@ -206,6 +209,196 @@ def test_api_rounds_post_score_only_computes_expected_differential(client):
     assert len(saved) == 1
     assert saved[0].total_gross == "85"
     assert saved[0].differential == str(expected_diff)
+
+
+# ---------------------------------------------------------------------------
+# WHS Rule 5.6 / 5.1a -- PCC (Playing Conditions Calculation) e2e wiring
+# ---------------------------------------------------------------------------
+
+def test_api_rounds_post_with_pcc_lowers_stored_differential(client):
+    """POST /api/rounds with pcc=1.0 must produce a stored differential
+    (113/slope)*(gross - rating - pcc) lower than the same round with the
+    default pcc=0: slope=120, rating=70.0, gross=85 -> no-pcc diff = 14.1,
+    pcc=1.0 diff = (113/120)*(85-70-1) = 13.15 -> 13.2 (round_half_up)."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+
+    resp_default = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only")
+    assert resp_default.status_code == 200
+    default_diff = resp_default.get_json()["differential"]
+    assert default_diff == 14.1
+
+    resp_pcc = _post_round(client, date="2026-06-02", gross_total="85", entry_mode="score_only", pcc=1.0)
+    assert resp_pcc.status_code == 200
+    pcc_diff = resp_pcc.get_json()["differential"]
+    assert pcc_diff == 13.2
+    assert pcc_diff < default_diff
+
+    saved = {r.date: r for r in store.get_all_rounds(1)}
+    assert saved["2026-06-01"].pcc == 0.0
+    assert saved["2026-06-02"].pcc == 1.0
+    assert saved["2026-06-02"].differential == str(pcc_diff)
+
+
+def test_api_rounds_post_9hole_pcc_applies_half_not_full(client):
+    """WHS Rule 5.1b: a front-9 (9-hole) round posted with pcc=+2.0 must
+    reflect a -1.0 term (half of 2.0) in the stored differential, NOT the
+    full -2.0. AGS=45, slope=113, rating=36.0 (course fixture's rating,
+    inherited by 'front' via get_slope_rating's front_rating fallback):
+    - full pcc would give (113/113)*(45-36-2.0) = 7.0
+    - Rule 5.1b half-pcc gives (113/113)*(45-36-1.0) = 8.0 (this test's
+      expectation) -- one stroke different, proving the halving actually
+      took effect end-to-end through the route."""
+    _login(client)
+    _make_course(client, slope=113, rating=36.0)
+
+    resp = _post_round(client, date="2026-06-01", gross_total="45", entry_mode="score_only",
+                        holes_played="front9", pcc=2.0)
+    assert resp.status_code == 200
+    diff = resp.get_json()["differential"]
+    assert diff == 8.0
+    assert diff != 7.0  # would be 7.0 if the FULL (un-halved) pcc were wrongly applied
+
+    saved = store.get_all_rounds(1)[0]
+    assert saved.holes_selection == "front"
+    assert saved.pcc == 2.0
+    assert saved.differential == "8.0"
+
+
+def test_api_rounds_post_18hole_pcc_applies_full_not_half(client):
+    """Control case for the Rule 5.1b test above: the SAME pcc=+2.0 on an
+    18-hole ("all") round must apply the FULL pcc, giving 7.0 (not 8.0)."""
+    _login(client)
+    _make_course(client, slope=113, rating=36.0)
+
+    resp = _post_round(client, date="2026-06-01", gross_total="45", entry_mode="score_only",
+                        holes_played="18", pcc=2.0)
+    assert resp.status_code == 200
+    diff = resp.get_json()["differential"]
+    assert diff == 7.0
+
+    saved = store.get_all_rounds(1)[0]
+    assert saved.holes_selection == "all"
+    assert saved.differential == "7.0"
+
+
+def test_api_rounds_put_9hole_pcc_applies_half_not_full(client):
+    """WHS Rule 5.1b applies on the PUT/edit recompute path too, not just
+    POST/create."""
+    _login(client)
+    _make_course(client, slope=113, rating=36.0)
+    resp = _post_round(client, date="2026-06-01", gross_total="45", entry_mode="score_only",
+                        holes_played="front9")
+    idx = resp.get_json()["index"]
+
+    put_resp = client.put(
+        f"/api/rounds/2026-06-01/{idx}",
+        json={
+            "date": "2026-06-01",
+            "course": "Test GC",
+            "tees": "White",
+            "holes_played": "front9",
+            "entry_mode": "score_only",
+            "gross_total": "45",
+            "notes": "",
+            "holes": {},
+            "pcc": 2.0,
+        },
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.get_json()["differential"] == 8.0
+    saved = store.get_all_rounds(1)[0]
+    assert saved.differential == "8.0"
+
+
+def test_api_rounds_post_pcc_omitted_defaults_zero_unchanged(client):
+    """No 'pcc' key in the request body -- differential/pcc must be
+    identical to today's (pre-Rule-5.6) behavior, proving the change is
+    non-breaking for every existing caller."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    resp = _post_round(client, gross_total="85", entry_mode="score_only")
+    assert resp.status_code == 200
+    assert resp.get_json()["differential"] == 14.1
+    saved = store.get_all_rounds(1)
+    assert saved[0].pcc == 0.0
+
+
+def test_api_rounds_post_pcc_out_of_range_clamped(client):
+    """pcc=5.0 -> clamped to 3.0 (WHS Rule 5.6's own upper bound); pcc=-2.0
+    -> clamped to -1.0; non-numeric pcc -> 0.0."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+
+    resp_hi = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only", pcc=5.0)
+    resp_lo = _post_round(client, date="2026-06-02", gross_total="85", entry_mode="score_only", pcc=-2.0)
+    resp_bad = _post_round(client, date="2026-06-03", gross_total="85", entry_mode="score_only", pcc="nope")
+    assert resp_hi.status_code == resp_lo.status_code == resp_bad.status_code == 200
+
+    saved = {r.date: r for r in store.get_all_rounds(1)}
+    assert saved["2026-06-01"].pcc == 3.0
+    assert saved["2026-06-02"].pcc == -1.0
+    assert saved["2026-06-03"].pcc == 0.0
+
+
+def test_api_rounds_put_updates_pcc_and_differential(client):
+    """PUT /api/rounds/<date>/<index> with a new pcc must persist it and
+    recompute the differential to reflect it."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    resp = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only")
+    assert resp.status_code == 200
+    idx = resp.get_json()["index"]
+
+    put_resp = client.put(
+        f"/api/rounds/2026-06-01/{idx}",
+        json={
+            "date": "2026-06-01",
+            "course": "Test GC",
+            "tees": "White",
+            "holes_played": "18",
+            "entry_mode": "score_only",
+            "gross_total": "85",
+            "notes": "",
+            "holes": {},
+            "pcc": 1.0,
+        },
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.get_json()["differential"] == 13.2
+
+    saved = store.get_all_rounds(1)[0]
+    assert saved.pcc == 1.0
+    assert saved.differential == "13.2"
+
+
+def test_api_rounds_put_omitted_pcc_preserves_existing_value(client):
+    """PUT without a 'pcc' key must NOT silently reset an existing non-zero
+    pcc to 0 -- mirrors the `excluded` field's default-to-prior-value
+    pattern (routes/rounds.py)."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    resp = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only", pcc=1.0)
+    idx = resp.get_json()["index"]
+    assert store.get_all_rounds(1)[0].pcc == 1.0
+
+    put_resp = client.put(
+        f"/api/rounds/2026-06-01/{idx}",
+        json={
+            "date": "2026-06-01",
+            "course": "Test GC",
+            "tees": "White",
+            "holes_played": "18",
+            "entry_mode": "score_only",
+            "gross_total": "90",
+            "notes": "",
+            "holes": {},
+        },
+    )
+    assert put_resp.status_code == 200
+    saved = store.get_all_rounds(1)[0]
+    assert saved.pcc == 1.0
+    assert saved.total_gross == "90"
 
 
 def test_api_rounds_post_detailed_sums_hole_gross_for_total(client):
@@ -411,6 +604,55 @@ def test_round_detail_computes_100pct_fir_and_gir_for_perfect_round(client):
     assert b'"rd-stat-value">36<' in body  # 18 holes * 2 putts = 36
 
 
+def test_round_detail_shows_readonly_pcc_next_to_differential(client):
+    """The read-only round view (not just the edit form) must surface the
+    PCC that produced the differential -- minor #2 from the C4 review."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+
+    # Two prior rounds so the 3rd (the one under test) gets a computed
+    # handicap and the "Handicap impact" / Diff block actually renders
+    # (see test_api_rounds_post_links_round_to_match_when_computed_handicap_present).
+    for i, diff in enumerate(["10.0", "12.0"]):
+        store.save_round(
+            {
+                "course": "Test GC", "tees": "White", "holes_played": "all",
+                "entry_mode": "score_only", "holes": {}, "total_gross": "80",
+                "differential": diff, "computed_handicap": "",
+            },
+            f"2026-05-0{i + 1}", 0, user_id=1,
+        )
+
+    resp = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only", pcc=1.5)
+    assert resp.status_code == 200
+
+    view = client.get("/rounds/2026-06-01/0")
+    assert view.status_code == 200
+    assert b"PCC +1.5" in view.data
+
+
+def test_round_detail_hides_pcc_readout_when_zero(client):
+    """No PCC readout when pcc is the default 0 (per the 'only show when
+    non-zero' design choice)."""
+    _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    for i, diff in enumerate(["10.0", "12.0"]):
+        store.save_round(
+            {
+                "course": "Test GC", "tees": "White", "holes_played": "all",
+                "entry_mode": "score_only", "holes": {}, "total_gross": "80",
+                "differential": diff, "computed_handicap": "",
+            },
+            f"2026-05-0{i + 1}", 0, user_id=1,
+        )
+    resp = _post_round(client, date="2026-06-01", gross_total="85", entry_mode="score_only")
+    assert resp.status_code == 200
+
+    view = client.get("/rounds/2026-06-01/0")
+    assert view.status_code == 200
+    assert b"PCC " not in view.data
+
+
 def test_round_detail_score_only_round_has_no_par_total(client):
     """Score-only rounds should not compute a hole-level par total."""
     _login(client)
@@ -498,6 +740,71 @@ def test_report_card_renders_for_existing_round(client):
     resp = client.get("/rounds/2026-06-01/0/report")
     assert resp.status_code == 200
     assert b"Score vs Par" in resp.data
+
+
+# ---------------------------------------------------------------------------
+# POST /api/rounds -- WHS 9-hole Score Differential combine (expected-score
+# equation from the TUI: base 9-hole differential + prior_hi * 0.52 + 1.197)
+# ---------------------------------------------------------------------------
+
+def test_api_rounds_post_front9_no_prior_hi_uses_raw_base(client):
+    """A front-9 round with no established Handicap Index gets the raw base
+    9-hole Score Differential -- no combine term. base = (113/113)*(45-33.7)
+    = 11.3 (front falls back to the 18-hole slope/rating when the tee has no
+    front-specific values)."""
+    _login(client)
+    _make_course(client, slope=113, rating=33.7)
+
+    resp = _post_round(client, date="2026-06-01", gross_total="45", holes_played="front9")
+    assert resp.status_code == 200
+    assert resp.get_json()["differential"] == 11.3
+
+
+def test_api_rounds_post_front9_combines_with_prior_hi(client):
+    """A front-9 round played with an established Handicap Index combines the
+    base differential with the expected 9-hole adjustment keyed on the prior
+    DISPLAYED HI -- the most recent chronologically-prior round's stored
+    computed_handicap (read back from the DB after the prior POSTs' recompute
+    cascade, not hardcoded)."""
+    _login(client)
+    _make_course(client, slope=113, rating=33.7)
+
+    # Three prior 18-hole rounds (gross 90 -> diff 56.3 each) establish a HI.
+    for d in ("2026-04-01", "2026-04-02", "2026-04-03"):
+        resp = _post_round(client, date=d, gross_total="90")
+        assert resp.status_code == 200
+
+    prior_rounds = store.get_all_rounds(1)
+    hi = float(prior_rounds[0].computed_handicap)
+    assert hi > 0, "prior rounds should have established a real HI"
+
+    resp = _post_round(client, date="2026-06-01", gross_total="45", holes_played="front9")
+    assert resp.status_code == 200
+    expected = round(11.3 + hi * 0.52 + 1.197, 1)
+    assert resp.get_json()["differential"] == expected
+
+
+def test_api_rounds_put_front9_clearing_lock_recomputes_with_combine(client):
+    """PUT with differential_override=None clears the lock and recomputes the
+    front-9 differential with the same combine equation, keyed on the prior
+    displayed HI from the PUT's own prior scan."""
+    _login(client)
+    _make_course(client, slope=113, rating=33.7)
+
+    for d in ("2026-04-01", "2026-04-02", "2026-04-03"):
+        assert _post_round(client, date=d, gross_total="90").status_code == 200
+    assert _post_round(client, date="2026-06-01", gross_total="45",
+                       holes_played="front9").status_code == 200
+
+    prior_rounds = store.get_all_rounds(1)
+    prior_hi_round = next(r for r in prior_rounds if r.date < "2026-06-01")
+    hi = float(prior_hi_round.computed_handicap)
+
+    resp = _put_round(client, "2026-06-01", "0", holes_played="front9",
+                      gross_total="45", differential_override=None)
+    assert resp.status_code == 200
+    expected = round(11.3 + hi * 0.52 + 1.197, 1)
+    assert resp.get_json()["differential"] == expected
 
 
 # ---------------------------------------------------------------------------
@@ -804,3 +1111,85 @@ def test_rounds_list_handicap_highlight_uses_recent_20_window(client, capture_re
     counted = [r for r in rounds if r["in_handicap"]]
     assert len(counted) == 8  # count_table_n(20) == 8
     assert all(r["date"].startswith("2026-03") for r in counted)
+
+
+# ---------------------------------------------------------------------------
+# Issue #80 (CWE-20): server-side bounds on round score fields
+# ---------------------------------------------------------------------------
+
+class TestScoreBounds:
+    """Issue #80: absurd/negative scores are clamped in place, not rejected —
+    the app tolerates malformed input (must not 500) but must not let it poison
+    the handicap. Per-hole gross clamps to [0, 20]; score-only total to
+    [0, 20 * holes]."""
+
+    def _setup(self, client):
+        _login(client)
+        _make_course(client)
+
+    def _round_on(self, date):
+        return next(r for r in store.get_all_rounds(1) if r.date == date)
+
+    def test_negative_hole_gross_clamped_to_zero(self, client):
+        self._setup(client)
+        holes = _full_detailed_holes(gross=4)
+        holes["1"]["gross"] = "-3"
+        resp = _post_round(client, date="2026-06-01", entry_mode="detailed", holes=holes)
+        assert resp.status_code == 200
+        r = self._round_on("2026-06-01")
+        assert r.holes["1"].gross == 0          # negative clamped to 0
+        assert r.total_gross == str(17 * 4)          # 68, not 68-3
+
+    def test_absurd_hole_gross_clamped_to_max(self, client):
+        self._setup(client)
+        holes = _full_detailed_holes(gross=4)
+        holes["7"]["gross"] = "99"
+        resp = _post_round(client, date="2026-06-02", entry_mode="detailed", holes=holes)
+        assert resp.status_code == 200
+        r = self._round_on("2026-06-02")
+        assert r.holes["7"].gross == 20         # clamped to MAX_HOLE_GROSS
+        assert r.total_gross == str(17 * 4 + 20)     # 88, not 167
+
+    def test_absurd_score_only_total_clamped(self, client):
+        self._setup(client)
+        resp = _post_round(client, date="2026-06-03", entry_mode="score_only", gross_total="9999")
+        assert resp.status_code == 200
+        # 18 holes * 20 = 360 ceiling
+        assert self._round_on("2026-06-03").total_gross == "360"
+
+    def test_valid_scores_pass_through_unchanged(self, client):
+        self._setup(client)
+        assert _post_round(client, date="2026-06-04", entry_mode="score_only", gross_total="85").status_code == 200
+        assert self._round_on("2026-06-04").total_gross == "85"
+        holes = _full_detailed_holes(gross=5)
+        assert _post_round(client, date="2026-06-05", entry_mode="detailed", holes=holes).status_code == 200
+        assert self._round_on("2026-06-05").total_gross == str(18 * 5)
+
+    def test_edit_path_is_also_clamped(self, client):
+        # The PUT edit path shares the sanitizer.
+        self._setup(client)
+        assert _post_round(client, date="2026-06-06", entry_mode="score_only", gross_total="85").status_code == 200
+        bad_holes = _full_detailed_holes(gross=4)
+        bad_holes["1"]["gross"] = "-1"
+        resp = client.put("/api/rounds/2026-06-06/0", json={
+            "date": "2026-06-06", "course": "Test GC", "tees": "White",
+            "holes_played": "18", "entry_mode": "detailed", "notes": "",
+            "gross_total": "", "holes": bad_holes,
+        })
+        assert resp.status_code == 200
+        assert self._round_on("2026-06-06").holes["1"].gross == 0
+
+
+def test_api_rounds_put_manual_override_rounds_half_up(client):
+    """WHS Rule 5.1a: a user-entered manual differential of 18.25 must be
+    stored as 18.3 (.5 rounded UP), not banker's-rounded 18.2."""
+    _login(client)
+    _make_course(client)
+    _post_round(client, gross_total="85")
+
+    resp = _put_round(client, "2026-06-01", "0", differential_override=18.25)
+    assert resp.status_code == 200
+    assert resp.get_json()["differential"] == 18.3
+    saved = store.get_all_rounds(1)
+    assert saved[0].differential == "18.3"
+    assert saved[0].differential_locked is True
