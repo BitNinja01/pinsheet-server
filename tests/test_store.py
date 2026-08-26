@@ -888,3 +888,75 @@ def test_recompute_score_only_round_still_uses_raw_total(db):
     saved = get_all_rounds(user_id=1)[0]
     expected = round((113 / 128) * (96 - 71.5), 1)
     assert saved.differential == str(expected)
+
+
+# --------------------------------------------------------------------------
+# WHS 9-hole Score Differential combine: recompute_handicaps_for_user must
+# fill a missing ("0") 9-hole differential with the base 9-hole differential
+# plus the expected 9-hole adjustment keyed on the prior displayed HI
+# (handicap_index * 0.52 + 1.197), matching the TUI's expected-score
+# equation.
+# --------------------------------------------------------------------------
+
+
+def _r12_course_with_front():
+    """_r12_course plus front-9 tee slope/rating so get_slope_rating("front")
+    resolves to 128 / 35.7 instead of falling back to the 18-hole values."""
+    course = _r12_course()
+    course["tees"]["White"]["front_slope"] = 128
+    course["tees"]["White"]["front_rating"] = 35.7
+    return course
+
+
+def test_recompute_backfills_9hole_round_with_combine(db):
+    """A 9-hole score-only round with the "0" differential sentinel must be
+    backfilled with base + prior_hi * 0.52 + 1.197, where prior_hi is the
+    computed_handicap the recompute assigns to the last chronologically-prior
+    round (read AFTER recompute -- the recompute may adjust it). base =
+    round((113/128)*(45-35.7), 1) = 8.2."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course_with_front(), "GC")
+
+    for d, diff, ch in (("2026-05-01", "10.0", "10.0"),
+                        ("2026-05-02", "12.0", "12.0"),
+                        ("2026-05-03", "11.0", "11.0")):
+        save_round({"course": "GC", "tees": "White", "total_gross": "90",
+                    "differential": diff, "computed_handicap": ch,
+                    "holes_selection": "all", "entry_mode": "score_only", "holes": {}},
+                   d, 0, user_id=1)
+
+    save_round({"course": "GC", "tees": "White", "total_gross": "45",
+                "differential": "0", "computed_handicap": "",
+                "holes_selection": "front", "entry_mode": "score_only", "holes": {}},
+               "2026-06-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)
+    nine_hole = next(r for r in saved if r.holes_selection == "front")
+    prior = next(r for r in saved if r.date < "2026-06-01")
+
+    base = round((113 / 128) * (45 - 35.7), 1)
+    assert base == 8.2
+    assert float(prior.computed_handicap) > 0, "the fixture must establish a HI"
+    expected = round(base + float(prior.computed_handicap) * 0.52 + 1.197, 1)
+    assert nine_hole.differential == str(expected)
+    assert nine_hole.differential != "0"
+
+
+def test_recompute_backfills_9hole_round_without_prior_hi_uses_raw_base(db):
+    """No prior rounds -> no established HI -> the 9-hole differential is the
+    raw base 9-hole Score Differential (no combine term)."""
+    create_user("golfer", "Golfer", "pass1234")
+    save_course(_r12_course_with_front(), "GC")
+
+    save_round({"course": "GC", "tees": "White", "total_gross": "45",
+                "differential": "0", "computed_handicap": "",
+                "holes_selection": "front", "entry_mode": "score_only", "holes": {}},
+               "2026-06-01", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+
+    saved = get_all_rounds(user_id=1)[0]
+    base = round((113 / 128) * (45 - 35.7), 1)
+    assert saved.differential == str(base)

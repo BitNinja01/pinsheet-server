@@ -46,6 +46,15 @@
         <span class="summary-label">Exclude from HCP</span>
         <input type="checkbox" id="edit-excluded"{% if round.excluded %} checked{% endif %}>
       </div>
+      <div class="summary-item">
+        <span class="summary-label"
+              title="Playing Conditions Calculation (WHS Rule 5.6), -1.0 to +3.0. Enter the full published day's PCC -- only 50% is applied to a 9-hole round's differential (WHS Rule 5.1b).">PCC</span>
+        <input type="number" id="edit-pcc" class="step-input" step="0.1" min="-1.0" max="3.0"
+               value="{{ round.pcc }}" style="width:5rem;text-align:right;">
+      </div>
+      <div class="summary-item" style="font-size:0.85em;opacity:0.7;">
+        Full published PCC -- 9-hole rounds apply only 50% automatically (Rule 5.1b).
+      </div>
       {% if round.computed_handicap %}
       <div class="summary-item"><span class="summary-label">HI After</span> {{ round.computed_handicap }}</div>
       {% endif %}
@@ -226,6 +235,12 @@
       <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:4px;font-family:var(--ps-font-mono);">
         Diff {{ round.differential }}{% if round.differential_locked %} &#128274;{% endif %}
       </div>
+      {% if round.pcc and round.pcc != 0 %}
+      <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-ink-3);margin-top:2px;font-family:var(--ps-font-mono);"
+           title="Playing Conditions Calculation (WHS Rule 5.6) applied to this round's differential">
+        PCC {{ "%+.1f"|format(round.pcc) }}{% if round.holes_selection != 'all' %} &middot; ½ applied (9-hole, Rule 5.1b): {{ "%+.1f"|format(round.pcc * 0.5) }}{% endif %}
+      </div>
+      {% endif %}
       {% endif %}
       {% if round.excluded %}
       <div style="font-size:var(--ps-fs-eyebrow);color:var(--ps-warn);margin-top:4px;font-family:var(--ps-font-mono);">
@@ -554,6 +569,9 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
     var isCurrentlyLocked = {{ 'true' if round.differential_locked else 'false' }};
     var diffClearRequested = window._diffClearRequested || false;
     var excludedEl = document.getElementById("edit-excluded");
+    var pccEl = document.getElementById("edit-pcc");
+    var pcc = pccEl && pccEl.value !== "" ? parseFloat(pccEl.value) : 0;
+    if (isNaN(pcc)) pcc = 0;
     var body = {
         date: date,
         course: course,
@@ -565,6 +583,7 @@ document.getElementById("btn-save-round")?.addEventListener("click", function() 
         holes: holes,
         gross_total: grossTotal,
         excluded: excludedEl ? excludedEl.checked : false,
+        pcc: pcc,
     };
 
     if (diffClearRequested) {

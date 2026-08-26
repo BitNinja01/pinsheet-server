@@ -204,6 +204,15 @@ window._courses = {{ courses|tojson }};
         <label class="step-label">Notes</label>
         <textarea class="step-input" id="round-notes" rows="3"
                   placeholder="Optional: weather, swing thoughts, course conditions..."></textarea>
+        <label class="step-label" style="margin-top:0.75rem">PCC (optional)</label>
+        <input class="step-input" type="number" id="round-pcc" step="0.1" min="-1.0" max="3.0"
+               placeholder="0.0">
+        <div style="font-size:0.85em;opacity:0.7;margin-top:0.25rem;">
+            Playing Conditions Calculation (WHS Rule 5.6), range -1.0 to +3.0.
+            Leave blank unless you know the day's published PCC. Enter the
+            full published value even for a 9-hole round -- only 50% of it
+            is applied to a 9-hole differential automatically (WHS Rule 5.1b).
+        </div>
         <button class="btn btn-accent" id="notes-continue" style="margin-top:0.75rem">Continue</button>
     </div>
 

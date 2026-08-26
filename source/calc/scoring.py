@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from source.models import RoundData, CourseData, HoleData, HoleDef, TeeData
+from calc.handicap import round_half_up
 
 
 def calc_trend(all_rounds: list[RoundData], calc_fn, *args, filter_fn=None) -> list:
@@ -256,7 +257,10 @@ def calc_per_hole_stats(
                         slope = float(first_tee.slope or "113")
                         rating = float(first_tee.rating or "0")
                         c_par = int(course_obj.par) if course_obj else par_val
-                        course_hcp = round(handicap_index * slope / 113 + (c_par - rating))
+                        # WHS Rule 6.1a: nearest whole, .5 UP (round_half_up),
+                        # not banker's round(). (The (c_par - rating) sign and
+                        # delegation to calc_course_handicap are the R13 fix.)
+                        course_hcp = int(round_half_up(handicap_index * slope / 113 + (c_par - rating), 0))
                         strokes_received += 1 if si_int <= course_hcp else 0
                         holes_with_si += 1
                     except (ValueError, TypeError, StopIteration):

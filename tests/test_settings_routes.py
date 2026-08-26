@@ -251,6 +251,118 @@ class TestSettingsImport:
         assert saved["tees"]["blue"]["yardages"] == {"1": "377", "2": "150"}
         assert saved["tees"]["white"]["yardages"] == {"1": "362"}
 
+    def test_import_with_pcc_computes_differential_reflecting_pcc(self, logged_in_client):
+        """WHS Rule 5.6: a zip-import round dict carrying 'pcc' must persist
+        that pcc and have its recomputed differential (the settings.py
+        inline backfill site) reflect the -PCC term -- same formula as
+        calc_round_dif and store.py's recompute, exercised end-to-end
+        through the actual /settings/import route this time (not the
+        formula reproduced against stored data, as in test_handicap.py's
+        consistency test)."""
+        course_payload = {
+            "ImportGC": {
+                "par": "72",
+                "holes": {str(n): {"par": 4, "hole_index": n} for n in range(1, 19)},
+                "tees": {"White": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+            }
+        }
+        rounds_payload = {
+            "2026-06-01": {
+                "0": {
+                    "course": "ImportGC",
+                    "tees": "White",
+                    "holes_selection": "all",
+                    "total_gross": "90",
+                    "differential": "0",
+                    "computed_handicap": "",
+                    "holes": {},
+                    "pcc": 1.0,
+                }
+            },
+            "2026-06-02": {
+                "0": {
+                    "course": "ImportGC",
+                    "tees": "White",
+                    "holes_selection": "all",
+                    "total_gross": "90",
+                    "differential": "0",
+                    "computed_handicap": "",
+                    "holes": {},
+                }
+            },
+        }
+
+        zip_bytes = _make_zip({
+            "courses.json": json.dumps(course_payload),
+            "rounds/2026.json": json.dumps(rounds_payload),
+        })
+
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "pcc_export.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"Imported 1 courses and 2 rounds." in resp.data
+
+        rounds = {r.date: r for r in get_all_rounds(1)}
+        # (113/113)*(90-72.0-1.0) = 17.0
+        assert rounds["2026-06-01"].pcc == 1.0
+        assert rounds["2026-06-01"].differential == "17.0"
+        # (113/113)*(90-72.0-0.0) = 18.0 -- unaffected/default.
+        assert rounds["2026-06-02"].pcc == 0.0
+        assert rounds["2026-06-02"].differential == "18.0"
+
+    def test_import_9hole_pcc_applies_half_not_full(self, logged_in_client):
+        """WHS Rule 5.1b: a zip-imported 9-hole (front) round with pcc=+2.0
+        must have its recomputed differential reflect only HALF the pcc
+        (-1.0), not the full -2.0 -- same effective_pcc halving as the
+        POST/PUT routes and store.py's recompute, now exercised through the
+        settings.py import inline site end-to-end. AGS=45, slope=113,
+        rating=36.0 -> half-pcc diff = (113/113)*(45-36-1.0) = 8.0, full-pcc
+        would be 7.0."""
+        course_payload = {
+            "NineImportGC": {
+                "par": "72",
+                "holes": {str(n): {"par": 4, "hole_index": n} for n in range(1, 19)},
+                "tees": {"White": {"slope": "113", "rating": "36.0", "yardage": "6000"}},
+            }
+        }
+        rounds_payload = {
+            "2026-06-01": {
+                "0": {
+                    "course": "NineImportGC",
+                    "tees": "White",
+                    "holes_selection": "front",
+                    "total_gross": "45",
+                    "differential": "0",
+                    "computed_handicap": "",
+                    "holes": {},
+                    "pcc": 2.0,
+                }
+            },
+        }
+
+        zip_bytes = _make_zip({
+            "courses.json": json.dumps(course_payload),
+            "rounds/2026.json": json.dumps(rounds_payload),
+        })
+
+        resp = logged_in_client.post(
+            "/settings/import",
+            data={"zipfile": (io.BytesIO(zip_bytes), "nine_pcc_export.zip")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        assert b"Imported 1 courses and 1 rounds." in resp.data
+
+        rounds = get_all_rounds(1)
+        assert len(rounds) == 1
+        assert rounds[0].holes_selection == "front"
+        assert rounds[0].pcc == 2.0
+        assert rounds[0].differential == "8.0"
+        assert rounds[0].differential != "7.0"  # would be 7.0 at the (wrong) full pcc
+
     def test_import_recomputes_differentials_and_feeds_handicap_calc(self, logged_in_client):
         """Regression test for the fixed settings_import differential-staleness bug.
 
