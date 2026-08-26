@@ -20,6 +20,7 @@ from calc.handicap import (
     exceptional_reduction,
     round_half_up,
     WHS_HANDICAP_WINDOW,
+    WHS_MAX_HANDICAP_INDEX,
 )
 from source.models import clamp_pcc, dict_to_round, effective_pcc
 
@@ -969,13 +970,75 @@ def test_calc_handicap_index_19_diffs_no_adjustment(make_round):
 
 def test_calc_handicap_index_negative_not_clamped(make_round):
     """WHS Rule 5.2a intentionally allows negative (plus) handicap indexes --
-    no clamping is applied here (the 54.0 max is a separate, out-of-scope
-    rule). 3 differentials -> best-1 average minus 2.0 adjustment.
+    no LOWER clamp is applied (only the Rule 5.3 54.0 MAXIMUM is clamped;
+    see test_calc_handicap_index_max_54_clamp below). 3 differentials ->
+    best-1 average minus 2.0 adjustment.
     diffs sorted: [1.0, 2.0, 3.0], best-1 = 1.0, 1.0 - 2.0 = -1.0."""
     rounds = [make_round(differential=str(d)) for d in (1.0, 2.0, 3.0)]
     hi = calc_handicap_index(rounds)
     assert hi == -1.0
     assert hi < 0
+
+
+def test_calc_handicap_index_3_diffs_of_60_returns_raw_uncapped_58(make_round):
+    """WHS Rule 5.3: `calc_handicap_index` deliberately returns the RAW
+    (unclamped) Rule 5.2/5.2a value -- 3 differentials of 60.0 -> best-1
+    average (60.0) minus the Rule 5.2a -2.0 adjustment = 58.0. The 54.0
+    maximum is applied downstream, at the displayed/stored-value sites
+    (after any Rule 5.8 cap -- see store.recompute_handicaps_for_user and
+    the e2e coverage in test_e2e_rounds_scores.py), NOT here -- see this
+    function's docstring for why clamping here would distort Rule 5.8's
+    `increase = raw - low_hi` computation."""
+    rounds = [make_round(differential="60.0") for _ in range(3)]
+    assert calc_handicap_index(rounds) == 58.0
+
+
+def test_calc_handicap_index_20_diffs_best8_62_returns_raw_uncapped(make_round):
+    """WHS Rule 5.3: 20 differentials whose best-8 average is 62.0 (no Rule
+    5.2a adjustment at 20 diffs) -- `calc_handicap_index` returns the raw
+    62.0, not a clamped 54.0 (clamping happens downstream at
+    displayed/stored-value sites)."""
+    diffs = [62.0] * 8 + [90.0] * 12
+    rounds = [make_round(differential=str(d)) for d in diffs]
+    assert calc_handicap_index(rounds) == 62.0
+
+
+def test_calc_handicap_index_no_clamp_when_at_or_below_54(make_round):
+    """A normal record (best-8 average 12.3) is unaffected either way -- it
+    stays exactly at its computed value both raw and once clamped."""
+    diffs = [12.3] * 8 + [20.0] * 12
+    rounds = [make_round(differential=str(d)) for d in diffs]
+    assert calc_handicap_index(rounds) == 12.3
+
+
+def test_whs_max_handicap_index_constant_is_54():
+    assert WHS_MAX_HANDICAP_INDEX == 54.0
+
+
+def test_rule_5_8_cap_applied_before_rule_5_3_max_ordering(make_round):
+    """WHS order of operations: 5.2/5.2a -> 5.9 (ESR) -> 5.8 (soft/hard cap)
+    -> 5.3 (54.0 maximum), i.e. the 54.0 ceiling is applied LAST, AFTER the
+    Rule 5.8 cap -- so the cap must see the TRUE raw Handicap Index, not a
+    pre-clamped one. This regression proves the two orders diverge for a
+    low_hi in the ~47-51 band where raw exceeds 54:
+
+      raw = 58.0, low_hi = 49.0
+      correct (cap-then-clamp):  apply_handicap_cap(58.0, 49.0) = 54.0,
+                                  then min(54.0, 54.0) = 54.0
+      wrong   (clamp-then-cap):  min(58.0, 54.0) = 54.0,
+                                  then apply_handicap_cap(54.0, 49.0) = 53.0
+
+    A 1.0-stroke divergence -- proving clamp order matters and confirming
+    the fix applies the 54.0 max AFTER apply_handicap_cap, not before."""
+    raw = 58.0
+    low_hi = 49.0
+
+    correct_order = min(apply_handicap_cap(raw, low_hi), WHS_MAX_HANDICAP_INDEX)
+    wrong_order = apply_handicap_cap(min(raw, WHS_MAX_HANDICAP_INDEX), low_hi)
+
+    assert correct_order == 54.0
+    assert wrong_order == 53.0
+    assert correct_order != wrong_order
 
 
 def test_calc_handicap_trend_empty():
@@ -988,6 +1051,22 @@ def test_calc_handicap_trend_returns_pairs(make_round):
     trend = calc_handicap_trend(rounds)
     assert len(trend) > 0
     assert all(isinstance(t, tuple) and len(t) == 2 for t in trend)
+
+
+def test_calc_handicap_trend_clamps_to_max_54(make_round):
+    """WHS Rule 5.3 regression: unlike `calc_handicap_index`,
+    `calc_handicap_trend` is an independent rolling-window accumulator that
+    does NOT delegate to `calc_handicap_index` (and is wired into
+    STAT_CATALOG["handicap"]["trend_fn"] in web/catalog.py) -- it must
+    clamp its own emitted points. 3 differentials of 68.0 -> best-1 average
+    (68.0) minus the Rule 5.2a -2.0 adjustment = 66.0 raw, which must be
+    clamped down to 54.0 (prior to this fix the trend point would have been
+    the unclamped 66.0)."""
+    rounds = [make_round(date=f"2026-05-{d:02d}", gross=150, differential="68.0")
+              for d in range(1, 4)]
+    trend = calc_handicap_trend(rounds)
+    assert len(trend) == 1
+    assert trend[0][1] == 54.0
 
 
 def test_calc_playing_to_handicap_rate_empty():
@@ -2346,3 +2425,20 @@ def test_calc_course_handicap_rounds_half_up_not_bankers():
     assert calc_course_handicap(10.0, 72, 128, 71.5) == 11
     # negative (plus handicap) tie: -0.5 -> -1 (away from zero)
     assert calc_course_handicap(-0.5, 72, 113, 72.0) == -1
+
+
+def test_playing_to_handicap_rate_clamps_fallback_threshold_to_54():
+    """WHS Rule 5.3: the raw-HI fallback threshold (for rounds without a stored
+    computed_handicap) must be clamped to 54.0. A differential of 56 must count
+    as NOT played-to-handicap against the 54.0 bar, even though the unclamped
+    raw HI (58) would wrongly count it."""
+    from types import SimpleNamespace as NS
+    # 3 diffs of 60 -> raw calc_handicap_index = 58.0 (lowest-1 -2.0), clamps to 54.0
+    rounds = [
+        NS(differential="56.0", computed_handicap="", excluded=False, holes_selection="all"),
+        NS(differential="60.0", computed_handicap="", excluded=False, holes_selection="all"),
+        NS(differential="60.0", computed_handicap="", excluded=False, holes_selection="all"),
+    ]
+    rate = calc_playing_to_handicap_rate(rounds)
+    # threshold 54.0: none of 56/60/60 are <= 54 -> 0% played to handicap
+    assert rate == 0.0
