@@ -10,7 +10,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
-from source.models import dict_to_round, RoundData
+from source.models import dict_to_round, RoundData, clamp_pcc, effective_pcc
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -167,6 +167,7 @@ def get_all_rounds(user_id: int, limit: int = None) -> list[RoundData]:
             "excluded": bool(row["excluded"]),
             "computed_handicap": row["computed_handicap"],
             "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+            "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
@@ -197,6 +198,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
         "excluded": bool(row["excluded"]),
         "computed_handicap": row["computed_handicap"],
         "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+        "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
     }
     if row["total_putts"]:
         r["total_putts"] = row["total_putts"]
@@ -230,12 +232,18 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: clamp defensively here too (not just at the
+    # HTTP input boundary in routes/rounds.py) so a raw caller -- e.g. the
+    # zip-import path in routes/settings.py, which passes an archive's raw
+    # (untrusted) round dict straight through -- can never persist an
+    # out-of-range pcc.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
             entry_mode, holes, total_gross, total_putts, differential, notes,
-            excluded, computed_handicap, differential_locked)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            excluded, computed_handicap, differential_locked, pcc)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id,
             golf_round.get("course", ""),
@@ -252,6 +260,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
         ),
     )
     round_id = cur.lastrowid
@@ -270,6 +279,15 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
 
     Returns the number of rows updated (0 if the round no longer exists or is
     owned by another user), so callers can detect a lost-row race.
+
+    PRE-EXISTING CAVEAT (not fixed here): if this round is already linked to
+    a match (a match_rounds row references it), editing the round's gross
+    score / handicap here does NOT recompute or refresh that match_rounds
+    row's stored `net` -- `net` is a snapshot computed once at link_round()
+    time (see link_round / calc_playing_handicap call sites in
+    routes/matches.py and routes/rounds.py) and there is no re-link/refresh
+    path. A stale net can therefore persist after a round edit until the
+    round is unlinked and re-linked.
     """
     db = get_db()
     total_putts = None
@@ -281,12 +299,14 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: same defensive clamp as save_round.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """UPDATE rounds SET
              course_name = ?, date = ?, round_index = ?, tee_name = ?,
              holes_played = ?, entry_mode = ?, holes = ?, total_gross = ?,
              total_putts = ?, differential = ?, notes = ?, excluded = ?,
-             computed_handicap = ?, differential_locked = ?
+             computed_handicap = ?, differential_locked = ?, pcc = ?
            WHERE id = ? AND user_id = ?""",
         (
             golf_round.get("course", ""),
@@ -303,6 +323,7 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
             round_id,
             user_id,
         ),
@@ -388,8 +409,10 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         apply_handicap_cap,
         _is_eligible_diff_round,
         exceptional_reduction,
+        round_half_up,
         WHS_HANDICAP_WINDOW,
         calc_round_dif,
+        calc_9hole_dif,
         calc_course_handicap,
         calc_adjusted_gross_score,
     )
@@ -469,7 +492,26 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                         adjusted_gross = float(r.total_gross) if ags is None else ags
                     else:
                         adjusted_gross = float(r.total_gross)
-                    diff = calc_round_dif(slope, adjusted_gross, rating)
+                    # WHS Rule 5.6 / 5.1a: subtract this round's own PCC
+                    # (r.pcc, range-clamped by clamp_pcc at every write/
+                    # construction site) inside calc_round_dif, matching
+                    # rounds.py's live-save path exactly. WHS Rule 5.1b: a
+                    # 9-hole score applies only HALF the day's PCC --
+                    # effective_pcc(r.pcc, r.holes_selection).
+                    if r.holes_selection != "all":
+                        # WHS 9-hole combine: base 9-hole Score Differential
+                        # plus the expected 9-hole adjustment keyed on the HI
+                        # in effect when the round was played -- the prior
+                        # DISPLAYED HI (`prior_displayed[-1]`, which has not
+                        # yet had this round appended), or None when no HI has
+                        # been established yet (raw base then).
+                        diff = calc_9hole_dif(
+                            slope, adjusted_gross, rating,
+                            prior_displayed[-1][1] if prior_displayed else None,
+                            effective_pcc(r.pcc, r.holes_selection),
+                        )
+                    else:
+                        diff = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(r.pcc, r.holes_selection))
                     str_diff = str(diff)
                     if r.differential != str_diff:
                         db.execute(
@@ -519,7 +561,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         # to each of the 20 windowed differentials individually and
         # re-averaging, since the reduction is uniform across the window).
         active_reduction_sum = sum(exceptional_reductions[-WHS_HANDICAP_WINDOW:])
-        hi_after_esr = round(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
+        hi_after_esr = round_half_up(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
 
         # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
         # this round already has >= 20 acceptable scores; the cap then
@@ -913,11 +955,34 @@ def get_invite_codes() -> list:
     return result
 
 
-def create_match(created_by: int, course_name: str, date: str) -> int:
+def create_match(
+    created_by: int,
+    course_name: str,
+    date: str,
+    allowance_percent: int = 100,
+    format_key: str = "individual_match",
+) -> int:
+    # NOTE (WHS Rule 6.2 / Appendix C): `allowance_percent` and `format_key`
+    # are effectively IMMUTABLE after match creation -- there is no
+    # update_match()/edit path that changes either. `match_rounds.net` is
+    # computed once, at link_round() time, from
+    # calc_playing_handicap(course_handicap, allowance_percent) as it stood
+    # at that moment; it is never recomputed. If an allowance/format-editing
+    # path is ever added, it MUST also re-link (recompute net for) every
+    # round already linked to the match, or those stored nets will silently
+    # go stale relative to the new allowance.
+    #
+    # `format_key` is the display/source-of-truth for "which Appendix C
+    # format produced this allowance" (see MATCH_FORMAT_LABELS in
+    # routes/matches.py) -- `allowance_percent` alone is ambiguous for
+    # display purposes (e.g. 95% is shared by both individual_stroke and
+    # stableford_individual). `allowance_percent`, NOT `format_key`, remains
+    # the value actually used in net math.
     db = get_db()
     cur = db.execute(
-        "INSERT INTO matches (created_by, course_name, date) VALUES (?, ?, ?)",
-        (created_by, course_name, date),
+        "INSERT INTO matches (created_by, course_name, date, allowance_percent, format_key) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (created_by, course_name, date, allowance_percent, format_key),
     )
     db.commit()
     match_id = cur.lastrowid
