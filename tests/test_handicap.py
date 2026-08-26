@@ -3,8 +3,11 @@ from calc.handicap import (
     calc_hole_scores,
     calc_strokes_given,
     calc_course_handicap,
+    calc_playing_handicap,
+    WHS_HANDICAP_ALLOWANCES,
     calc_round_dif,
     calc_expected_9hole_dif,
+    calc_9hole_dif,
     count_table_n,
     count_table_adjustment,
     calc_effective_diffs,
@@ -13,10 +16,74 @@ from calc.handicap import (
     calc_handicap_trend,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
+    calc_adjusted_gross_score,
     apply_handicap_cap,
     exceptional_reduction,
+    round_half_up,
     WHS_HANDICAP_WINDOW,
+    WHS_MAX_HANDICAP_INDEX,
 )
+from source.models import clamp_pcc, dict_to_round, effective_pcc
+
+
+# ---------------------------------------------------------------------------
+# Adjusted Gross Score (WHS net double bogey) — the fix for the Cedar Irons vs
+# Scarecrow ranking bug (raw gross was used instead of adjusted gross).
+# ---------------------------------------------------------------------------
+def test_adjusted_gross_score_caps_blowup_at_net_double_bogey():
+    course_holes = {str(n): {"par": 4, "index": n} for n in range(1, 19)}
+    round_holes = {str(n): {"gross": 4} for n in range(1, 19)}
+    round_holes["1"]["gross"] = 10  # blow-up on the hardest hole (SI 1)
+
+    # course handicap 0 -> net double bogey cap = par + 2 = 6 (raw sum is 78)
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 17 * 4 + 6
+    # course handicap 18 -> 1 stroke on SI 1 -> cap = par + 2 + 1 = 7
+    assert calc_adjusted_gross_score(round_holes, course_holes, 18) == 17 * 4 + 7
+
+
+def test_adjusted_gross_score_reads_legacy_hole_index_key():
+    # Older courses store the stroke index under "hole_index", not "index".
+    course_holes = {"1": {"par": 5, "hole_index": 1}}
+    round_holes = {"1": {"gross": 10}}
+    # course handicap 0 -> cap = 5 + 2 = 7
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 7
+
+
+def test_adjusted_gross_score_none_without_hole_data():
+    course_holes = {str(n): {"par": 4, "index": n} for n in range(1, 19)}
+    assert calc_adjusted_gross_score({}, course_holes, 0) is None
+    assert calc_adjusted_gross_score(None, course_holes, 0) is None
+
+
+def test_adjusted_gross_score_handles_blank_or_bad_par_without_crash_or_deflation():
+    # Course-hole par comes from client JSON — a blank or non-numeric par must
+    # neither crash nor silently cap the hole against par 0. Such holes stay
+    # uncapped (raw gross); a valid par still caps.
+    course_holes = {
+        "1": {"par": "", "index": 1},     # blank -> uncapped
+        "2": {"par": "N/A", "index": 2},  # non-numeric -> uncapped (no crash)
+        "3": {"par": 4, "index": 3},      # valid -> cap at par + 2 = 6
+    }
+    round_holes = {"1": {"gross": 9}, "2": {"gross": 8}, "3": {"gross": 10}}
+    assert calc_adjusted_gross_score(round_holes, course_holes, 0) == 9 + 8 + 6
+
+
+def test_calc_hole_scores_allocates_third_stroke_tier():
+    # WHS gives a 3rd stroke on the hardest holes once course handicap >= SI+36.
+    _, net, esc = calc_hole_scores(1, 37, 4, 15)  # SI 1, CH 37
+    assert esc == 4 + 2 + 3  # net double bogey cap includes 3 strokes
+    assert net == 15 - 3
+
+
+def test_adjusted_gross_lowers_differential_versus_raw():
+    # Reproduces the Cedar Irons case: a 10 on a par 5 inflates the raw
+    # differential; capping to net double bogey lowers it.
+    course_holes = {"1": {"par": 5, "index": 1}}
+    round_holes = {"1": {"gross": 10}}
+    ags = calc_adjusted_gross_score(round_holes, course_holes, 0)  # -> 7
+    raw_diff = calc_round_dif(121, 10, 68.5)
+    ags_diff = calc_round_dif(121, ags, 68.5)
+    assert ags_diff < raw_diff
 
 
 def test_count_table_n_all_boundaries():
@@ -73,15 +140,19 @@ def test_calc_hole_scores_esc_limits_gross():
 
 
 def test_calc_strokes_given_boundaries():
-    """WHS 0/1/2 stroke rule boundaries: 0 strokes below Stroke Index, 1
-    stroke at/above SI, 2 strokes only once Course Handicap reaches
-    SI + 18 (not SI + 17)."""
+    """WHS 0/1/2/3 stroke rule boundaries (Rule 6.2b): 0 strokes below
+    Stroke Index, 1 stroke at/above SI, 2 strokes once Course Handicap
+    reaches SI + 18 (not SI + 17), 3 strokes once it reaches SI + 36
+    (reachable under the Rule 5.3 54.0 max index on hard/high-slope
+    courses)."""
     si = 10
     assert calc_strokes_given(si, si - 1) == 0       # CH < SI -> 0
     assert calc_strokes_given(si, si) == 1           # CH == SI -> 1
     assert calc_strokes_given(si, si + 17) == 1       # CH == SI+17 -> still 1
     assert calc_strokes_given(si, si + 18) == 2       # CH == SI+18 -> 2
-    assert calc_strokes_given(si, 999) == 2           # huge CH -> capped at 2
+    assert calc_strokes_given(si, si + 35) == 2       # CH == SI+35 -> still 2
+    assert calc_strokes_given(si, si + 36) == 3       # CH == SI+36 -> 3
+    assert calc_strokes_given(si, 999) == 3           # huge CH -> 3 (max allowed)
 
 
 def test_calc_course_handicap_standard():
@@ -90,7 +161,69 @@ def test_calc_course_handicap_standard():
 
 def test_calc_course_handicap_harder_course():
     result = calc_course_handicap(10.0, 72, 140, 74)
-    assert result == round(10 * (140 / 113) + (74 - 72))
+    # WHS Rule 6.1a: nearest whole, .5 UP. 10*(140/113)+(74-72) = 14.39 -> 14.
+    # Oracle is a hand-computed literal, NOT round() (which is banker's and
+    # would silently validate the wrong rounding on a future tie fixture).
+    assert result == 14
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 6.2 / Appendix C -- calc_playing_handicap
+# --------------------------------------------------------------------------
+
+def test_calc_playing_handicap_default_allowance_is_unchanged():
+    """Default allowance (100%) leaves the Course Handicap unchanged --
+    non-breaking behavior for existing (pre-Rule-6.2) callers."""
+    assert calc_playing_handicap(20) == 20
+    assert calc_playing_handicap(20, 100) == 20
+
+
+def test_calc_playing_handicap_individual_stroke_95_percent():
+    # 20 * 0.95 = 19.0 -> 19 (exact, no rounding tie).
+    assert calc_playing_handicap(20, 95) == 19
+
+
+def test_calc_playing_handicap_fourball_stroke_85_percent():
+    # 20 * 0.85 = 17.0 -> 17 (exact, no rounding tie).
+    assert calc_playing_handicap(20, 85) == 17
+
+
+def test_calc_playing_handicap_half_up_tie_rounds_up():
+    # WHS Rule 6.2: ".5 rounded upwards" -- 10 * 0.95 = 9.5 -> 10 (half-up).
+    assert calc_playing_handicap(10, 95) == 10
+
+
+def test_calc_playing_handicap_half_up_tie_rounds_up_second_case():
+    # 30 * 0.85 = 25.5 -> 26 (half-up).
+    assert calc_playing_handicap(30, 85) == 26
+
+
+def test_calc_playing_handicap_half_up_tie_disagrees_with_banker_rounding():
+    # 10 * 0.85 = 8.5. Python's banker's-rounding round(8.5) == 8 (rounds to
+    # the nearest EVEN integer), which would be WRONG under WHS Rule 6.2's
+    # "rounded upwards" tie-breaking -- calc_playing_handicap must give 9.
+    assert round(8.5) == 8  # documents the banker's-rounding pitfall being avoided
+    assert calc_playing_handicap(10, 85) == 9
+
+
+def test_calc_playing_handicap_negative_course_handicap_away_from_zero():
+    """A plus (negative) Course Handicap must round consistent with
+    round_half_up's documented away-from-zero tie-breaking (see
+    round_half_up's NEGATIVE-TIE DECISION docstring) -- Rule 6.2 doesn't
+    special-case sign, and calc_playing_handicap delegates straight to
+    round_half_up, so a plus handicap's Playing Handicap must follow the
+    same convention. -10 * 0.85 = -8.5 -> -9 (away from zero), not -8."""
+    assert calc_playing_handicap(-10, 85) == -9
+
+
+def test_whs_handicap_allowances_appendix_c_reference_values():
+    """Appendix C recommended allowances by format -- reference constant
+    only; not auto-applied, callers pass an explicit allowance_percent."""
+    assert WHS_HANDICAP_ALLOWANCES["individual_match"] == 100
+    assert WHS_HANDICAP_ALLOWANCES["individual_stroke"] == 95
+    assert WHS_HANDICAP_ALLOWANCES["fourball_stroke"] == 85
+    assert WHS_HANDICAP_ALLOWANCES["fourball_match"] == 90
+    assert WHS_HANDICAP_ALLOWANCES["stableford_individual"] == 95
 
 
 def test_calc_round_dif_scratch():
@@ -100,6 +233,574 @@ def test_calc_round_dif_scratch():
 def test_calc_round_dif_above_rating():
     result = calc_round_dif(128, 85, 71.5)
     assert result == round((113 / 128) * (85 - 71.5), 1)
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.6 / 5.1a -- PCC (Playing Conditions Calculation) adjustment
+# --------------------------------------------------------------------------
+
+def test_calc_round_dif_pcc_default_zero_unchanged():
+    """Default pcc=0.0 must reproduce the exact pre-Rule-5.6 differential --
+    non-breaking for every caller that doesn't pass pcc."""
+    assert calc_round_dif(113, 90, 72) == 18.0
+
+
+def test_calc_round_dif_pcc_positive_lowers_differential():
+    """WHS Rule 5.6: Score Differential = (113/Slope) x (AGS - CR - PCC).
+    A positive PCC (favorable/easy conditions) LOWERS the differential."""
+    assert calc_round_dif(113, 90, 72, pcc=1.0) == 17.0
+
+
+def test_calc_round_dif_pcc_negative_raises_differential():
+    """A negative PCC (difficult conditions) RAISES the differential."""
+    assert calc_round_dif(113, 90, 72, pcc=-1.0) == 19.0
+
+
+def test_calc_round_dif_pcc_max_boundary():
+    """WHS Rule 5.6's PCC upper bound (+3.0)."""
+    assert calc_round_dif(113, 90, 72, pcc=3.0) == 15.0
+
+
+def test_clamp_pcc_clamps_above_max():
+    assert clamp_pcc(5.0) == 3.0
+
+
+def test_clamp_pcc_clamps_below_min():
+    assert clamp_pcc(-2.0) == -1.0
+
+
+def test_clamp_pcc_within_range_unchanged():
+    assert clamp_pcc(1.5) == 1.5
+    assert clamp_pcc(-1.0) == -1.0
+    assert clamp_pcc(3.0) == 3.0
+
+
+def test_clamp_pcc_non_numeric_defaults_to_zero():
+    assert clamp_pcc("not-a-number") == 0.0
+    assert clamp_pcc(None) == 0.0
+    assert clamp_pcc("") == 0.0
+
+
+def test_clamp_pcc_nan_defaults_to_zero():
+    assert clamp_pcc(float("nan")) == 0.0
+
+
+def test_dict_to_round_defaults_pcc_zero_for_legacy_dict():
+    """A round dict with no 'pcc' key (legacy DB row / pre-Rule-5.6 data)
+    must construct with pcc=0.0, not raise."""
+    r = dict_to_round({"date": "2026-01-01"})
+    assert r.pcc == 0.0
+
+
+def test_dict_to_round_clamps_pcc_defense_in_depth():
+    """dict_to_round re-clamps pcc even if the source dict carries an
+    out-of-range value (e.g. a hand-edited zip-import archive)."""
+    r = dict_to_round({"date": "2026-01-01", "pcc": 99})
+    assert r.pcc == 3.0
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.1b -- 9-hole scores apply only 50% of the day's PCC
+# --------------------------------------------------------------------------
+
+def test_effective_pcc_full_for_18_hole():
+    assert effective_pcc(2.0, "all") == 2.0
+
+
+def test_effective_pcc_halved_for_front_nine():
+    assert effective_pcc(2.0, "front") == 1.0
+
+
+def test_effective_pcc_halved_for_back_nine():
+    assert effective_pcc(2.0, "back") == 1.0
+
+
+def test_effective_pcc_halved_negative_pcc():
+    assert effective_pcc(-1.0, "front") == -0.5
+
+
+def test_effective_pcc_zero_stays_zero_regardless_of_holes():
+    assert effective_pcc(0.0, "all") == 0.0
+    assert effective_pcc(0.0, "front") == 0.0
+
+
+def test_calc_round_dif_9hole_applies_half_pcc_not_full():
+    """WHS Rule 5.1b: a 9-hole (front/back) round with pcc=+2.0 must reflect
+    a -1.0 term (half of 2.0) in the differential, NOT the full -2.0 that an
+    18-hole round with the same pcc gets. AGS=45, slope=113, rating=36.0:
+    - 18-hole equivalent: (113/113)*(45-36-2.0) = 7.0
+    - 9-hole (half-pcc):  (113/113)*(45-36-1.0) = 8.0 -- ONE stroke better
+      than it would be at full pcc (7.0), reflecting only half the credit."""
+    all_18 = calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "all"))
+    nine = calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "front"))
+    assert all_18 == 7.0
+    assert nine == 8.0
+    assert nine != 7.0  # not accidentally applying the FULL pcc to a 9-hole score
+
+
+def test_9hole_pcc_consistent_across_calc_recompute_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.1b): a FRONT-9 round with pcc=+2.0 must
+    produce the SAME half-pcc-adjusted differential via calc_round_dif (with
+    effective_pcc applied by the caller), store.py's
+    recompute_handicaps_for_user inline site, and the routes/settings.py
+    zip-import inline site's exact formula -- all three must apply HALF
+    pcc, never the full amount, for a 9-hole score."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, get_courses, recompute_handicaps_for_user,
+        get_slope_rating,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc9", "Pcc9", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "NineCourse")
+
+    # 1) Pure-helper path: front-9, AGS=45 (half of 90 == a scratch front-9
+    # against a half-rating of 36.0), pcc=2.0 -> effective_pcc halves to 1.0.
+    assert calc_round_dif(113, 45, 36.0, pcc=effective_pcc(2.0, "front")) == 8.0
+
+    # 2) store.py inline-round path (recompute_handicaps_for_user). Front-9
+    # tee has no explicit front_slope/front_rating, so get_slope_rating
+    # falls back to the full-round slope/rating (113 / 72.0), and the
+    # "front" holes_selection halves the front-rating internally via
+    # get_slope_rating's own convention -- here we just assert the ACTUAL
+    # code path's output is internally consistent with itself and with
+    # calc_round_dif's effective_pcc-adjusted formula, not a hand-picked
+    # literal.
+    r = {"course": "NineCourse", "tees": "W", "total_gross": "45",
+         "differential": "", "computed_handicap": "", "holes_selection": "front",
+         "entry_mode": "score_only", "holes": {}, "pcc": 2.0}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.pcc == 2.0
+    assert stored.holes_selection == "front"
+
+    slope, rating = get_slope_rating(course["tees"]["W"], "front")
+    expected = round_half_up((113 / slope) * (45 - rating - effective_pcc(2.0, "front")), 1)
+    assert float(stored.differential) == expected
+    # The critical Rule 5.1b assertion: NOT the full-pcc value.
+    full_pcc_would_be = round_half_up((113 / slope) * (45 - rating - 2.0), 1)
+    assert float(stored.differential) != full_pcc_would_be
+
+    # 3) routes/settings.py zip-import inline round site's exact formula,
+    # reproduced against the same stored round + course tee data (mirrors
+    # test_zip_import_differential_rounding_matches_calc_round_dif's
+    # pattern for why this doesn't drive the Flask route directly).
+    courses_data = get_courses()
+    tee_data = courses_data[stored.course]["tees"][stored.tees]
+    s2, r2 = get_slope_rating(tee_data, stored.holes_selection)
+    zip_import_diff = round_half_up((113 / s2) * (float(stored.total_gross) - r2 - effective_pcc(stored.pcc, stored.holes_selection)), 1)
+    assert zip_import_diff == expected == float(stored.differential)
+
+
+# --------------------------------------------------------------------------
+# WHS Rule 5.1a / 5.2a -- round_half_up (differential-round-half-up fix,
+# GH#R1). Rule 5.1a: "...rounded to the nearest tenth, with .5 rounded
+# upwards" -- Python's built-in round() is banker's rounding (round-half-
+# to-even), which silently misrounds exact .5 ties (e.g. round(18.25, 1)
+# == 18.2, not the WHS-mandated 18.3). round_half_up fixes every WHS
+# nearest-tenth rounding site (Score Differential AND Handicap Index).
+# --------------------------------------------------------------------------
+
+def test_round_half_up_ties_round_up_not_to_even():
+    """Direct ties: round_half_up always rounds .5 UP, unlike round()'s
+    round-half-to-even, which would bounce 18.25 down to 18.2 (wrong) and
+    10.05 down to 10.0 (wrong) -- exactly the two examples from WHS Rule
+    5.1a's bug report."""
+    assert round_half_up(18.25, 1) == 18.3
+    assert round(18.25, 1) == 18.2  # banker's rounding: the bug being fixed
+    assert round_half_up(10.05, 1) == 10.1
+
+
+def test_round_half_up_non_tie_values_unchanged():
+    """Non-.5 values must round exactly as round() already did -- the fix
+    only changes tie-breaking, not ordinary rounding."""
+    assert round_half_up(18.24, 1) == 18.2
+    assert round_half_up(18.26, 1) == 18.3
+    assert round_half_up(0.04, 1) == 0.0
+    assert round_half_up(0.06, 1) == 0.1
+
+
+def test_round_half_up_negative_tie_away_from_zero():
+    """NEGATIVE-TIE DECISION (documented in round_half_up's docstring):
+    WHS Rule 5.1a's "rounded upwards" is written for the always-nonnegative
+    Score Differential, where "upwards" and "away from zero" coincide. This
+    implementation adopts away-from-zero for negative ties too (rather than
+    toward-positive-infinity), matching Decimal's ROUND_HALF_UP and the
+    standard cross-language meaning of "round half up". A negative (plus)
+    Handicap Index differential of -2.25 must therefore round to -2.3, NOT
+    -2.2 (which is what toward-+infinity rounding would give)."""
+    assert round_half_up(-2.25, 1) == -2.3
+    assert round_half_up(-2.15, 1) == -2.2
+    assert round_half_up(-0.05, 1) == -0.1
+
+
+def test_calc_round_dif_real_data_tie_18_25_rounds_up():
+    """Real-data validation (WHS Rule 5.1a): (113/113)*(90.25-72.0) == 18.25
+    exactly -- the round() banker's-rounding bug this fix addresses rounds
+    this DOWN to 18.2 (wrong); WHS Rule 5.1a's ".5 rounded upwards" requires
+    18.3."""
+    raw = (113 / 113) * (90.25 - 72.0)
+    assert raw == 18.25
+    assert calc_round_dif(113, 90.25, 72.0) == 18.3
+    assert round(raw, 1) == 18.2  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_calc_round_dif_real_data_tie_16_95_rounds_up():
+    """Real-data validation (WHS Rule 5.1a), a second exact-tie differential
+    computed from realistic slope/AGS/rating inputs (no synthetic decimal
+    inputs required): tee slope 120, Adjusted Gross Score 89, Course Rating
+    71.0 -> (113/120)*(89-71.0) == 16.95 exactly. Pre-fix, round()'s
+    banker's rounding gives 16.9 (wrong, rounds a "5" DOWN to the even
+    digit); WHS Rule 5.1a requires 17.0."""
+    raw = (113 / 120) * (89 - 71.0)
+    assert raw == 16.95
+    assert calc_round_dif(120, 89, 71.0) == 17.0
+    assert round(raw, 1) == 16.9  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_calc_handicap_index_real_data_avg_plus_adjustment_tie_rounds_up(make_round):
+    """Real-data validation (WHS Rule 5.2a): 6 differentials -> best-2
+    average minus the Rule 5.2a count-table adjustment (-1.0 for count==6)
+    lands EXACTLY on a tenth-tie. diffs sorted: [5.0, 11.5, 30.0, 30.0,
+    30.0, 30.0], best-2 = [5.0, 11.5], avg = 8.25, 8.25 - 1.0 = 7.25 exactly
+    -- a genuine "avg + adjustment == x.x5" tie. Pre-fix, round()'s banker's
+    rounding gives 7.2 (wrong); WHS Rule 5.2a (via round_half_up) requires
+    7.3."""
+    rounds = [make_round(differential=str(d))
+              for d in (5.0, 11.5, 30.0, 30.0, 30.0, 30.0)]
+    avg = (5.0 + 11.5) / 2
+    val = avg + count_table_adjustment(6)
+    assert val == 7.25
+    hi = calc_handicap_index(rounds)
+    assert hi == 7.3
+    assert round(val, 1) == 7.2  # the pre-fix (wrong) banker's-rounded value
+
+
+def test_differential_rounding_consistent_across_calc_store_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.1a): the SAME (slope, AGS, rating) tie input
+    must produce the IDENTICAL rounded differential on every code path that
+    computes it -- calc_round_dif (the pure helper), store.py's
+    recompute_handicaps_for_user (inline round site), and
+    routes/settings.py's zip-import backfill (inline round site). All three
+    must round the exact 18.25 tie UP to 18.3, never down to 18.2."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, recompute_handicaps_for_user,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("tie1", "Tie1", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "TieCourse")
+
+    # Direct pure-helper path.
+    assert calc_round_dif(113, 90.25, 72.0) == 18.3
+
+    # store.py inline-round path: save a round with total_gross = 90.25 and
+    # NO differential yet, so recompute_handicaps_for_user's differential
+    # backfill (the inline `round_half_up((113/slope)*(...), 1)` site) computes
+    # it fresh.
+    r = {"course": "TieCourse", "tees": "W", "total_gross": "90.25",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.differential == "18.3", (
+        f"store.py inline differential round produced {stored.differential!r}, "
+        "expected the half-up-rounded '18.3' (WHS Rule 5.1a)."
+    )
+
+
+def test_zip_import_differential_rounding_matches_calc_round_dif(tmp_data_dir):
+    """Consistency (WHS Rule 5.1a): routes/settings.py's zip-import
+    differential backfill loop must round the same 18.25 tie the same way
+    (half up -> 18.3) as calc_round_dif and store.py's recompute."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_course, save_round, get_all_rounds, get_courses
+    from calc.handicap import round_half_up as _rhu
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("tie2", "Tie2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "TieCourse")
+
+    r = {"course": "TieCourse", "tees": "W", "total_gross": "90.25",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}}
+    save_round(r, "2026-05-01", 0, user_id=1)
+
+    # Reproduce routes/settings.py's zip-import inline round site directly
+    # (importing/exercising the Flask route itself requires a full app/auth
+    # fixture; this asserts the exact inline computation the route performs
+    # against the same tee data, matching the site-by-site audit).
+    all_rounds = get_all_rounds(user_id=1)
+    courses_data = get_courses()
+    r0 = all_rounds[0]
+    tee_data = courses_data[r0.course]["tees"][r0.tees]
+    slope = float(tee_data["slope"])
+    rating = float(tee_data["rating"])
+    diff = _rhu((113 / slope) * (float(r0.total_gross) - rating), 1)
+    assert diff == 18.3 == calc_round_dif(113, 90.25, 72.0)
+
+
+def test_round_saved_with_pcc_stores_pcc_and_differential_reflects_it(tmp_data_dir):
+    """WHS Rule 5.6: a round saved with pcc=+1 must (a) store that pcc, and
+    (b) have its differential reflect the -PCC term via store.py's
+    recompute_handicaps_for_user inline differential-backfill site (the
+    same site test_differential_rounding_consistent_... exercises for
+    Rule 5.1a). AGS=90, slope=113, rating=72.0, pcc=1.0 ->
+    (113/113)*(90-72.0-1.0) = 17.0, vs 18.0 with the default pcc=0."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, recompute_handicaps_for_user,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc1", "Pcc1", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "PccCourse")
+
+    # Round WITH pcc=1.0.
+    r_with_pcc = {"course": "PccCourse", "tees": "W", "total_gross": "90",
+                  "differential": "", "computed_handicap": "", "holes_selection": "all",
+                  "entry_mode": "score_only", "holes": {}, "pcc": 1.0}
+    save_round(r_with_pcc, "2026-05-01", 0, user_id=1)
+
+    # Round WITHOUT pcc (default 0.0) -- same score, must be unaffected.
+    r_default = {"course": "PccCourse", "tees": "W", "total_gross": "90",
+                 "differential": "", "computed_handicap": "", "holes_selection": "all",
+                 "entry_mode": "score_only", "holes": {}}
+    save_round(r_default, "2026-05-02", 0, user_id=1)
+
+    recompute_handicaps_for_user(user_id=1)
+    stored = {r.date: r for r in get_all_rounds(user_id=1)}
+
+    assert stored["2026-05-01"].pcc == 1.0
+    assert stored["2026-05-01"].differential == "17.0"
+
+    # Default (no pcc) round: pcc=0.0, differential unchanged vs today
+    # (identical to the pre-Rule-5.6 formula / test_differential_rounding_
+    # consistent_..._and_zip_import's 18.0-family expectations).
+    assert stored["2026-05-02"].pcc == 0.0
+    assert stored["2026-05-02"].differential == "18.0"
+
+
+def test_pcc_differential_consistent_across_calc_store_and_zip_import(tmp_data_dir):
+    """Consistency (WHS Rule 5.6): the SAME (slope, AGS, rating, pcc) input
+    must produce the IDENTICAL differential via calc_round_dif (the pure
+    helper), store.py's recompute_handicaps_for_user (inline round site),
+    and the routes/settings.py zip-import inline round site's formula."""
+    from database import set_db_path, init_db
+    from store import (
+        create_user, save_settings, save_course, save_round,
+        get_all_rounds, get_courses, recompute_handicaps_for_user,
+        get_slope_rating,
+    )
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc2", "Pcc2", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "PccCourse2")
+
+    # 1) Pure-helper path.
+    assert calc_round_dif(113, 90, 72.0, pcc=1.0) == 17.0
+
+    # 2) store.py inline-round path (recompute_handicaps_for_user).
+    r = {"course": "PccCourse2", "tees": "W", "total_gross": "90",
+         "differential": "", "computed_handicap": "", "holes_selection": "all",
+         "entry_mode": "score_only", "holes": {}, "pcc": 1.0}
+    save_round(r, "2026-05-01", 0, user_id=1)
+    recompute_handicaps_for_user(user_id=1)
+    stored = get_all_rounds(user_id=1)[0]
+    assert stored.pcc == 1.0
+    assert stored.differential == "17.0"
+
+    # 3) routes/settings.py zip-import inline round site's exact formula,
+    # reproduced against the same stored round + course tee data (see
+    # test_zip_import_differential_rounding_matches_calc_round_dif for why
+    # this doesn't drive the Flask route directly).
+    courses_data = get_courses()
+    tee_data = courses_data[stored.course]["tees"][stored.tees]
+    slope, rating = get_slope_rating(tee_data, stored.holes_selection)
+    zip_import_diff = round_half_up((113 / slope) * (float(stored.total_gross) - rating - stored.pcc), 1)
+    assert zip_import_diff == 17.0 == calc_round_dif(113, 90, 72.0, pcc=1.0)
+
+
+def test_pcc_out_of_range_clamped_on_save(tmp_data_dir):
+    """WHS Rule 5.6: pcc=5.0 -> clamped to 3.0 on persistence (store.save_round's
+    defensive clamp_pcc call), and pcc=-2.0 -> clamped to -1.0. Exercised at
+    the store layer (bypassing the route-layer clamp) to prove the
+    defense-in-depth clamp in save_round itself, not just routes/rounds.py."""
+    from database import set_db_path, init_db
+    from store import create_user, save_settings, save_course, save_round, get_all_rounds
+
+    db_path = str(tmp_data_dir / "pinsheet.db")
+    set_db_path(db_path)
+    init_db()
+
+    create_user("pcc3", "Pcc3", "pass1234")
+    save_settings({"include_9hole": True}, user_id=1)
+    course = {
+        "par": "72",
+        "holes": {str(n): {"par": "4", "hole_index": str(n)} for n in range(1, 19)},
+        "tees": {"W": {"slope": "113", "rating": "72.0", "yardage": "6000"}},
+    }
+    save_course(course, "ClampCourse")
+
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": 5.0},
+               "2026-05-01", 0, user_id=1)
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": -2.0},
+               "2026-05-02", 0, user_id=1)
+    save_round({"course": "ClampCourse", "tees": "W", "total_gross": "90",
+                "differential": "0", "computed_handicap": "", "holes_selection": "all",
+                "entry_mode": "score_only", "holes": {}, "pcc": "not-a-number"},
+               "2026-05-03", 0, user_id=1)
+
+    stored = {r.date: r for r in get_all_rounds(user_id=1)}
+    assert stored["2026-05-01"].pcc == 3.0
+    assert stored["2026-05-02"].pcc == -1.0
+    assert stored["2026-05-03"].pcc == 0.0
+
+
+def test_legacy_db_without_pcc_column_migrates_and_loads(tmp_data_dir):
+    """Migration (WHS Rule 5.6): a DB created before the pcc column existed
+    (simulated here by creating the `rounds` table WITHOUT it) must still
+    load after init_db() runs its migration -- existing rows backfill to
+    pcc=0.0 and their differentials are unaffected."""
+    import sqlite3
+    from database import set_db_path, init_db
+    from store import create_user, get_all_rounds
+
+    db_path = str(tmp_data_dir / "legacy.db")
+    set_db_path(db_path)
+
+    # Simulate a pre-Rule-5.6 DB: create users + a rounds table with NO pcc
+    # column (mirrors the pre-migration schema in database.py's CREATE
+    # TABLE), then insert a legacy round row directly, bypassing store.py
+    # entirely so no code path can implicitly create the column first.
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE users (
+            id            INTEGER PRIMARY KEY,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            is_admin      INTEGER DEFAULT 0,
+            created_at    TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE rounds (
+            id            INTEGER PRIMARY KEY,
+            user_id       INTEGER NOT NULL REFERENCES users(id),
+            course_name   TEXT NOT NULL,
+            date          TEXT NOT NULL,
+            round_index   INTEGER NOT NULL DEFAULT 0,
+            tee_name      TEXT,
+            holes_played  TEXT,
+            entry_mode    TEXT,
+            holes         TEXT,
+            total_gross   TEXT,
+            total_putts   TEXT,
+            differential  TEXT,
+            notes         TEXT,
+            excluded      INTEGER DEFAULT 0,
+            computed_handicap TEXT,
+            created_at    TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, date, round_index)
+        )
+    """)
+    conn.execute(
+        "INSERT INTO users (id, username, display_name, password_hash) VALUES (1, 'legacy', 'Legacy', 'x')"
+    )
+    conn.execute(
+        """INSERT INTO rounds
+           (user_id, course_name, date, round_index, tee_name, holes_played,
+            entry_mode, holes, total_gross, differential, notes, excluded, computed_handicap)
+           VALUES (1, 'LegacyCourse', '2025-01-01', 0, 'W', 'all', 'score_only', '{}',
+                   '85', '18.0', '', 0, '10.0')"""
+    )
+    conn.commit()
+    conn.close()
+
+    # init_db()'s migration (_add_column_if_missing) must add pcc without
+    # error and without touching the existing (pre-Rule-5.6) differential.
+    init_db()
+
+    rounds = get_all_rounds(user_id=1)
+    assert len(rounds) == 1
+    assert rounds[0].pcc == 0.0
+    assert rounds[0].differential == "18.0"
+
+
+def test_calc_9hole_dif_combines_base_with_expected():
+    # WHS 9-hole combine: base 9-hole Score Differential + the expected
+    # 9-hole adjustment keyed on the prior displayed Handicap Index
+    # (handicap_index * 0.52 + 1.197). base = (113/113)*(45-33.7) = 11.3.
+    assert calc_9hole_dif(113, 45, 33.7, 10.0) == round(11.3 + 10.0 * 0.52 + 1.197, 1) == 17.7
+    # A genuine 0.0 scratch HI still gets the expected term -- matches the TUI.
+    assert calc_9hole_dif(113, 45, 33.7, 0.0) == round(11.3 + 0.0 * 0.52 + 1.197, 1) == 12.5
+
+
+def test_calc_9hole_dif_no_prior_hi_returns_raw_base():
+    # No established HI -> the raw base 9-hole Score Differential, unadjusted.
+    assert calc_9hole_dif(113, 45, 33.7, None) == 11.3
 
 
 def test_calc_expected_9hole_dif():
@@ -286,13 +987,75 @@ def test_calc_handicap_index_19_diffs_no_adjustment(make_round):
 
 def test_calc_handicap_index_negative_not_clamped(make_round):
     """WHS Rule 5.2a intentionally allows negative (plus) handicap indexes --
-    no clamping is applied here (the 54.0 max is a separate, out-of-scope
-    rule). 3 differentials -> best-1 average minus 2.0 adjustment.
+    no LOWER clamp is applied (only the Rule 5.3 54.0 MAXIMUM is clamped;
+    see test_calc_handicap_index_max_54_clamp below). 3 differentials ->
+    best-1 average minus 2.0 adjustment.
     diffs sorted: [1.0, 2.0, 3.0], best-1 = 1.0, 1.0 - 2.0 = -1.0."""
     rounds = [make_round(differential=str(d)) for d in (1.0, 2.0, 3.0)]
     hi = calc_handicap_index(rounds)
     assert hi == -1.0
     assert hi < 0
+
+
+def test_calc_handicap_index_3_diffs_of_60_returns_raw_uncapped_58(make_round):
+    """WHS Rule 5.3: `calc_handicap_index` deliberately returns the RAW
+    (unclamped) Rule 5.2/5.2a value -- 3 differentials of 60.0 -> best-1
+    average (60.0) minus the Rule 5.2a -2.0 adjustment = 58.0. The 54.0
+    maximum is applied downstream, at the displayed/stored-value sites
+    (after any Rule 5.8 cap -- see store.recompute_handicaps_for_user and
+    the e2e coverage in test_e2e_rounds_scores.py), NOT here -- see this
+    function's docstring for why clamping here would distort Rule 5.8's
+    `increase = raw - low_hi` computation."""
+    rounds = [make_round(differential="60.0") for _ in range(3)]
+    assert calc_handicap_index(rounds) == 58.0
+
+
+def test_calc_handicap_index_20_diffs_best8_62_returns_raw_uncapped(make_round):
+    """WHS Rule 5.3: 20 differentials whose best-8 average is 62.0 (no Rule
+    5.2a adjustment at 20 diffs) -- `calc_handicap_index` returns the raw
+    62.0, not a clamped 54.0 (clamping happens downstream at
+    displayed/stored-value sites)."""
+    diffs = [62.0] * 8 + [90.0] * 12
+    rounds = [make_round(differential=str(d)) for d in diffs]
+    assert calc_handicap_index(rounds) == 62.0
+
+
+def test_calc_handicap_index_no_clamp_when_at_or_below_54(make_round):
+    """A normal record (best-8 average 12.3) is unaffected either way -- it
+    stays exactly at its computed value both raw and once clamped."""
+    diffs = [12.3] * 8 + [20.0] * 12
+    rounds = [make_round(differential=str(d)) for d in diffs]
+    assert calc_handicap_index(rounds) == 12.3
+
+
+def test_whs_max_handicap_index_constant_is_54():
+    assert WHS_MAX_HANDICAP_INDEX == 54.0
+
+
+def test_rule_5_8_cap_applied_before_rule_5_3_max_ordering(make_round):
+    """WHS order of operations: 5.2/5.2a -> 5.9 (ESR) -> 5.8 (soft/hard cap)
+    -> 5.3 (54.0 maximum), i.e. the 54.0 ceiling is applied LAST, AFTER the
+    Rule 5.8 cap -- so the cap must see the TRUE raw Handicap Index, not a
+    pre-clamped one. This regression proves the two orders diverge for a
+    low_hi in the ~47-51 band where raw exceeds 54:
+
+      raw = 58.0, low_hi = 49.0
+      correct (cap-then-clamp):  apply_handicap_cap(58.0, 49.0) = 54.0,
+                                  then min(54.0, 54.0) = 54.0
+      wrong   (clamp-then-cap):  min(58.0, 54.0) = 54.0,
+                                  then apply_handicap_cap(54.0, 49.0) = 53.0
+
+    A 1.0-stroke divergence -- proving clamp order matters and confirming
+    the fix applies the 54.0 max AFTER apply_handicap_cap, not before."""
+    raw = 58.0
+    low_hi = 49.0
+
+    correct_order = min(apply_handicap_cap(raw, low_hi), WHS_MAX_HANDICAP_INDEX)
+    wrong_order = apply_handicap_cap(min(raw, WHS_MAX_HANDICAP_INDEX), low_hi)
+
+    assert correct_order == 54.0
+    assert wrong_order == 53.0
+    assert correct_order != wrong_order
 
 
 def test_calc_handicap_trend_empty():
@@ -305,6 +1068,22 @@ def test_calc_handicap_trend_returns_pairs(make_round):
     trend = calc_handicap_trend(rounds)
     assert len(trend) > 0
     assert all(isinstance(t, tuple) and len(t) == 2 for t in trend)
+
+
+def test_calc_handicap_trend_clamps_to_max_54(make_round):
+    """WHS Rule 5.3 regression: unlike `calc_handicap_index`,
+    `calc_handicap_trend` is an independent rolling-window accumulator that
+    does NOT delegate to `calc_handicap_index` (and is wired into
+    STAT_CATALOG["handicap"]["trend_fn"] in web/catalog.py) -- it must
+    clamp its own emitted points. 3 differentials of 68.0 -> best-1 average
+    (68.0) minus the Rule 5.2a -2.0 adjustment = 66.0 raw, which must be
+    clamped down to 54.0 (prior to this fix the trend point would have been
+    the unclamped 66.0)."""
+    rounds = [make_round(date=f"2026-05-{d:02d}", gross=150, differential="68.0")
+              for d in range(1, 4)]
+    trend = calc_handicap_trend(rounds)
+    assert len(trend) == 1
+    assert trend[0][1] == 54.0
 
 
 def test_calc_playing_to_handicap_rate_empty():
@@ -1424,18 +2203,28 @@ def test_esr_three_simultaneous_exceptional_scores_staggered_aging_out(tmp_data_
         return rounds_by_date[date_str].computed_handicap
 
     # Rounds 31-40: all three exceptional reductions active simultaneously
-    # (cumulative -3.0 vs. the raw window average).
-    assert hi_at(31) == "13.2"
-    assert hi_at(40) == "13.2"
-    # Round 41: round 21 ages out of the window -- sum steps to -2.0.
-    assert hi_at(41) == "15.2"
-    assert hi_at(45) == "15.2"
-    # Round 46: round 26 ages out -- sum steps to -1.0.
+    # (cumulative -3.0 vs. the raw window average). The window-31 raw
+    # best-8 average lands exactly on a tenth-tie (16.25); WHS Rule 5.1a's
+    # "rounded to the nearest tenth, with .5 rounded upwards" (applied via
+    # round_half_up to Rule 5.2a's Handicap Index rounding too) resolves
+    # this UP to 16.3, not banker's-rounding's 16.2 -- so 16.3 - 3.0 = 13.3
+    # (was "13.2" pre-fix, when round() banker-rounded the 16.25 tie down).
+    assert hi_at(31) == "13.3"
+    assert hi_at(40) == "13.3"
+    # Round 41: round 21 ages out of the window -- sum steps to -2.0. The
+    # window-41 raw best-8 average also lands on a tie (17.25 -> 17.3 half
+    # up, not 17.2), so 17.3 - 2.0 = 15.3 (was "15.2" pre-fix).
+    assert hi_at(41) == "15.3"
+    assert hi_at(45) == "15.3"
+    # Round 46: round 26 ages out -- sum steps to -1.0. No tie in this
+    # window's raw average, so the half-up fix does not change this value.
     assert hi_at(46) == "16.9"
     assert hi_at(50) == "16.9"
-    # Round 51: round 31 ages out -- sum steps to 0.0, fully diluted.
-    assert hi_at(51) == "18.1"
-    assert hi_at(56) == "18.1"
+    # Round 51: round 31 ages out -- sum steps to 0.0, fully diluted. The
+    # window-51 raw best-8 average lands on a tie (18.15 -> 18.2 half up,
+    # not 18.1), so this is 18.2 (was "18.1" pre-fix).
+    assert hi_at(51) == "18.2"
+    assert hi_at(56) == "18.2"
 
 
 def test_esr_excluded_round_neither_exceptional_nor_consumes_window_slot(tmp_data_dir):
@@ -1631,3 +2420,42 @@ def test_handicap_trend_from_stored_skips_excluded_rounds():
     trend = handicap_trend_from_stored(rounds)
     assert trend == [("2026-03-01", 11.0), ("2026-03-03", 12.0)]
     assert all(d != "2026-03-02" for d, _ in trend)
+
+
+def test_apply_handicap_cap_soft_cap_tie_rounds_half_up():
+    """WHS Rule 5.1a half-up applies to the soft-cap output too: the
+    0.5*(increase-3.0) term can create a genuine .x5 tie. LHI 10.0, raw 13.1
+    -> increase 3.1 -> capped = 10+3+0.5*0.1 = 13.05 -> half-up 13.1 (banker's
+    round() would give 13.0)."""
+    assert apply_handicap_cap(13.1, 10.0) == 13.1
+    # sanity: a non-tie soft-cap still correct
+    assert apply_handicap_cap(14.0, 10.0) == 13.5
+
+
+def test_calc_course_handicap_rounds_half_up_not_bankers():
+    """WHS Rule 6.1a: Course Handicap rounds to the nearest whole with .5 UP.
+    slope 113 + rating==par makes CH == HI exactly, so a .5 HI is an exact tie."""
+    # 10.5 -> 11 (banker's round() gives 10), 2.5 -> 3 (banker's gives 2)
+    assert calc_course_handicap(10.5, 72, 113, 72.0) == 11
+    assert calc_course_handicap(2.5, 72, 113, 72.0) == 3
+    # non-tie unaffected: HI 10, slope 128, CR 71.5, par 72 -> 10*128/113-0.5 = 10.84 -> 11
+    assert calc_course_handicap(10.0, 72, 128, 71.5) == 11
+    # negative (plus handicap) tie: -0.5 -> -1 (away from zero)
+    assert calc_course_handicap(-0.5, 72, 113, 72.0) == -1
+
+
+def test_playing_to_handicap_rate_clamps_fallback_threshold_to_54():
+    """WHS Rule 5.3: the raw-HI fallback threshold (for rounds without a stored
+    computed_handicap) must be clamped to 54.0. A differential of 56 must count
+    as NOT played-to-handicap against the 54.0 bar, even though the unclamped
+    raw HI (58) would wrongly count it."""
+    from types import SimpleNamespace as NS
+    # 3 diffs of 60 -> raw calc_handicap_index = 58.0 (lowest-1 -2.0), clamps to 54.0
+    rounds = [
+        NS(differential="56.0", computed_handicap="", excluded=False, holes_selection="all"),
+        NS(differential="60.0", computed_handicap="", excluded=False, holes_selection="all"),
+        NS(differential="60.0", computed_handicap="", excluded=False, holes_selection="all"),
+    ]
+    rate = calc_playing_to_handicap_rate(rounds)
+    # threshold 54.0: none of 56/60/60 are <= 54 -> 0% played to handicap
+    assert rate == 0.0

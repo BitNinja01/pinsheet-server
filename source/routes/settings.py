@@ -8,11 +8,9 @@ from flask_login import login_required, current_user
 
 from store import (
     save_settings, save_course, save_round,
-    get_all_rounds, update_round_handicap, update_round_differential,
-    get_slope_rating,
+    reshape_course_data, recompute_handicaps_for_user,
     create_api_key, list_api_keys, revoke_api_key, API_KEY_PERMISSIONS,
 )
-from calc import calc_handicap_index
 from source.request_data import get_settings, get_courses, base_context
 from source.routes.courses import _coerce_course_numerics
 
@@ -92,6 +90,9 @@ def register_settings_routes(app, limiter, csrf):
                             # (finding U1 / GH#68), but lenient: blank out any
                             # non-numeric value instead of rejecting the import.
                             _coerce_course_numerics(cdata, strict=False)
+                            # TUI-era exports carry per-hole tees and possibly
+                            # `index` stroke keys; store canonically.
+                            cdata = reshape_course_data(cdata)
                             save_course(cdata, cname)
                             courses_count += 1
                     elif "rounds/" in name and name.endswith(".json"):
@@ -106,36 +107,16 @@ def register_settings_routes(app, limiter, csrf):
             except ValueError:
                 return _import_error("Archive entry too large")
 
-            all_imported = get_all_rounds(user_id)
-            chronological = list(reversed(all_imported))
-            total = len(all_imported)
-            courses_data = get_courses()
-            include_9hole = get_settings().get("include_9hole", True)
-            for i, r in enumerate(chronological):
-                if not r.differential or r.differential == "0":
-                    course_data = courses_data.get(r.course)
-                    if course_data:
-                        tee_data = course_data.get("tees", {}).get(r.tees)
-                        if tee_data and r.total_gross and r.total_gross != "0":
-                            slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                            diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
-                            update_round_differential(r.date, r.index, diff, user_id)
-                            # Keep the in-memory object in sync with the DB write so the
-                            # handicap window below sees the fresh differential (not stale "0").
-                            r.differential = str(diff)
-                # WHS Rule 5.2: calc_handicap_index requires most-recent-first
-                # input and windows to the most recent 20 ELIGIBLE
-                # differentials internally. `r` is chronological[i]
-                # (oldest-first); its position in the original
-                # most-recent-first `all_imported` is `idx`, so
-                # `all_imported[idx:]` is "all rounds up to and including r,
-                # in most-recent-first order" -- the old oldest-first,
-                # unbounded `chronological[:i + 1]` violated the contract.
-                idx = total - 1 - i
-                history_most_recent_first = all_imported[idx:]
-                hi = calc_handicap_index(history_most_recent_first, include_9hole)
-                if hi is not None:
-                    update_round_handicap(r.date, r.index, hi, user_id)
+            # WHS Rule 12 / Rule 3 / Rule 5.2 / 5.7-5.9: delegate the entire
+            # post-import recompute to the single authoritative sequential path
+            # so imported rounds get the SAME Score Differential (ESC-adjusted
+            # gross, using the prior DISPLAYED capped/ESR Handicap Index) and
+            # the SAME capped/ESR computed_handicap as live-entered rounds. A
+            # bespoke import loop previously used a raw (uncapped, no-ESR) prior
+            # HI as the ESC basis and skipped the Rule 5.8/5.9 pass, so an
+            # imported detailed round diverged from the identical round entered
+            # live once a cap/ESR was active.
+            recompute_handicaps_for_user(user_id)
 
             return render_template("settings_import.html", **base_context(
                 current_page="settings",
@@ -170,6 +151,7 @@ def register_settings_routes(app, limiter, csrf):
 
     @app.route("/settings/api-keys", methods=["POST"])
     @login_required
+    @limiter.limit("10 per minute")  # issue #75: throttle credential minting
     def api_keys_create():
         label = request.form.get("label", "").strip() or "Unnamed key"
         permissions = [p for p in request.form.getlist("permissions") if p in API_KEY_PERMISSIONS]

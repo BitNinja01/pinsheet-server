@@ -46,8 +46,20 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
         previous = found[1] if len(found) >= 2 else None
         return current, previous
 
-    from calc.handicap import calc_handicap_index
-    return calc_handicap_index(rounds, include_9hole), calc_handicap_index(rounds[1:], include_9hole)
+    from calc.handicap import calc_handicap_index, WHS_MAX_HANDICAP_INDEX
+    # WHS Rule 5.3: calc_handicap_index returns the raw, unclamped Rule
+    # 5.2/5.2a value (the 54.0 maximum is applied as the FINAL step at
+    # displayed-value sites, after any Rule 5.8 cap -- see that function's
+    # docstring). This IS a displayed value (the dashboard hero "Handicap"
+    # panel), so clamp both the current and previous fallback values here.
+    # No lower clamp -- plus/negative Handicap Indexes are preserved.
+    current = calc_handicap_index(rounds, include_9hole)
+    previous = calc_handicap_index(rounds[1:], include_9hole)
+    if current is not None:
+        current = min(current, WHS_MAX_HANDICAP_INDEX)
+    if previous is not None:
+        previous = min(previous, WHS_MAX_HANDICAP_INDEX)
+    return current, previous
 
 
 def handicap_trend_from_stored(all_rounds) -> list:

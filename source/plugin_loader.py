@@ -183,13 +183,16 @@ def discover_plugins(app: "Flask") -> None:
         # directory regardless of enable-state (used for admin listing).
         static_info = _read_plugin_info_static(entry)
 
-        # plugin_states/enable-gate is keyed by the folder name so gating
-        # can happen BEFORE import (a mismatched plugin_info["name"] is
-        # only knowable *after* import, which is exactly what we must not
-        # do yet for a disabled plugin).
+        # plugin_states/enable-gate is keyed by the folder name: the on-disk
+        # directory is the stable identity the admin vouches for when enabling.
+        # plugin_info["name"] is display metadata and may differ from the
+        # folder name (e.g. cartographer), so it must not gate loading.
         seed_plugin_state(folder_name)
         app._discovered_plugins.append(
-            types.SimpleNamespace(plugin_info=static_info or {"name": folder_name, "version": "?"})
+            types.SimpleNamespace(
+                plugin_info=static_info or {"name": folder_name, "version": "?"},
+                folder_name=folder_name,
+            )
         )
 
         # Default-DENY: if a plugin has no explicit enabled row, treat it as

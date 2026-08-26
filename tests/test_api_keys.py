@@ -381,7 +381,9 @@ def test_no_new_dependencies_added(test_app):
         for d in data["project"]["dependencies"]
     )
     assert names == sorted(
-        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "werkzeug"]
+        # werkzeug (dev) and flask-talisman (issue #73) added outside this
+        # feature — kept in the approved baseline so AC-15 stays meaningful.
+        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "werkzeug", "flask-talisman"]
     )
 
 

@@ -272,12 +272,11 @@ def calc_per_hole_stats(
                         # so there is a single source of truth; do not
                         # reimplement the (rating - par) term inline here.
                         course_hcp = calc_course_handicap(handicap_index, c_par, slope, rating)
-                        # WHS 0/1/2 stroke rule: a hole receives a 2nd
-                        # stroke once Course Handicap >= Stroke Index + 18
-                        # (reachable on hard/high-slope courses once HI
-                        # pushes Course Handicap above 18) -- delegate to
-                        # calc.handicap.calc_strokes_given (shared with
-                        # calc_hole_scores) instead of capping at 1 inline.
+                        # WHS stroke rule (Rule 6.2b) 0/1/2/3 allocation via
+                        # the single shared helper (also used by
+                        # calc_hole_scores) instead of capping at 1 inline --
+                        # a hole receives an extra stroke once Course
+                        # Handicap >= Stroke Index + 18 (+ 36 for the third).
                         strokes_received += calc_strokes_given(si_int, course_hcp)
                         holes_with_si += 1
                     except (ValueError, TypeError, StopIteration):

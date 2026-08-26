@@ -9,6 +9,7 @@ from calc import (
     calc_gir_trend,
     calc_handicap_index,
     calc_handicap_trend,
+    WHS_MAX_HANDICAP_INDEX,
     calc_one_putt_percent,
     calc_one_putt_trend,
     calc_par_or_better_percent,
@@ -25,6 +26,14 @@ from calc import (
     calc_three_putt_trend,
 )
 
+
+def _clamp_max_hi(val):
+    """WHS Rule 5.3: clamp a raw calc_handicap_index() value to the 54.0
+    maximum for display. No lower clamp -- plus/negative Handicap Indexes
+    are preserved. `val` may be None (not enough eligible rounds yet)."""
+    return val if val is None else min(val, WHS_MAX_HANDICAP_INDEX)
+
+
 STAT_CATALOG: list = [
     {
         "key": "handicap",
@@ -35,8 +44,11 @@ STAT_CATALOG: list = [
         # `l20` is caller-supplied and must be most-recent-first (WHS
         # ordering contract for calc_handicap_index); callers here pass
         # date-range-scoped rounds, already in most-recent-first order.
-        "fn_primary":   lambda l20, b8, c, i9: calc_handicap_index(l20, i9),
-        "fn_secondary": lambda l20, b8, c, i9: calc_handicap_index(l20[1:], i9),
+        # WHS Rule 5.3: calc_handicap_index returns the raw, unclamped
+        # value -- this IS a displayed value (challenge leaderboard), so
+        # clamp to the 54.0 maximum here (no lower clamp).
+        "fn_primary":   lambda l20, b8, c, i9: _clamp_max_hi(calc_handicap_index(l20, i9)),
+        "fn_secondary": lambda l20, b8, c, i9: _clamp_max_hi(calc_handicap_index(l20[1:], i9)),
         "trend_fn":     lambda all_r, c, i9: calc_handicap_trend(all_r, i9),
         "blank_text": "Play 3+ rounds to see handicap",
     },

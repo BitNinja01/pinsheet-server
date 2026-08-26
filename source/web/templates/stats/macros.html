@@ -75,7 +75,7 @@
         <circle cx="{{ last_x }}" cy="{{ last_y }}" r="4" fill="var(--ps-accent)" pointer-events="none"/>
         {% endif %}
       </svg>
-      <script>
+      <script nonce="{{ csp_nonce() }}">
         (function(){var c=document.currentScript.parentElement,q=c.querySelector("svg"),t=c.querySelector(".ps-chart-tip");if(!q||!t)return;var d=q.querySelectorAll(".ps-chart-dot,.ps-chart-dot-last");d.forEach(function(n){n.addEventListener("mouseenter",function(e){t.textContent=this.dataset.value,t.style.opacity="1";var r=c.getBoundingClientRect();t.style.left=(e.clientX-r.left+12)+"px",t.style.top=(e.clientY-r.top-28)+"px"}),n.addEventListener("mouseleave",function(){t.style.opacity="0"})})})();
       </script>
     </div>

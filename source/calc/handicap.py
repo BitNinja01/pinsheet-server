@@ -1,25 +1,67 @@
 import bisect
 import math
+from decimal import Decimal, ROUND_HALF_UP
 
 from source.models import RoundData
+
+
+def round_half_up(value: float, ndigits: int = 1) -> float:
+    """WHS-compliant nearest-tenth rounding: rounds .5 ties UP (away from
+    zero), NOT Python's built-in `round()`, which uses banker's rounding
+    (round-half-to-even) and would silently misround exact ties -- e.g.
+    `round(18.25, 1) == 18.2` (wrong) instead of `18.3` (correct).
+
+    WHS Rule 5.1a: "An 18-hole Score Differential is calculated as follows
+    and rounded to the nearest tenth, with .5 rounded upwards..." Rule 5.2a
+    applies the same "round to the nearest tenth" convention to the
+    Handicap Index. Both rules are implemented via this helper so every WHS
+    nearest-tenth rounding site behaves identically.
+
+    Uses `Decimal(str(value))` (not `Decimal(value)`) to avoid re-surfacing
+    the binary floating-point representation error of `value` itself before
+    rounding -- `str(value)` gives Python's shortest round-tripping decimal
+    representation, which is what a human (and the WHS rule text) means by
+    "the value".
+
+    NEGATIVE-TIE DECISION: `Decimal.quantize(..., rounding=ROUND_HALF_UP)`
+    rounds ties AWAY FROM ZERO (e.g. -2.25 -> -2.3), not toward positive
+    infinity. WHS Rule 5.1a's "rounded upwards" is written for the
+    (always non-negative) Score Differential calculation, where "upwards"
+    and "away from zero" coincide -- there is no ambiguity in the rule text
+    for that case. For a negative (plus) Handicap Index, "rounded upwards"
+    read literally would mean toward +infinity (-2.25 -> -2.2), but
+    away-from-zero is the standard, unambiguous interpretation of "round
+    half up" used by virtually every rounding-mode implementation
+    (including Python's `decimal.ROUND_HALF_UP`) and by common golf/WHS
+    software implementations, so it is adopted here uniformly for both
+    differentials and Handicap Index values rather than special-casing sign.
+    A negative .x5 boundary is asserted against this (away-from-zero)
+    behavior in tests -- see `test_round_half_up_negative_tie_away_from_zero`.
+    """
+    quantum = Decimal(1).scaleb(-ndigits)
+    return float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
 def calc_strokes_given(hole_stroke_index, course_handicap) -> int:
     """WHS stroke allocation (Rule 6.2b): a player receives 1 stroke on a
     hole once their Course Handicap reaches/exceeds that hole's Stroke
-    Index, and a 2nd stroke once it reaches/exceeds Stroke Index + 18.
-    The +18 branch only fires once Course Handicap exceeds 18 -- e.g.
-    high-Handicap-Index players on hard/high-slope courses -- so it is
-    easy to omit by accident when a Course Handicap consumer only
-    hand-rolls the single-stroke branch. Single source of truth for the
-    0/1/2 stroke rule; shared by `calc_hole_scores` and
-    `calc.scoring.calc_per_hole_stats`'s strokes-received stat so they
-    can't drift apart."""
+    Index, a 2nd stroke once it reaches/exceeds Stroke Index + 18, and a
+    3rd stroke once it reaches/exceeds Stroke Index + 36 (Course
+    Handicaps above 36 are reachable under the Rule 5.3 54.0 max index on
+    hard/high-slope courses). The +18/+36 branches only fire once Course
+    Handicap exceeds 18 -- e.g. high-Handicap-Index players on
+    hard/high-slope courses -- so they are easy to omit by accident when a
+    Course Handicap consumer only hand-rolls the single-stroke branch.
+    Single source of truth for the 0/1/2/3 stroke rule; shared by
+    `calc_hole_scores` and `calc.scoring.calc_per_hole_stats`'s
+    strokes-received stat so they can't drift apart."""
     strokes_given = 0
     if course_handicap >= hole_stroke_index:
         strokes_given = 1
     if course_handicap >= (hole_stroke_index + 18):
         strokes_given = 2
+    if course_handicap >= (hole_stroke_index + 36):
+        strokes_given = 3
     return strokes_given
 
 
@@ -31,11 +73,130 @@ def calc_hole_scores(hole_stroke_index, course_handicap, hole_par, hole_gross) -
 
 
 def calc_course_handicap(handicap, course_par, course_slope, course_rating) -> int:
-    return round(handicap * (course_slope / 113) + (course_rating - course_par))
+    # WHS Rule 6.1a (2024): Course Handicap = HI x (Slope/113) + (CR - Par),
+    # rounded to the nearest whole number with .5 rounded UP. Python's built-in
+    # round() is banker's (half-to-even), so 10.5 -> 10 and 2.5 -> 2 (both
+    # should be 11 and 3). round_half_up(x, 0) gives the WHS-correct integer.
+    return int(round_half_up(handicap * (course_slope / 113) + (course_rating - course_par), 0))
 
 
-def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating) -> float:
-    return round((113 / tee_slope) * (adjusted_gross_score - tee_rating), 1)
+# WHS Appendix C: recommended Handicap Allowances by play format. These are
+# the *recommended* percentages a committee may apply to the Course Handicap
+# to derive the Playing Handicap for a given format -- they are reference
+# defaults, not mandated values (a committee/club may choose otherwise), so
+# callers pass an explicit `allowance_percent` to `calc_playing_handicap`
+# rather than this dict being consulted automatically.
+WHS_HANDICAP_ALLOWANCES = {
+    "individual_match": 100,
+    "individual_stroke": 95,
+    "fourball_match": 90,
+    "fourball_stroke": 85,
+    "stableford_individual": 95,
+}
+
+
+def calc_playing_handicap(course_handicap: int, allowance_percent: float = 100) -> int:
+    # WHS Rule 6.2: Playing Handicap = Course Handicap x Handicap Allowance,
+    # rounded to the nearest whole number with .5 rounded UP (same
+    # round_half_up convention as Rule 6.1a's Course Handicap rounding --
+    # NOT Python's banker's-rounding round()). Appendix C recommends
+    # allowance percentages by format (see WHS_HANDICAP_ALLOWANCES); the
+    # default of 100 leaves the Course Handicap unchanged, matching prior
+    # (pre-Rule-6.2) behavior for callers that don't specify an allowance.
+    return int(round_half_up(course_handicap * allowance_percent / 100.0, 0))
+
+
+def calc_round_dif(tee_slope, adjusted_gross_score, tee_rating, pcc: float = 0.0) -> float:
+    # WHS Rule 5.6 / 5.1a: Score Differential = (113/Slope) x (Adjusted Gross
+    # Score - Course Rating - PCC), rounded to the nearest tenth with .5
+    # rounded upwards -- use round_half_up, not banker's-rounding round().
+    # PCC (Playing Conditions Calculation, WHS Rule 5.6) ranges -1.0..+3.0
+    # and is normally computed centrally by the handicap authority from the
+    # day's whole field of scores, which a single-user tracking app has no
+    # way to compute -- so it's plumbed through here as an optional
+    # per-round input (see source.models.clamp_pcc for the range guard
+    # applied at every input boundary). Default 0.0 (no PCC adjustment)
+    # reproduces every differential exactly as computed before this
+    # parameter existed, for every caller that doesn't pass pcc.
+    return round_half_up((113 / tee_slope) * (adjusted_gross_score - tee_rating - pcc), 1)
+
+
+def calc_9hole_dif(tee_slope, adjusted_gross_score, tee_rating, prior_hi, pcc: float = 0.0) -> float:
+    """WHS 9-hole combine (expected-score equation, mirrors the TUI): the Score
+    Differential for a 9-hole round is the base 9-hole Score Differential
+    (computed from the 9-hole tee slope/rating against the adjusted gross,
+    PCC-adjusted per Rule 5.6 / 5.1b -- callers pass the EFFECTIVE, halved
+    PCC for 9-hole scores, see source.models.effective_pcc) PLUS the
+    expected 9-hole adjustment keyed on the Handicap Index in effect when
+    the round was played. Rounded to the nearest tenth with .5 UP per WHS
+    Rule 5.1a (round_half_up), matching every other Score Differential site.
+
+    ``prior_hi`` is the prior DISPLAYED (Rule 5.8-capped / 5.9-ESR-adjusted)
+    Handicap Index -- i.e. the most recent chronologically-prior round's
+    stored computed_handicap -- or None when no Handicap Index has been
+    established yet. In that case the raw base differential is returned
+    unadjusted (there is no HI to combine against), matching the TUI.
+    """
+    base = calc_round_dif(tee_slope, adjusted_gross_score, tee_rating, pcc)
+    if prior_hi is None:
+        return base
+    return round_half_up(base + calc_expected_9hole_dif(prior_hi), 1)
+
+
+def _hole_gross_value(hole) -> int:
+    """Read a hole's gross from either a HoleData object or a plain dict."""
+    if hole is None:
+        return 0
+    raw = getattr(hole, "gross", None)
+    if raw is None and isinstance(hole, dict):
+        raw = hole.get("gross")
+    try:
+        return int(raw or 0)
+    except (ValueError, TypeError):
+        return 0
+
+
+def calc_adjusted_gross_score(round_holes, course_holes, course_handicap) -> int | None:
+    """WHS Adjusted Gross Score: sum of per-hole scores each capped at net
+    double bogey (par + 2 + strokes received).
+
+    ``round_holes`` maps hole number -> HoleData|dict (with ``gross``).
+    ``course_holes`` maps hole number -> dict with ``par`` and a stroke index
+    under either ``hole_index`` (canonical) or ``index`` (legacy fallback).
+
+    Returns the adjusted total, or ``None`` when no per-hole gross is available
+    (the caller should then fall back to the raw total gross).
+    """
+    if not round_holes or not course_holes:
+        return None
+    total = 0
+    any_scored = False
+    for hole_num, hole in round_holes.items():
+        gross = _hole_gross_value(hole)
+        hc = course_holes.get(str(hole_num)) or course_holes.get(hole_num) or {}
+        # Parse par defensively: course hole data comes from client JSON and may
+        # be blank or non-numeric. A hole we cannot parse a real par for is left
+        # UNCAPPED (raw gross) rather than crashing or capping against par 0,
+        # which would silently deflate the score.
+        par = None
+        if hc:
+            try:
+                par = int(hc.get("par"))
+            except (ValueError, TypeError):
+                par = None
+        if par and gross > 0:
+            try:
+                si = int(hc.get("hole_index", hc.get("index", 999)))
+            except (ValueError, TypeError):
+                si = 999
+            _, _, esc = calc_hole_scores(si, course_handicap, par, gross)
+            total += esc
+            any_scored = True
+        else:
+            total += gross
+            if gross > 0:
+                any_scored = True
+    return total if any_scored else None
 
 
 def calc_expected_9hole_dif(handicap_index: float) -> float:
@@ -47,6 +208,13 @@ def calc_expected_9hole_dif(handicap_index: float) -> float:
 # window and calc_handicap_trend's rolling window so the two windowing
 # implementations can't drift apart.
 WHS_HANDICAP_WINDOW = 20
+
+# WHS Rule 5.3 / 5.2a: the maximum Handicap Index that can be issued to a
+# player is 54.0. If a player's calculated Handicap Index exceeds this, it
+# is allocated as 54.0 instead. There is deliberately NO lower clamp -- WHS
+# permits plus/negative Handicap Indexes (see the Rule 5.2a/5.9 negative-HI
+# handling elsewhere in this module).
+WHS_MAX_HANDICAP_INDEX = 54.0
 
 
 def count_table_n(n: int) -> int:
@@ -168,8 +336,22 @@ def calc_handicap_index(
     best_n = diffs[:n]
     avg = sum(best_n) / len(best_n)
     # WHS Rule 5.2a: subtract the count-table adjustment (keyed on the number
-    # of differentials in the record) before the final round-to-tenth.
-    return round(avg + count_table_adjustment(len(diffs)), 1)
+    # of differentials in the record) before the final round-to-tenth (half
+    # up, per Rule 5.1a's rounding convention -- see round_half_up).
+    #
+    # NOTE (WHS Rule 5.3): this function deliberately returns the RAW
+    # (unclamped) Rule 5.2/5.2a value -- it is NOT the final issued Handicap
+    # Index. WHS order of operations is 5.2/5.2a -> 5.9 (ESR) -> 5.8 (soft/
+    # hard cap) -> 5.3 (54.0 maximum), i.e. the 54.0 ceiling is applied LAST,
+    # after the Rule 5.8 cap, so the cap's `increase = raw - low_hi`
+    # computation sees the TRUE raw value (clamping here first would distort
+    # that increase for any low_hi in the ~47-51 band where raw exceeds 54).
+    # The WHS_MAX_HANDICAP_INDEX clamp is instead applied as the final step
+    # at every DISPLAYED/STORED-value site: `store.recompute_handicaps_for_
+    # user` (after `apply_handicap_cap`), the live-save `new_hi` sites in
+    # `routes/rounds.py` (create + edit), and `calc_handicap_trend`'s
+    # per-point output.
+    return round_half_up(avg + count_table_adjustment(len(diffs)), 1)
 
 
 def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
@@ -191,17 +373,17 @@ def apply_handicap_cap(raw_hi: float, low_hi: float | None) -> float:
     WHS convention).
     """
     if low_hi is None:
-        return round(raw_hi, 1)
+        return round_half_up(raw_hi, 1)
 
     increase = raw_hi - low_hi
     if increase <= 3.0:
-        return round(raw_hi, 1)
+        return round_half_up(raw_hi, 1)
 
     capped = low_hi + 3.0 + 0.5 * (increase - 3.0)  # soft cap
     hard_cap = low_hi + 5.0
     if capped > hard_cap:
         capped = hard_cap  # hard cap
-    return round(capped, 1)
+    return round_half_up(capped, 1)
 
 
 def exceptional_reduction(hi_in_effect: float | None, differential: float) -> float:
@@ -253,7 +435,9 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
     NOTE: this is an independent rolling-window accumulator -- it does NOT
     call/delegate to `calc_handicap_index`; it maintains its own sorted
     window of the most recent WHS_HANDICAP_WINDOW eligible differentials
-    as it walks the (reconstructed) chronological order."""
+    as it walks the (reconstructed) chronological order. Each emitted point
+    IS clamped to the WHS Rule 5.3 maximum (54.0, no lower clamp) since this
+    is itself a displayed value, not a raw intermediate."""
     chronological = list(reversed(all_rounds))
     result = []
     window_diffs = []
@@ -276,15 +460,29 @@ def calc_handicap_trend(all_rounds: list[RoundData], include_9hole: bool = False
         if n > 0:
             avg = sum(window_diffs[:n]) / n
             # WHS Rule 5.2a: subtract the count-table adjustment (keyed on
-            # the number of differentials in the window) before rounding.
-            val = round(avg + count_table_adjustment(len(window_diffs)), 1)
+            # the number of differentials in the window) before rounding
+            # (half up, mirroring calc_handicap_index -- same rule, same
+            # rounding convention, so the trend series and the live
+            # Handicap Index never disagree on the same window of diffs).
+            val = round_half_up(avg + count_table_adjustment(len(window_diffs)), 1)
+            # WHS Rule 5.3: this IS a displayed/emitted value (not a raw
+            # intermediate feeding another rule's calculation), so the
+            # 54.0 maximum clamp applies directly here. No lower clamp --
+            # plus/negative Handicap Indexes are preserved.
+            val = min(val, WHS_MAX_HANDICAP_INDEX)
             result.append((r.date, val))
 
     return result
 
 
 def calc_playing_to_handicap_rate(rounds: list[RoundData], include_9hole: bool = False) -> float | None:
+    # WHS Rule 5.3: calc_handicap_index returns the raw (unclamped) value; this
+    # fallback threshold is a DISPLAYED comparison bar (the "Playing to Handicap
+    # Rate" panel) for rounds without a stored computed_handicap, so it must be
+    # clamped to the 54.0 issued maximum like every other displayed HI.
     overall_hi = calc_handicap_index(rounds, include_9hole)
+    if overall_hi is not None:
+        overall_hi = min(overall_hi, WHS_MAX_HANDICAP_INDEX)
     valid = []
     for r in rounds:
         if r.excluded:
@@ -335,4 +533,6 @@ def calc_career_low_handicap(all_rounds: list[RoundData]) -> str | None:
                     best_hi = v
             except (ValueError, TypeError):
                 pass
-    return str(round(best_hi, 1)) if best_hi < 999.0 else None
+    # WHS nearest-tenth, .5 UP (round_half_up) for consistency; best_hi is a
+    # min of already-tenths-precision stored HIs so no new tie arises today.
+    return str(round_half_up(best_hi, 1)) if best_hi < 999.0 else None

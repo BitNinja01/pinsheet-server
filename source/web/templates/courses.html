@@ -2,9 +2,11 @@
 {% block content %}
 <h2>Courses</h2>
 
+{% if current_user.is_admin %}
 <div class="section-actions">
     <a href="/courses/new" class="btn btn-accent">Add Course</a>
 </div>
+{% endif %}
 
 {% if courses %}
 <table class="data-table">

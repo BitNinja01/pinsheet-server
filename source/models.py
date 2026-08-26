@@ -30,6 +30,11 @@ class RoundData:
     excluded: bool = False
     differential_locked: bool = False
     index: int = 0
+    # WHS Rule 5.6 / 5.1a: Playing Conditions Calculation adjustment for this
+    # round, range [-1.0, +3.0] (see clamp_pcc). Default 0.0 == no PCC
+    # adjustment, the pre-Rule-5.6 behavior, for every round that doesn't
+    # set one.
+    pcc: float = 0.0
 
 
 @dataclass
@@ -103,6 +108,59 @@ def _safe_int(val, default=0):
         return int(val)
     except (ValueError, TypeError):
         return default
+
+
+# WHS Rule 5.6: PCC (Playing Conditions Calculation) is bounded to
+# [-1.0, +3.0] by the rule itself.
+PCC_MIN = -1.0
+PCC_MAX = 3.0
+
+
+def clamp_pcc(value, default: float = 0.0) -> float:
+    """Clamp a PCC (Playing Conditions Calculation) value to WHS Rule 5.6's
+    [-1.0, +3.0] range. Non-numeric / missing input defaults to 0.0 (no
+    adjustment -- the pre-Rule-5.6 behavior) rather than raising, since
+    callers include untrusted JSON request bodies (routes/rounds.py),
+    zip-import archive contents (routes/settings.py), and legacy DB rows
+    that predate this column.
+
+    Defined here (not calc/handicap.py) to avoid a circular import --
+    calc/handicap.py already imports RoundData from this module, so this
+    module must not import from calc. calc.calc_round_dif's own `pcc`
+    parameter deliberately does NOT re-clamp (it's a pure calculation
+    function that trusts its caller, matching calc_course_handicap /
+    calc_playing_handicap's convention of not clamping their own inputs) --
+    every call site is responsible for clamping via this helper first.
+
+    DESIGN DECISION: clamp (not reject) out-of-range input -- a value of
+    5.0 becomes 3.0, -2.0 becomes -1.0, matching the "reject or clamp out-of
+    -range; pick one" requirement.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    if v != v:  # NaN guard (NaN != NaN is the standard NaN-detection idiom)
+        return default
+    return max(PCC_MIN, min(PCC_MAX, v))
+
+
+def effective_pcc(pcc: float, holes_selection: str) -> float:
+    """WHS Rule 5.1b: "50% of the playing conditions calculation (PCC) for
+    the day is applied" when computing a 9-hole Score Differential -- the
+    FULL day's PCC is only applied to an 18-hole ("all") score. Callers
+    store/enter the player-facing, un-halved `pcc` value (the day's
+    published PCC) and pass the result of THIS function into
+    `calc.handicap.calc_round_dif`'s `pcc` parameter at the point the
+    differential is actually computed -- mirrors the existing 9-hole
+    Handicap Index halving pattern already used throughout
+    routes/rounds.py (`adj_hi = hi / 2 if holes_sel != "all" else hi`).
+
+    `holes_selection` is the normalized value ("all" / "front" / "back"),
+    not the raw wire value ("18" / "front9" / "back9") -- every call site
+    already normalizes this before use (see routes/rounds.py's
+    `holes_sel` normalization block)."""
+    return pcc * 0.5 if holes_selection != "all" else pcc
 
 
 def safe_float(val, default=0.0):
@@ -228,6 +286,12 @@ def dict_to_round(d: dict) -> RoundData:
         excluded=d.get("excluded", False),
         differential_locked=bool(d.get("differential_locked", False)),
         index=d.get("index", 0),
+        # Defense-in-depth: re-clamp on construction too (not just at the
+        # HTTP input boundary in routes/rounds.py) so every RoundData object
+        # -- including ones built from zip-import archive contents or a
+        # legacy DB row -- carries a range-valid pcc, even if the dict that
+        # produced it came from an untrusted or pre-validation source.
+        pcc=clamp_pcc(d.get("pcc", 0.0)),
     )
 
 

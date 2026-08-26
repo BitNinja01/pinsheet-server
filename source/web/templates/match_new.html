@@ -30,6 +30,18 @@
     </div>
 
     <div class="settings-group">
+        <h3>Format</h3>
+        <select name="format" class="settings-field" style="width:100%;font-family:var(--ps-font-mono);font-size:var(--ps-fs-eyebrow);padding:8px;border:1px solid var(--ps-rule-c);background:var(--ps-paper);color:var(--ps-ink);">
+            {% for key, label in formats %}
+            <option value="{{ key }}" {% if key == (selected_format or 'individual_match') %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <p class="ps-hint" style="font-family:var(--ps-font-mono);font-size:var(--ps-fs-micro);color:var(--ps-ink-dim);margin-top:4px;">
+            WHS Appendix C recommended Handicap Allowance for this format. Applied to each player's Course Handicap (Rule 6.2) to compute their Playing Handicap when a round is linked to this match.
+        </p>
+    </div>
+
+    <div class="settings-group">
         <h3>Participants (select at least 2)</h3>
         {% for u in users %}
         <label class="settings-toggle">

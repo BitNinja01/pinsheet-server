@@ -10,7 +10,7 @@ from pathlib import Path
 import bcrypt
 
 from database import get_db, init_db, set_db_path
-from source.models import dict_to_round, RoundData, safe_float, safe_positive_float
+from source.models import dict_to_round, RoundData, clamp_pcc, effective_pcc, safe_float, safe_positive_float
 
 _log = logging.getLogger("pinsheet")
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -79,6 +79,35 @@ def get_courses() -> dict:
     return result
 
 
+def reshape_course_data(course: dict) -> dict:
+    """Convert a legacy TUI-shaped course document to the canonical shape.
+
+    Legacy (TUI-era) courses store per-hole yardages inside each hole
+    (``holes[h]["tees"][tee] = yardage``) and older wizard data uses an
+    ``index`` stroke-index key. The canonical server shape stores per-hole
+    yardages at the tee level (``tees[tee]["yardages"][hole] = yardage``)
+    with holes holding only ``par`` + ``hole_index``.
+
+    Canonical documents pass through unchanged; a new dict is returned
+    (the input is never mutated).
+    """
+    out = json.loads(json.dumps(course))
+    holes = out.get("holes")
+    if isinstance(holes, dict):
+        for hkey, hdata in list(holes.items()):
+            if not isinstance(hdata, dict):
+                continue
+            if "index" in hdata and "hole_index" not in hdata:
+                hdata["hole_index"] = hdata.pop("index")
+            legacy_tees = hdata.pop("tees", None)
+            if legacy_tees:
+                for tee_name, yardage in legacy_tees.items():
+                    tee_data = out.setdefault("tees", {}).setdefault(tee_name, {})
+                    yardages = tee_data.setdefault("yardages", {})
+                    yardages.setdefault(str(hkey), str(yardage))
+    return out
+
+
 def save_course(course, course_name) -> None:
     db = get_db()
     db.execute(
@@ -138,6 +167,7 @@ def get_all_rounds(user_id: int, limit: int = None) -> list[RoundData]:
             "excluded": bool(row["excluded"]),
             "computed_handicap": row["computed_handicap"],
             "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+            "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
         }
         if row["total_putts"]:
             r["total_putts"] = row["total_putts"]
@@ -168,6 +198,7 @@ def get_round_by_id(round_id: int) -> RoundData | None:
         "excluded": bool(row["excluded"]),
         "computed_handicap": row["computed_handicap"],
         "differential_locked": bool(row["differential_locked"]) if row["differential_locked"] is not None else False,
+        "pcc": row["pcc"] if row["pcc"] is not None else 0.0,
     }
     if row["total_putts"]:
         r["total_putts"] = row["total_putts"]
@@ -201,12 +232,18 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: clamp defensively here too (not just at the
+    # HTTP input boundary in routes/rounds.py) so a raw caller -- e.g. the
+    # zip-import path in routes/settings.py, which passes an archive's raw
+    # (untrusted) round dict straight through -- can never persist an
+    # out-of-range pcc.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """INSERT OR REPLACE INTO rounds
            (user_id, course_name, date, round_index, tee_name, holes_played,
             entry_mode, holes, total_gross, total_putts, differential, notes,
-            excluded, computed_handicap, differential_locked)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            excluded, computed_handicap, differential_locked, pcc)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id,
             golf_round.get("course", ""),
@@ -223,6 +260,7 @@ def save_round(golf_round, date, index, user_id: int = 1) -> int:
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
         ),
     )
     round_id = cur.lastrowid
@@ -241,6 +279,15 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
 
     Returns the number of rows updated (0 if the round no longer exists or is
     owned by another user), so callers can detect a lost-row race.
+
+    PRE-EXISTING CAVEAT (not fixed here): if this round is already linked to
+    a match (a match_rounds row references it), editing the round's gross
+    score / handicap here does NOT recompute or refresh that match_rounds
+    row's stored `net` -- `net` is a snapshot computed once at link_round()
+    time (see link_round / calc_playing_handicap call sites in
+    routes/matches.py and routes/rounds.py) and there is no re-link/refresh
+    path. A stale net can therefore persist after a round edit until the
+    round is unlinked and re-linked.
     """
     db = get_db()
     total_putts = None
@@ -252,12 +299,14 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             except (ValueError, TypeError):
                 return 0
         total_putts = sum(_to_int(h.get("putts")) for h in holes.values())
+    # WHS Rule 5.6 / 5.1a: same defensive clamp as save_round.
+    pcc = clamp_pcc(golf_round.get("pcc", 0.0))
     cur = db.execute(
         """UPDATE rounds SET
              course_name = ?, date = ?, round_index = ?, tee_name = ?,
              holes_played = ?, entry_mode = ?, holes = ?, total_gross = ?,
              total_putts = ?, differential = ?, notes = ?, excluded = ?,
-             computed_handicap = ?, differential_locked = ?
+             computed_handicap = ?, differential_locked = ?, pcc = ?
            WHERE id = ? AND user_id = ?""",
         (
             golf_round.get("course", ""),
@@ -274,6 +323,7 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
             1 if golf_round.get("excluded") else 0,
             golf_round.get("computed_handicap", ""),
             1 if golf_round.get("differential_locked") else 0,
+            pcc,
             round_id,
             user_id,
         ),
@@ -359,7 +409,13 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         apply_handicap_cap,
         _is_eligible_diff_round,
         exceptional_reduction,
+        round_half_up,
         WHS_HANDICAP_WINDOW,
+        calc_round_dif,
+        calc_9hole_dif,
+        calc_course_handicap,
+        calc_adjusted_gross_score,
+        WHS_MAX_HANDICAP_INDEX,
     )
 
     courses_data = get_courses()
@@ -410,7 +466,53 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 tee_data = course_data.get("tees", {}).get(r.tees)
                 if tee_data and r.total_gross and r.total_gross != "0":
                     slope, rating = get_slope_rating(tee_data, r.holes_selection)
-                    diff = round((113 / slope) * (float(r.total_gross) - rating), 1)
+                    # WHS Rule 3 (Net Double Bogey) / Rule 12: the Score
+                    # Differential must be computed from the ESC-adjusted
+                    # gross (each hole capped to Net Double Bogey), not the
+                    # raw total_gross, whenever per-hole data is available --
+                    # otherwise a detailed round with a blow-up hole is
+                    # over-counted relative to the SAME round entered live
+                    # (rounds.py applies this cap inline via
+                    # calc_adjusted_gross_score). Score-only rounds have no
+                    # per-hole data to cap, so they correctly keep raw
+                    # total_gross as the Adjusted Gross Score (AGS).
+                    course_holes = course_data.get("holes", {})
+                    if r.holes and course_holes:
+                        # Course Handicap for the ESC cap uses the HI in
+                        # effect when the round was played -- the prior
+                        # DISPLAYED HI (same value Rule 5.9/ESR calls
+                        # `hi_in_effect`, tracked via `prior_displayed`,
+                        # which has not yet had this round appended). 0.0 is
+                        # used when no HI has been established yet (the ESC
+                        # cap then collapses to par+2 for every hole).
+                        hi_before = prior_displayed[-1][1] if prior_displayed else 0.0
+                        adj_hi = hi_before / 2 if r.holes_selection != "all" else hi_before
+                        played_par = sum(int(course_holes.get(hn, {}).get("par", 0)) for hn in r.holes)
+                        course_handicap = calc_course_handicap(adj_hi, played_par, slope, rating)
+                        ags = calc_adjusted_gross_score(r.holes, course_holes, course_handicap)
+                        adjusted_gross = float(r.total_gross) if ags is None else ags
+                    else:
+                        adjusted_gross = float(r.total_gross)
+                    # WHS Rule 5.6 / 5.1a: subtract this round's own PCC
+                    # (r.pcc, range-clamped by clamp_pcc at every write/
+                    # construction site) inside calc_round_dif, matching
+                    # rounds.py's live-save path exactly. WHS Rule 5.1b: a
+                    # 9-hole score applies only HALF the day's PCC --
+                    # effective_pcc(r.pcc, r.holes_selection).
+                    if r.holes_selection != "all":
+                        # WHS 9-hole combine: base 9-hole Score Differential
+                        # plus the expected 9-hole adjustment keyed on the HI
+                        # in effect when the round was played -- the prior
+                        # DISPLAYED HI (`prior_displayed[-1]`, which has not
+                        # yet had this round appended), or None when no HI has
+                        # been established yet (raw base then).
+                        diff = calc_9hole_dif(
+                            slope, adjusted_gross, rating,
+                            prior_displayed[-1][1] if prior_displayed else None,
+                            effective_pcc(r.pcc, r.holes_selection),
+                        )
+                    else:
+                        diff = calc_round_dif(slope, adjusted_gross, rating, effective_pcc(r.pcc, r.holes_selection))
                     str_diff = str(diff)
                     if r.differential != str_diff:
                         db.execute(
@@ -460,7 +562,7 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         # to each of the 20 windowed differentials individually and
         # re-averaging, since the reduction is uniform across the window).
         active_reduction_sum = sum(exceptional_reductions[-WHS_HANDICAP_WINDOW:])
-        hi_after_esr = round(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
+        hi_after_esr = round_half_up(raw_hi + active_reduction_sum, 1) if raw_hi is not None else None
 
         # WHS Rule 5.7/5.8: LHI is only established once the record PRIOR to
         # this round already has >= 20 acceptable scores; the cap then
@@ -479,6 +581,12 @@ def recompute_handicaps_for_user(user_id: int) -> int:
                 low_hi = min(candidates)
 
         hi = apply_handicap_cap(hi_after_esr, low_hi) if hi_after_esr is not None else None
+        # WHS Rule 5.3: the 54.0 maximum is the FINAL issued ceiling, applied
+        # AFTER the Rule 5.8 soft/hard cap (which must see the true raw
+        # increase above `low_hi` -- see calc_handicap_index's docstring).
+        # No lower clamp -- plus/negative Handicap Indexes are preserved.
+        if hi is not None:
+            hi = min(hi, WHS_MAX_HANDICAP_INDEX)
 
         if hi is not None:
             new_val = str(hi)
@@ -660,13 +768,23 @@ def create_user(username: str, display_name: str, password: str) -> dict:
     return {"id": user_id, "username": username, "display_name": display_name, "is_admin": bool(is_admin)}
 
 
+# Fixed bcrypt hash used to normalize login timing for unknown usernames
+# (issue #77). Computed once at import; the password value is irrelevant since
+# no real login ever matches against it.
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"pinsheet-timing-normalizer", bcrypt.gensalt()).decode()
+
+
 def verify_user(username: str, password: str) -> dict | None:
     db = get_db()
     row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     db.close()
-    if not row or not row["password_hash"]:
-        return None
-    if bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+    # Issue #77 (CWE-208): always run one bcrypt.checkpw so an unknown username
+    # (no such row) takes the same ~time as a wrong password for a real user,
+    # closing the login timing side-channel. Mirrors the _SENTINEL_KEY_HASH
+    # pattern used for API keys.
+    stored_hash = row["password_hash"] if (row and row["password_hash"]) else _DUMMY_PASSWORD_HASH
+    password_ok = bcrypt.checkpw(password.encode(), stored_hash.encode())
+    if row and row["password_hash"] and password_ok:
         return {"id": row["id"], "username": row["username"], "display_name": row["display_name"], "is_admin": bool(row["is_admin"])}
     return None
 
@@ -848,11 +966,34 @@ def get_invite_codes() -> list:
     return result
 
 
-def create_match(created_by: int, course_name: str, date: str) -> int:
+def create_match(
+    created_by: int,
+    course_name: str,
+    date: str,
+    allowance_percent: int = 100,
+    format_key: str = "individual_match",
+) -> int:
+    # NOTE (WHS Rule 6.2 / Appendix C): `allowance_percent` and `format_key`
+    # are effectively IMMUTABLE after match creation -- there is no
+    # update_match()/edit path that changes either. `match_rounds.net` is
+    # computed once, at link_round() time, from
+    # calc_playing_handicap(course_handicap, allowance_percent) as it stood
+    # at that moment; it is never recomputed. If an allowance/format-editing
+    # path is ever added, it MUST also re-link (recompute net for) every
+    # round already linked to the match, or those stored nets will silently
+    # go stale relative to the new allowance.
+    #
+    # `format_key` is the display/source-of-truth for "which Appendix C
+    # format produced this allowance" (see MATCH_FORMAT_LABELS in
+    # routes/matches.py) -- `allowance_percent` alone is ambiguous for
+    # display purposes (e.g. 95% is shared by both individual_stroke and
+    # stableford_individual). `allowance_percent`, NOT `format_key`, remains
+    # the value actually used in net math.
     db = get_db()
     cur = db.execute(
-        "INSERT INTO matches (created_by, course_name, date) VALUES (?, ?, ?)",
-        (created_by, course_name, date),
+        "INSERT INTO matches (created_by, course_name, date, allowance_percent, format_key) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (created_by, course_name, date, allowance_percent, format_key),
     )
     db.commit()
     match_id = cur.lastrowid
@@ -1080,8 +1221,24 @@ def get_clubs(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def save_club(club_data: dict, user_id: int) -> None:
+def save_club(club_data: dict, user_id: int) -> bool:
+    """Insert or update a club for ``user_id``.
+
+    Ownership guard (issue #69, CWE-639): the client controls the ``id`` primary
+    key, so an INSERT OR REPLACE could otherwise overwrite another user's club
+    row and reassign it. Reject when the id already exists under a different
+    owner. Returns True if saved, False if rejected as a cross-user write.
+    """
     db = get_db()
+    existing = db.execute(
+        "SELECT user_id FROM clubs WHERE id = ?", (club_data["id"],)
+    ).fetchone()
+    if existing is not None and existing["user_id"] != user_id:
+        db.close()
+        _log.warning(
+            "save_club rejected: club %s is owned by another user", club_data["id"]
+        )
+        return False
     db.execute(
         """INSERT OR REPLACE INTO clubs (id, user_id, category, club, number, brand, model, loft, lie, length, shaft_flex, shaft_brand, shaft, grip, sw, carry)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -1107,6 +1264,7 @@ def save_club(club_data: dict, user_id: int) -> None:
     db.commit()
     db.close()
     _log.info("club saved: %s", club_data["id"])
+    return True
 
 
 def delete_club(club_id: str, user_id: int) -> None:
@@ -1145,13 +1303,18 @@ def save_bag_slots(slot_ids: list, user_id: int) -> None:
     _log.info("bag slots saved for user_id=%s", user_id)
 
 
-def get_distinct_club_field_values(field: str) -> list[str]:
+def get_distinct_club_field_values(field: str, user_id: int) -> list[str]:
+    # Issue #72 (CWE-200): scope to the caller's own clubs — without WHERE
+    # user_id this leaked every user's brand/model/shaft/grip to any /bag
+    # visitor. `field` stays allowlist-checked against SAFE (not user input in
+    # the SQL text); user_id is bound as a parameter.
     SAFE = {"brand", "model", "shaft_brand", "shaft", "grip"}
     if field not in SAFE:
         return []
     db = get_db()
     rows = db.execute(
-        f"SELECT DISTINCT {field} FROM clubs WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}"
+        f"SELECT DISTINCT {field} FROM clubs WHERE user_id = ? AND {field} IS NOT NULL AND {field} != '' ORDER BY {field}",
+        (user_id,),
     ).fetchall()
     db.close()
     return [r[field] for r in rows]
