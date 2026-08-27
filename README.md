@@ -4,6 +4,11 @@
 [![Platform](https://img.shields.io/badge/Platforms-Linux%20|%20macOS%20|%20Windows-white.svg?style=for-the-badge&color=green)](https://github.com/BitNinja01/pinsheet-server)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge&color=green)](https://www.python.org/downloads/)
 
+<p align="center">
+  <img src="docs/img/logo_light.svg#gh-light-mode-only" alt="PinSheet Logo" width="500">
+  <img src="docs/img/logo_dark.svg#gh-dark-mode-only" alt="PinSheet Logo" width="500">
+</p>
+
 ---
 
 > Analogue golf, digital stats — self-hosted.
