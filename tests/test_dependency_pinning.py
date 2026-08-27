@@ -16,7 +16,11 @@ def test_pyproject_direct_deps_have_upper_bounds():
     deps = data["project"]["dependencies"]
     assert deps
     for dep in deps:
-        assert "<" in dep, f"dependency {dep!r} has no upper version bound"
+        # An exact pin (`==`) satisfies the intent as strongly as an upper
+        # bound -- it permits exactly one version (opentelemetry-api/-sdk
+        # are exact-pinned deliberately: API and SDK must move in lockstep
+        # per the OTel Python project's own policy).
+        assert "<" in dep or "==" in dep, f"dependency {dep!r} has no upper version bound"
 
 
 def test_requirements_txt_has_upper_bounds():
@@ -27,7 +31,7 @@ def test_requirements_txt_has_upper_bounds():
     ]
     assert lines
     for spec in lines:
-        assert "<" in spec, f"requirement {spec!r} has no upper version bound"
+        assert "<" in spec or "==" in spec, f"requirement {spec!r} has no upper version bound"
 
 
 def test_lockfile_exists_and_is_hash_pinned():
@@ -36,6 +40,7 @@ def test_lockfile_exists_and_is_hash_pinned():
     text = lock.read_text()
     assert "--hash=sha256:" in text, "lockfile is not hash-pinned"
     # Exact pins (==), not ranges — the direct deps must appear pinned.
-    for pkg in ("flask", "werkzeug", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "flask-talisman"):
+    for pkg in ("flask", "werkzeug", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "flask-talisman",
+                "apiflask", "flask-cors", "opentelemetry-api", "opentelemetry-sdk"):
         assert re.search(rf"^{re.escape(pkg)}==", text, re.MULTILINE | re.IGNORECASE), \
             f"{pkg} is not pinned in requirements.lock"
