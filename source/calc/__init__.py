@@ -14,6 +14,7 @@ from calc.handicap import (
     get_best_n_rounds,
     calc_handicap_index,
     calc_handicap_trend,
+    calc_handicap_pairs_in_range,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
     calc_handicap_values_in_range,

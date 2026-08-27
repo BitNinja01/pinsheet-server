@@ -14,6 +14,8 @@ from calc.handicap import (
     get_best_n_rounds,
     calc_handicap_index,
     calc_handicap_trend,
+    calc_handicap_pairs_in_range,
+    calc_handicap_values_in_range,
     calc_playing_to_handicap_rate,
     calc_raw_hi,
     calc_adjusted_gross_score,
@@ -1084,6 +1086,68 @@ def test_calc_handicap_trend_clamps_to_max_54(make_round):
     trend = calc_handicap_trend(rounds)
     assert len(trend) == 1
     assert trend[0][1] == 54.0
+
+
+def test_calc_handicap_pairs_in_range_empty():
+    assert calc_handicap_pairs_in_range([], "2026-01-01") == []
+
+
+def test_calc_handicap_pairs_in_range_cutoff_filters(make_round):
+    rounds = [
+        make_round(date="2026-06-01", computed_handicap="18.1"),
+        make_round(date="2026-01-01", computed_handicap="19.5"),
+        make_round(date="2025-12-31", computed_handicap="20.0"),
+    ]
+    pairs = calc_handicap_pairs_in_range(rounds, "2026-01-01")
+    assert pairs == [("2026-01-01", 19.5), ("2026-06-01", 18.1)]
+
+
+def test_calc_handicap_pairs_in_range_chronological(make_round):
+    # Input is most-recent-first (the standard ordering contract); output
+    # must be chronological (oldest -> newest).
+    rounds = [
+        make_round(date="2026-06-01", computed_handicap="18.1"),
+        make_round(date="2026-03-01", computed_handicap="19.5"),
+        make_round(date="2026-01-01", computed_handicap="20.0"),
+    ]
+    pairs = calc_handicap_pairs_in_range(rounds, "2026-01-01")
+    assert [d for d, _ in pairs] == ["2026-01-01", "2026-03-01", "2026-06-01"]
+
+
+def test_calc_handicap_pairs_in_range_skips_empty_and_zero(make_round):
+    rounds = [
+        make_round(date="2026-03-01", computed_handicap="0"),
+        make_round(date="2026-04-01", computed_handicap=""),
+        make_round(date="2026-05-01", computed_handicap="18.1"),
+    ]
+    assert calc_handicap_pairs_in_range(rounds, "2026-01-01") == [("2026-05-01", 18.1)]
+
+
+def test_calc_handicap_pairs_in_range_skips_non_numeric_computed(make_round):
+    rounds = [make_round(date="2026-05-01", computed_handicap="not-a-number")]
+    assert calc_handicap_pairs_in_range(rounds, "2026-01-01") == []
+
+
+def test_calc_handicap_pairs_in_range_excluded_rounds_carry_forward(make_round):
+    # Mirrors the profile chart: excluded rounds carry their stored
+    # computed_handicap forward (no exclusion filter in this helper).
+    excluded = make_round(date="2026-04-01", computed_handicap="18.5")
+    excluded.excluded = True
+    rounds = [make_round(date="2026-05-01", computed_handicap="18.1"), excluded]
+    assert calc_handicap_pairs_in_range(rounds, "2026-01-01") == [
+        ("2026-04-01", 18.5),
+        ("2026-05-01", 18.1),
+    ]
+
+
+def test_calc_handicap_values_in_range_delegates_unchanged(make_round):
+    # Regression: the values-only wrapper must keep its exact old behavior.
+    rounds = [
+        make_round(date="2026-06-01", computed_handicap="18.1"),
+        make_round(date="2026-01-01", computed_handicap="19.5"),
+        make_round(date="2025-12-31", computed_handicap="20.0"),
+    ]
+    assert calc_handicap_values_in_range(rounds, "2026-01-01") == [19.5, 18.1]
 
 
 def test_calc_playing_to_handicap_rate_empty():

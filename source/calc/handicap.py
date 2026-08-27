@@ -505,19 +505,32 @@ def calc_raw_hi(rounds: list[RoundData], include_9hole: bool = False) -> float |
     return (sum(diffs) / len(diffs)) * 0.96
 
 
-def calc_handicap_values_in_range(all_rounds: list[RoundData], cutoff: str) -> list[float]:
-    vals = []
-    for r in all_rounds:
+def calc_handicap_pairs_in_range(all_rounds: list[RoundData], cutoff: str) -> list[tuple[str, float]]:
+    """Chronological (date, stored computed_handicap) pairs for rounds played
+    on/after `cutoff` (YYYY-MM-DD). Mirrors the profile page's 12-month line
+    graph exactly: the STORED displayed HI (post-Rule-5.8-cap / Rule-5.9-ESR
+    `computed_handicap`), skipping rounds with no established HI (empty, or
+    the "0" exclusion sentinel). Excluded rounds carry their value forward,
+    matching the profile chart's existing behavior. `all_rounds` must be
+    most-recent-first (the standard ordering contract); output is
+    oldest -> newest."""
+    chronological = list(reversed(all_rounds))
+    result = []
+    for r in chronological:
         if r.date < cutoff:
             continue
         ch = r.computed_handicap
-        if ch and ch != "0":
-            try:
-                vals.append(float(ch))
-            except ValueError:
-                pass
-    vals.reverse()
-    return vals
+        if not ch or ch == "0":
+            continue
+        try:
+            result.append((r.date, float(ch)))
+        except (ValueError, TypeError):
+            continue
+    return result
+
+
+def calc_handicap_values_in_range(all_rounds: list[RoundData], cutoff: str) -> list[float]:
+    return [v for _, v in calc_handicap_pairs_in_range(all_rounds, cutoff)]
 
 
 def calc_career_low_handicap(all_rounds: list[RoundData]) -> str | None:
