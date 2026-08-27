@@ -430,3 +430,325 @@ def test_match_link_round_get_excludes_already_linked_rounds(client):
     resp = client.get(f"/matches/{match_id}/link-round")
     assert resp.status_code == 200
     assert resp.data.count(b'name="round_id"') == 0
+
+
+# ---------------------------------------------------------------------------
+# WHS Rule 6.2 / Appendix C -- Playing Handicap allowance on match net
+# ---------------------------------------------------------------------------
+
+def test_match_create_defaults_allowance_percent_to_100(client):
+    """store.create_match with no allowance_percent stores the non-breaking
+    default (100 -- WHS Rule 6.2, Playing Handicap == Course Handicap)."""
+    user = _login(client)
+    _save_course_direct()
+    match_id = store.create_match(created_by=user["id"], course_name="Test GC", date="2026-06-01")
+    match = store.get_match(match_id)
+    assert match["allowance_percent"] == 100
+
+
+def test_match_link_round_default_allowance_matches_old_full_course_handicap_net(client):
+    """With the default allowance_percent (100), Playing Handicap == Course
+    Handicap (WHS Rule 6.2), so the linked net must equal the pre-Rule-6.2
+    formula (gross - course_handicap) exactly -- non-breaking default."""
+    user = _login(client)
+    _make_course(client, slope=120, rating=70.0)
+    match_id = store.create_match(created_by=user["id"], course_name="Test GC", date="2026-06-01")
+    store.add_match_player(match_id, user["id"])
+    round_id = _save_round_with_handicap(user["id"], gross="85", computed_handicap="14.0")
+
+    resp = client.post(f"/matches/{match_id}/link-round", data={"round_id": str(round_id)},
+                        follow_redirects=False)
+    assert resp.status_code == 302
+
+    links = store.get_match_rounds(match_id)
+    # Same hand-computed course handicap as
+    # test_match_link_round_post_success_computes_net_and_redirects:
+    # round_half_up(14.0 * (120/113) + (70.0-72)) = round_half_up(12.867..) = 13
+    expected_ch = 13
+    expected_net = 85 - expected_ch  # == old (pre-Rule-6.2) net formula, unchanged
+    assert float(links[0]["net"]) == float(expected_net)
+
+
+def test_match_link_round_allowance_95_reduces_playing_handicap(client):
+    """WHS Rule 6.2 / Appendix C: an explicit allowance_percent < 100
+    reduces the Course Handicap to a smaller Playing Handicap before net is
+    computed, so the resulting net differs from (and is lower than) the
+    full-Course-Handicap net."""
+    user = _login(client)
+    # slope=113, rating=par(72) -> course handicap == handicap index exactly
+    # (no slope/rating adjustment), keeping the arithmetic easy to hand-verify.
+    _make_course(client, slope=113, rating=72.0)
+    match_id = store.create_match(created_by=user["id"], course_name="Test GC",
+                                   date="2026-06-01", allowance_percent=95)
+    match = store.get_match(match_id)
+    assert match["allowance_percent"] == 95
+    store.add_match_player(match_id, user["id"])
+    round_id = _save_round_with_handicap(user["id"], gross="90", computed_handicap="20.0")
+
+    resp = client.post(f"/matches/{match_id}/link-round", data={"round_id": str(round_id)},
+                        follow_redirects=False)
+    assert resp.status_code == 302
+
+    links = store.get_match_rounds(match_id)
+    # course_handicap = round_half_up(20.0 * (113/113) + (72.0-72)) = 20
+    # playing_handicap (95% allowance) = round_half_up(20 * 95 / 100) = 19
+    # -> lower than the full-Course-Handicap net (90 - 20 == 70).
+    expected_net = 90 - 19
+    assert float(links[0]["net"]) == float(expected_net)
+    assert float(links[0]["net"]) != 90 - 20
+
+
+def test_matches_table_migration_adds_allowance_percent_column(tmp_path):
+    """An existing DB created before the Rule 6.2 allowance_percent column
+    existed must still load -- and new/legacy rows must default to 100 --
+    when init_db() is (re-)run against it (guarded ALTER TABLE, migration-
+    safe)."""
+    import sqlite3
+
+    db_path = str(tmp_path / "old_schema.db")
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE users (
+            id            INTEGER PRIMARY KEY,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            is_admin      INTEGER DEFAULT 0,
+            created_at    TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE matches (
+            id          INTEGER PRIMARY KEY,
+            created_by  INTEGER NOT NULL REFERENCES users(id),
+            course_name TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'active',
+            created_at  TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("INSERT INTO users (id, username, display_name) VALUES (1, 'legacy', 'Legacy User')")
+    conn.execute(
+        "INSERT INTO matches (id, created_by, course_name, date) VALUES (1, 1, 'Legacy Course', '2026-01-01')"
+    )
+    conn.commit()
+    conn.close()
+
+    set_db_path(db_path)
+    init_db()  # must not raise; guarded ALTER TABLE backfills the column
+
+    legacy_match = store.get_match(1)
+    assert legacy_match is not None
+    assert legacy_match["allowance_percent"] == 100
+
+
+# ---------------------------------------------------------------------------
+# WHS Rule 6.2 / Appendix C -- format selector on POST /matches/new
+# (end-to-end: form -> allowance_percent -> Playing Handicap -> linked net)
+# ---------------------------------------------------------------------------
+
+def test_match_new_get_renders_format_selector_with_appendix_c_options(client):
+    _login(client)
+    _make_course(client)
+    resp = client.get("/matches/new")
+    assert resp.status_code == 200
+    assert b'name="format"' in resp.data
+    assert b"Individual match play (100%)" in resp.data
+    assert b"Individual stroke play (95%)" in resp.data
+    assert b"Four-ball stroke play (85%)" in resp.data
+
+
+def test_match_new_post_with_fourball_stroke_format_sets_allowance_85_and_reduces_net(client):
+    """e2e (closes the C4 gate): POST /matches/new with format=fourball_stroke
+    wires through store.create_match's allowance_percent=85, and a
+    subsequently linked round's net reflects the reduced (Appendix C 85%)
+    Playing Handicap -- proving a real user, through the actual UI form, CAN
+    produce a non-default Playing Handicap."""
+    user1 = _login(client, username="alice", password="alicepass")
+    user2 = store.create_user("bob", "Bob", "bobpassword")
+    _make_course(client, name="Test GC", slope=113, rating=72.0)
+
+    resp = client.post("/matches/new", data={
+        "course": "Test GC", "date": "2026-06-01", "format": "fourball_stroke",
+        "participants": [str(user1["id"]), str(user2["id"])],
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    match_id = int(resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1])
+
+    match = store.get_match(match_id)
+    assert match["allowance_percent"] == 85
+    assert match["format_key"] == "fourball_stroke"
+
+    round_id = _save_round_with_handicap(user1["id"], gross="90", computed_handicap="20.0")
+    resp = client.post(f"/matches/{match_id}/link-round", data={"round_id": str(round_id)},
+                        follow_redirects=False)
+    assert resp.status_code == 302
+
+    links = store.get_match_rounds(match_id)
+    linked = next(l for l in links if l["round_id"] == round_id)
+    # course_handicap = round_half_up(20 * (113/113) + (72.0-72)) = 20
+    # playing_handicap (85% allowance) = round_half_up(20 * 85 / 100) = 17
+    expected_net = 90 - 17
+    assert float(linked["net"]) == float(expected_net)
+    assert float(linked["net"]) != 90 - 20  # differs from the full-CH net
+
+
+def test_match_new_post_default_format_keeps_allowance_100_and_net_unchanged(client):
+    """e2e: POST /matches/new with no `format` field (browsers submitting the
+    default-selected option, or a client omitting it) resolves to
+    allowance_percent=100 -- Playing Handicap == Course Handicap, so the
+    linked net is unchanged from the pre-Rule-6.2 formula."""
+    user1 = _login(client, username="alice", password="alicepass")
+    user2 = store.create_user("bob", "Bob", "bobpassword")
+    _make_course(client, name="Test GC", slope=113, rating=72.0)
+
+    resp = client.post("/matches/new", data={
+        "course": "Test GC", "date": "2026-06-01",
+        "participants": [str(user1["id"]), str(user2["id"])],
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    match_id = int(resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1])
+    match = store.get_match(match_id)
+    assert match["allowance_percent"] == 100
+    assert match["format_key"] == "individual_match"
+
+    round_id = _save_round_with_handicap(user1["id"], gross="90", computed_handicap="20.0")
+    resp = client.post(f"/matches/{match_id}/link-round", data={"round_id": str(round_id)},
+                        follow_redirects=False)
+    assert resp.status_code == 302
+
+    links = store.get_match_rounds(match_id)
+    linked = next(l for l in links if l["round_id"] == round_id)
+    # course_handicap == playing_handicap == 20 at 100% allowance -> net ==
+    # the pre-Rule-6.2 (gross - course_handicap) formula, unchanged.
+    assert float(linked["net"]) == float(90 - 20)
+
+
+def test_match_new_post_unknown_format_falls_back_to_default_100(client):
+    """An unrecognized/tampered `format` value in the POST body must NOT be
+    trusted as a raw percentage -- only the fixed Appendix C format keys are
+    ever accepted (WHS_HANDICAP_ALLOWANCES), so an unknown key silently
+    falls back to the default (individual_match, 100%) rather than producing
+    an out-of-range or attacker-controlled allowance."""
+    user1 = _login(client, username="alice", password="alicepass")
+    user2 = store.create_user("bob", "Bob", "bobpassword")
+    _make_course(client, name="Test GC")
+
+    resp = client.post("/matches/new", data={
+        "course": "Test GC", "date": "2026-06-01", "format": "not_a_real_format",
+        "participants": [str(user1["id"]), str(user2["id"])],
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    match_id = int(resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1])
+    match = store.get_match(match_id)
+    assert match["allowance_percent"] == 100
+    assert match["format_key"] == "individual_match"
+
+
+# ---------------------------------------------------------------------------
+# WHS Rule 6.2 / Appendix C -- format label display (match_detail /
+# match_link_round), so a participant can verify which allowance governs
+# their net.
+# ---------------------------------------------------------------------------
+
+def test_match_detail_renders_format_label_for_fourball_stroke(client):
+    """match_detail must display the human-readable Appendix C format label
+    (via format_key, not a reverse-lookup of allowance_percent -- 95% alone
+    is ambiguous between individual_stroke and stableford_individual) for a
+    non-default match."""
+    user = _login(client)
+    _save_course_direct()
+    match_id = store.create_match(
+        created_by=user["id"], course_name="Test GC", date="2026-06-01",
+        allowance_percent=85, format_key="fourball_stroke",
+    )
+    store.add_match_player(match_id, user["id"])
+
+    resp = client.get(f"/matches/{match_id}")
+    assert resp.status_code == 200
+    assert b"Four-ball stroke play (85%)" in resp.data
+
+
+def test_match_detail_renders_format_label_for_default_individual_match(client):
+    """A default (individual_match, 100%) match must display its own
+    correct label, not a blank/generic one."""
+    user = _login(client)
+    _save_course_direct()
+    match_id = store.create_match(created_by=user["id"], course_name="Test GC", date="2026-06-01")
+    store.add_match_player(match_id, user["id"])
+
+    resp = client.get(f"/matches/{match_id}")
+    assert resp.status_code == 200
+    assert b"Individual match play (100%)" in resp.data
+
+
+def test_match_link_round_preview_renders_format_label(client):
+    """The link-round preview page (where a player picks which round to
+    link) must also surface the governing format/allowance, not just the
+    post-link match_detail page."""
+    user = _login(client)
+    _save_course_direct()
+    match_id = store.create_match(
+        created_by=user["id"], course_name="Test GC", date="2026-06-01",
+        allowance_percent=95, format_key="individual_stroke",
+    )
+    store.add_match_player(match_id, user["id"])
+
+    resp = client.get(f"/matches/{match_id}/link-round")
+    assert resp.status_code == 200
+    assert b"Individual stroke play (95%)" in resp.data
+
+
+def test_matches_table_migration_backfills_format_key_for_legacy_row(tmp_path):
+    """An existing match row created before the format_key column existed
+    (but after allowance_percent was added) must still load -- and default
+    to 'individual_match' -- when init_db() is (re-)run against it (guarded
+    ALTER TABLE, migration-safe)."""
+    import sqlite3
+
+    db_path = str(tmp_path / "pre_format_key.db")
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE users (
+            id            INTEGER PRIMARY KEY,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            is_admin      INTEGER DEFAULT 0,
+            created_at    TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    # Schema as it existed after the allowance_percent migration, but before
+    # format_key was added.
+    conn.execute("""
+        CREATE TABLE matches (
+            id                INTEGER PRIMARY KEY,
+            created_by        INTEGER NOT NULL REFERENCES users(id),
+            course_name       TEXT NOT NULL,
+            date              TEXT NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'active',
+            allowance_percent INTEGER NOT NULL DEFAULT 100,
+            created_at        TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("INSERT INTO users (id, username, display_name) VALUES (1, 'legacy', 'Legacy User')")
+    conn.execute(
+        "INSERT INTO matches (id, created_by, course_name, date, allowance_percent) "
+        "VALUES (1, 1, 'Legacy Course', '2026-01-01', 95)"
+    )
+    conn.commit()
+    conn.close()
+
+    set_db_path(db_path)
+    init_db()  # must not raise; guarded ALTER TABLE backfills format_key
+
+    legacy_match = store.get_match(1)
+    assert legacy_match is not None
+    assert legacy_match["allowance_percent"] == 95  # pre-existing value preserved
+    assert legacy_match["format_key"] == "individual_match"  # new column backfilled
+    # ...but the DISPLAY label must NOT claim "Individual match play (100%)" for
+    # a row whose real applied allowance is 95% -- _format_label cross-checks the
+    # stored allowance and renders a percent-only "Custom" label instead, so the
+    # shown % never contradicts the % actually used in the net math.
+    from source.routes.matches import _format_label
+    assert _format_label(legacy_match) == "Custom allowance (95%)"

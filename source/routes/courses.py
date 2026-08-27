@@ -1,9 +1,27 @@
-from flask import render_template, request, jsonify, g, current_app
+from flask import render_template, request, jsonify, g, current_app, redirect, url_for
 from flask_login import login_required, current_user
 
+from auth_keys import require_permission
 from store import save_course, delete_course, rename_course
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
 from source.plugin import fire_hook
+
+
+def _course_write_forbidden():
+    """Return a 403 response if the caller may not mutate courses, else None.
+
+    Courses are shared global data referenced by every user's rounds, so
+    create/edit/delete is restricted. Session users must be admins (mirrors
+    admin.py). API-key identities must carry the ``courses:write`` scope.
+    """
+    if getattr(current_user, "via_api_key", False):
+        granted = getattr(current_user, "api_permissions", None) or []
+        if "courses:write" not in granted:
+            return jsonify({"error": "insufficient_scope", "required": "courses:write"}), 403
+        return None
+    if not current_user.is_admin:
+        return "Forbidden", 403
+    return None
 
 
 def _validate_hole_keys(holes) -> str | None:
@@ -25,6 +43,16 @@ _COURSE_NUMERIC_TEE_FIELDS = (
     "front_rating", "front_slope", "back_rating", "back_slope",
 )
 
+# Slope/rating (and their front_/back_ variants) are divisors/terms in the
+# WHS Course Handicap and Score Differential formulas
+# (calc_course_handicap, calc_round_dif). Unlike blank/missing, "0" (and
+# negative values) parse fine as a float but are domain-invalid --
+# calc_round_dif divides by slope, so slope<=0 is a ZeroDivisionError
+# waiting to happen at round-save time (CV-001). "yardage" has no such
+# constraint (a 0 yardage is merely unhelpful, not divide-by-zero
+# dangerous), so it is deliberately excluded from this stricter check.
+_POSITIVE_ONLY_TEE_FIELDS = ("rating", "slope", "front_rating", "front_slope", "back_rating", "back_slope")
+
 
 def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
     """Validate tee/hole numeric fields on an incoming course payload.
@@ -37,15 +65,19 @@ def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
     hole regardless of template behavior.
 
     strict=True (API write path, courses.py): the first present,
-      non-empty, non-numeric value causes this to return an error message
-      describing the offending tee/field; the payload is left untouched
-      so the caller can 400 before anything is persisted.
-    strict=False (zip import path, settings.py): non-numeric values are
-      blanked out in place instead of rejected, so a single bad course in
-      a batch import doesn't fail the whole import; this always returns
-      None.
+      non-empty, non-numeric OR non-positive (slope/rating only) value
+      causes this to return an error message describing the offending
+      tee/field; the payload is left untouched so the caller can 400
+      before anything is persisted.
+    strict=False (zip import path, settings.py): non-numeric/non-positive
+      values are blanked out in place instead of rejected, so a single bad
+      course in a batch import doesn't fail the whole import; this always
+      returns None.
 
     Blank/missing values are left as-is in both modes (blank is allowed).
+    A non-positive slope/rating ("0", "-5", ...) is NOT treated as blank --
+    it is domain-invalid (see `_POSITIVE_ONLY_TEE_FIELDS` above) and is
+    rejected/blanked the same as a non-numeric value.
     """
     tees = data.get("tees")
     if not isinstance(tees, dict):
@@ -58,10 +90,15 @@ def _coerce_course_numerics(data: dict, *, strict: bool = True) -> str | None:
             if val in (None, ""):
                 continue
             try:
-                float(val)
+                parsed = float(val)
             except (TypeError, ValueError):
                 if strict:
                     return f"tee '{tee_name}' field '{field}' must be numeric"
+                tee[field] = ""
+                continue
+            if field in _POSITIVE_ONLY_TEE_FIELDS and parsed <= 0:
+                if strict:
+                    return f"tee '{tee_name}' field '{field}' must be a positive number"
                 tee[field] = ""
         yardages = tee.get("yardages")
         if isinstance(yardages, dict):
@@ -81,6 +118,8 @@ def register_courses_routes(app, csrf):
     @app.route("/courses/new")
     @login_required
     def course_entry():
+        if not current_user.is_admin:
+            return redirect(url_for("course_list"))
         return render_template("course_entry.html", **base_context(
             courses=get_courses(),
         ))
@@ -119,7 +158,7 @@ def register_courses_routes(app, csrf):
         if not course:
             return "Course not found", 404
 
-        edit_mode = request.args.get("edit") == "1"
+        edit_mode = request.args.get("edit") == "1" and current_user.is_admin
 
         play_count = 0
         first_played = None
@@ -184,8 +223,12 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses", methods=["POST"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_post():
+        forbidden = _course_write_forbidden()
+        if forbidden:
+            return forbidden
         data = request.get_json()
         name = data.get("name", "").strip()
         if not name:
@@ -216,8 +259,12 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["DELETE"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_delete(name):
+        forbidden = _course_write_forbidden()
+        if forbidden:
+            return forbidden
         for r in get_all_rounds_for_user():
             if r.course == name:
                 return jsonify({"error": "Cannot delete course with existing rounds"}), 409
@@ -226,8 +273,12 @@ def register_courses_routes(app, csrf):
 
     @app.route("/api/courses/<name>", methods=["PUT"])
     @login_required
+    @require_permission("courses:write")
     @csrf.exempt
     def api_courses_put(name):
+        forbidden = _course_write_forbidden()
+        if forbidden:
+            return forbidden
         if not get_courses().get(name):
             return jsonify({"error": "Course not found"}), 404
 

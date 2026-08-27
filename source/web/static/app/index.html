@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>PinSheet · Scorecard</title>
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body class="ps-dark">
+<div id="app" class="app-shell">
+
+  <header class="app-header">
+    <span class="app-logo">PinSheet</span>
+    <button id="key-toggle" class="btn-ghost" type="button" aria-expanded="false" aria-controls="key-panel">
+      Key
+    </button>
+  </header>
+
+  <section id="key-panel" class="key-panel" hidden>
+    <label class="field-label" for="api-key-input">API key</label>
+    <div class="key-row">
+      <input id="api-key-input" class="key-input" type="password" autocomplete="off"
+             autocapitalize="off" spellcheck="false" placeholder="psk_...">
+      <button id="key-show" class="btn-ghost" type="button">show</button>
+    </div>
+    <div class="key-actions">
+      <button id="key-save" class="btn-primary" type="button">Save</button>
+      <button id="key-clear" class="btn-danger" type="button">Forget</button>
+    </div>
+    <p class="key-note">
+      Stored only in this browser tab's <code>sessionStorage</code> — cleared when the tab
+      closes, never written to <code>localStorage</code> or a cookie, and never sent anywhere
+      except as the <code>Authorization: Bearer</code> header on <code>/api/v1</code> calls.
+      Anyone who can run script in this page (XSS) could still read it, so only use this on a
+      device/network you trust, and use "Forget" when you're done.
+    </p>
+    <p id="key-status" class="key-status" aria-live="polite"></p>
+  </section>
+
+  <div id="error-banner" class="error-banner" hidden role="alert"></div>
+
+  <main id="view" class="app-view" aria-live="polite"></main>
+
+  <nav class="app-nav" id="app-nav" aria-label="Primary">
+    <a href="/app" class="app-nav-link">Home</a>
+    <a href="/app/rounds" class="app-nav-link">Rounds</a>
+    <a href="/app/rounds/new" class="app-nav-link app-nav-link-cta">Score</a>
+    <a href="/app/courses" class="app-nav-link">Courses</a>
+    <a href="/app/stats" class="app-nav-link">Stats</a>
+  </nav>
+
+</div>
+<script src="/app/app.js"></script>
+</body>
+</html>

@@ -22,8 +22,37 @@ not just to line counts — every AC-1..AC-16 has at least one test below.
     AC-13 admin route denied via key      -> test_admin_route_denied_for_api_key,
                                              test_request_loader_forces_is_admin_false, test_store_layer_sanitizes_is_admin
     AC-14 @require_permission scaffold    -> test_require_permission_scaffold_allows_and_denies
-    AC-15 zero new dependencies           -> test_no_new_dependencies_added
+    AC-15 dependency governance           -> test_no_new_dependencies_added
     AC-16 idempotent migration            -> test_init_db_is_idempotent
+
+Revision (eng-qa Step 5, issue #50 / apiv1-issue50-20260814-001): two tests
+below were superseded by the accepted `/api/v1` (issue #50) architecture and
+are updated here, not deleted -- their SECURITY INTENT is preserved, only
+the asserted contract changes:
+
+  - `test_no_new_dependencies_added` (AC-15): the literal "zero new deps"
+    assertion predates issue #50, which deliberately adds exactly 4 new
+    direct dependencies (`apiflask`, `flask-cors`, `opentelemetry-api`,
+    `opentelemetry-sdk` -- each individually justified/pinned/CVE-floored in
+    `pyproject.toml` and `eng-lead-apiv1.md` §1). The test now pins the
+    dependency-governance INVARIANT that actually matters: the set is
+    EXACTLY the pre-v1 baseline 6 plus these 4 named, reviewed additions --
+    not silently zero, and not silently unbounded either. A new,
+    un-reviewed dependency added by a future PR still fails this test.
+  - `test_require_permission_scaffold_allows_and_denies` (AC-14): the old
+    `FakeUser` stub predates `auth_keys._audit_would_block` (ADR-004's
+    Detect-signal audit log, which reads `current_user.id`) and never set
+    `.id`, so the scope-check path raised `AttributeError` on every real
+    invocation -- meaning this was the ONLY test in the suite exercising
+    `require_permission`'s reject path, and it was silently broken
+    (eng-devsecops-apiv1.md L1 §8, flagged P1). Fixed AND expanded to
+    additionally cover the full ADR-004 permissive-pending vs.
+    `API_SCOPE_ENFORCEMENT`-enforced contract (a real `User`-shaped double
+    with `.id` set; asserts the flag-off path logs `scope.would_block` but
+    still allows the call, and the flag-on path 403s). Deeper, behavioral
+    coverage of this same contract against REAL registered `/api/v1` routes
+    (not a decorator applied to a throwaway view) lives in
+    `tests/test_api_v1_security.py`.
 """
 
 import hashlib
@@ -342,20 +371,39 @@ def test_plaintext_never_appears_in_logs(test_app, caplog):
     assert plaintext not in caplog.text
 
 
-def test_require_permission_scaffold_allows_and_denies(test_app, monkeypatch):
-    """AC-14: the decorator is functional in isolation — passes when the permission
-    is present, 403s when absent, and session (non-key) identities bypass."""
+def test_require_permission_scaffold_allows_and_denies(test_app, monkeypatch, caplog):
+    """AC-14 (ADR-004 permissive-pending + enforced contract): the decorator
+    is functional in isolation -- passes when the permission is present,
+    session (non-key) identities always bypass, and the reject-path behavior
+    follows the #121 merge-audit contract (2026-08-26):
+      - DEFAULT = ENFORCED: a missing scope is 403 even with
+        `API_SCOPE_ENFORCEMENT` off -- this is what keeps the shipped legacy
+        route wiring (#41) airtight.
+      - `permissive_pending=True` (v1 lenient endpoints only) + flag OFF: a
+        missing scope is AUDITED (`scope.would_block`) but the call still
+        succeeds.
+      - `permissive_pending=True` + flag ON: a missing scope is rejected 403.
+
+    `FakeUser` sets `.id` and `.prefix` so the `_audit_would_block` audit-log
+    call -- which reads both -- does not raise (fix for the AttributeError
+    that left the reject-path assertion silently non-functional)."""
     import auth_keys
 
     @auth_keys.require_permission("rounds:read")
     def view():
         return "ok"
 
+    @auth_keys.require_permission("rounds:read", permissive_pending=True)
+    def lenient_view():
+        return "ok"
+
     class FakeUser:
         pass
 
     granted = FakeUser(); granted.via_api_key = True; granted.api_permissions = ["rounds:read"]
+    granted.id = 1; granted.prefix = "psk_test1234"
     missing = FakeUser(); missing.via_api_key = True; missing.api_permissions = ["stats:read"]
+    missing.id = 2; missing.prefix = "psk_test5678"
     session_user = FakeUser()  # no via_api_key attr -> treated as session user
 
     with test_app.test_request_context():
@@ -365,13 +413,42 @@ def test_require_permission_scaffold_allows_and_denies(test_app, monkeypatch):
         monkeypatch.setattr(auth_keys, "current_user", session_user)
         assert view() == "ok"                       # session users bypass the scaffold
 
+        # --- default ENFORCED (flag OFF): a missing scope still 403s ---
+        monkeypatch.setattr(auth_keys, "API_SCOPE_ENFORCEMENT", False)
         monkeypatch.setattr(auth_keys, "current_user", missing)
-        body, status = view()                       # key lacks the scope
+        body, status = view()                        # key lacks the scope, flag is off
+        assert status == 403, "default must stay enforced (legacy #41 wiring)"
+
+        # --- permissive-pending (explicit opt-in, flag OFF, the default) ---
+        monkeypatch.setattr(auth_keys, "current_user", missing)
+        with caplog.at_level(logging.WARNING, logger="pinsheet"):
+            result = lenient_view()                  # key lacks the scope, but flag is off
+        assert result == "ok", "permissive-pending must never reject on a missing scope"
+        assert any("scope.would_block" in rec.message for rec in caplog.records)
+        caplog.clear()
+
+        # --- enforced (flag ON) ---
+        monkeypatch.setattr(auth_keys, "API_SCOPE_ENFORCEMENT", True)
+        body, status = lenient_view()                # key lacks the scope, flag is on
         assert status == 403
+
+        # enforced mode still allows a key that DOES have the scope
+        monkeypatch.setattr(auth_keys, "current_user", granted)
+        assert lenient_view() == "ok"
 
 
 def test_no_new_dependencies_added(test_app):
-    """AC-15: the feature adds no new third-party dependency (stdlib + Flask-Login only)."""
+    """AC-15 (dependency governance, updated for issue #50): the pre-v1
+    baseline was 6 direct dependencies (stdlib + Flask-Login only). Issue
+    #50 (/api/v1) deliberately adds exactly 4 more -- `apiflask`,
+    `flask-cors` (CVE-floored >=6.0.0, see eng-lead-apiv1.md §1), and the
+    exact-pinned `opentelemetry-api`/`opentelemetry-sdk` no-op tracing pair
+    (ADR-003). This test now pins the FULL, exact expected dependency set
+    (baseline + the 4 reviewed additions) rather than asserting zero
+    growth -- any OTHER new, un-reviewed dependency added by a future PR
+    still fails this test, preserving the original security intent
+    (no silent dependency-supply-chain growth) without contradicting the
+    accepted v1 architecture."""
     import tomllib
     from pathlib import Path
     root = Path(__file__).resolve().parent.parent
@@ -381,7 +458,13 @@ def test_no_new_dependencies_added(test_app):
         for d in data["project"]["dependencies"]
     )
     assert names == sorted(
-        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf", "werkzeug"]
+        # werkzeug and flask-talisman added outside this feature; the #50
+        # (/api/v1) merge adds the 4 v1 deps (apiflask, flask-cors,
+        # opentelemetry-api, opentelemetry-sdk) -- all kept in the approved
+        # set so AC-15 stays meaningful.
+        ["flask", "waitress", "bcrypt", "flask-login", "flask-limiter", "flask-wtf",
+         "werkzeug", "flask-talisman",
+         "apiflask", "flask-cors", "opentelemetry-api", "opentelemetry-sdk"]
     )
 
 
@@ -395,3 +478,159 @@ def test_init_db_is_idempotent(test_app):
     ).fetchone()
     db.close()
     assert row is not None
+
+
+# --------------------------------------------------------------------------- #
+# Scope enforcement — @require_permission wired onto routes (issue #41)
+#
+# Deny-by-default function-level authZ (OWASP A01 / CWE-862): a key reaches only
+# the endpoints matching its granted scopes; anything else is 403
+# insufficient_scope. Session users bypass the check entirely.
+# --------------------------------------------------------------------------- #
+
+def _keyed_client(test_app, scopes, username="scoped", display="Scoped"):
+    """A user + a client that sends a bearer key carrying `scopes`."""
+    user = create_user(username, display, "pass1234")
+    plaintext, _ = create_api_key(user["id"], "k", scopes)
+    return test_app.test_client(), plaintext, user
+
+
+def test_scope_read_key_reaches_matching_read_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.get("/api/drafts/round", headers=_bearer(key))
+    assert resp.status_code == 200
+
+
+def test_scope_read_only_key_denied_on_round_write(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.post("/api/rounds", headers=_bearer(key), json={})
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body == {"error": "insufficient_scope", "required": "rounds:write"}
+
+
+def test_scope_write_key_reaches_matching_write_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:write"])
+    resp = client.put("/api/drafts/round", headers=_bearer(key), json={"hole": 1})
+    assert resp.status_code == 200
+
+
+def test_scope_write_only_key_denied_on_round_read(test_app):
+    # Scopes are directional: rounds:write does NOT grant rounds:read.
+    client, key, _ = _keyed_client(test_app, ["rounds:write"])
+    resp = client.get("/api/drafts/round", headers=_bearer(key))
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "rounds:read"
+
+
+def test_scope_read_key_denied_on_stats(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.get("/stats/scoring", headers=_bearer(key))
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "stats:read"
+
+
+def test_scope_stats_key_reaches_stats(test_app):
+    client, key, _ = _keyed_client(test_app, ["stats:read"])
+    resp = client.get("/stats/scoring", headers=_bearer(key))
+    assert resp.status_code == 200
+
+
+def test_scope_key_without_courses_write_denied_on_course_mutation(test_app):
+    client, key, _ = _keyed_client(test_app, ["rounds:read"])
+    resp = client.post("/api/courses", headers=_bearer(key), json={"name": "X"})
+    assert resp.status_code == 403
+    assert resp.get_json()["required"] == "courses:write"
+
+
+def test_scope_courses_write_key_reaches_course_mutation(test_app):
+    client, key, _ = _keyed_client(test_app, ["courses:write"])
+    resp = client.post("/api/courses", headers=_bearer(key), json={
+        "name": "Pebble Beach",
+        "location": {"city": "Pebble Beach", "state/province": "CA", "country": "USA"},
+        "holes": {},
+        "par": 72,
+    })
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "Pebble Beach"
+
+
+def test_scope_empty_key_denied_on_any_scoped_endpoint(test_app):
+    client, key, _ = _keyed_client(test_app, [])
+    assert client.get("/api/drafts/round", headers=_bearer(key)).status_code == 403
+    assert client.get("/stats/scoring", headers=_bearer(key)).status_code == 403
+    assert client.post("/api/rounds", headers=_bearer(key), json={}).status_code == 403
+
+
+def test_scope_course_draft_gated_on_courses_write(test_app):
+    # Course drafts are course-authoring state — no `courses:read` scope exists,
+    # so a rounds-only key cannot read/write them.
+    denied, dkey, _ = _keyed_client(test_app, ["rounds:read", "rounds:write"], username="a", display="A")
+    assert denied.get("/api/drafts/course", headers=_bearer(dkey)).status_code == 403
+    allowed, akey, _ = _keyed_client(test_app, ["courses:write"], username="b", display="B")
+    assert allowed.get("/api/drafts/course", headers=_bearer(akey)).status_code == 200
+
+
+def test_session_user_unaffected_by_scope_gate(test_app):
+    # A session (cookie) user has no scopes but keeps full account access.
+    client, _ = _login(test_app)
+    assert client.get("/stats/scoring").status_code == 200
+    assert client.put("/api/drafts/round", json={"hole": 1}).status_code == 200
+    assert client.get("/api/drafts/course").status_code == 200
+
+
+def test_unauthenticated_scoped_route_is_not_scope_403(test_app):
+    # login_required runs before the scope gate: no auth -> 401 (bearer path)
+    # or 302 (web path), never a misleading 403 insufficient_scope.
+    client = test_app.test_client()
+    assert client.get("/stats/scoring", headers=_bearer("psk_bogus")).status_code == 401
+    assert client.get("/stats/scoring").status_code == 302
+
+
+def test_scope_import_requires_both_write_scopes(test_app):
+    # /settings/import bulk-writes rounds AND courses (save_round + save_course),
+    # so it is gated on both scopes — closing an unscoped round/course write path.
+    ro, rok, _ = _keyed_client(test_app, ["rounds:read"], username="i1", display="I1")
+    r = ro.get("/settings/import", headers=_bearer(rok))
+    assert r.status_code == 403 and r.get_json()["required"] == "rounds:write"
+
+    rw, rwk, _ = _keyed_client(test_app, ["rounds:write"], username="i2", display="I2")
+    r = rw.get("/settings/import", headers=_bearer(rwk))
+    assert r.status_code == 403 and r.get_json()["required"] == "courses:write"
+
+    both, bk, _ = _keyed_client(test_app, ["rounds:write", "courses:write"], username="i3", display="I3")
+    assert both.get("/settings/import", headers=_bearer(bk)).status_code == 200
+
+
+def test_scope_match_link_round_requires_rounds_write(test_app):
+    ro, rok, _ = _keyed_client(test_app, ["rounds:read"], username="m1", display="M1")
+    r = ro.get("/matches/1/link-round", headers=_bearer(rok))
+    assert r.status_code == 403 and r.get_json()["required"] == "rounds:write"
+    # With the scope the gate passes; the handler then 404s on the missing match.
+    rw, rwk, _ = _keyed_client(test_app, ["rounds:write"], username="m2", display="M2")
+    assert rw.get("/matches/1/link-round", headers=_bearer(rwk)).status_code == 404
+
+
+def test_session_user_unaffected_by_import_and_link_gates(test_app):
+    client, _ = _login(test_app)
+    assert client.get("/settings/import").status_code == 200
+    assert client.get("/matches/1/link-round").status_code == 404  # gate bypassed, match missing
+
+
+def test_csrf_exemption_survives_scope_decorator(test_app):
+    """Inserting @require_permission between @login_required and @csrf.exempt must
+    not break CSRF exemption. flask_wtf matches exemptions by
+    f"{view.__module__}.{view.__name__}"; @wraps preserves both, so the exemption
+    still resolves. Verified here with CSRF actually enabled (the rest of the
+    suite runs with it off)."""
+    client, _ = _login(test_app)                      # session established (CSRF off)
+    test_app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        # Exempt write route still passes tokenless with CSRF on.
+        assert client.put("/api/drafts/round", json={"hole": 1}).status_code == 200
+        # Negative control: a CSRF-protected route rejects a tokenless POST,
+        # proving CSRF is genuinely active in this block.
+        resp = client.post("/settings/api-keys", data={"label": "x", "permissions": ""})
+        assert resp.status_code == 400
+    finally:
+        test_app.config["WTF_CSRF_ENABLED"] = False

@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from source.models import RoundData, CourseData, HoleData, HoleDef, TeeData
+from calc.handicap import calc_course_handicap, calc_strokes_given
 
 
 def calc_trend(all_rounds: list[RoundData], calc_fn, *args, filter_fn=None) -> list:
@@ -254,10 +255,29 @@ def calc_per_hole_stats(
                         tee_data = course_obj.tees if course_obj else {}
                         first_tee = next(iter(tee_data.values())) if tee_data else TeeData()
                         slope = float(first_tee.slope or "113")
-                        rating = float(first_tee.rating or "0")
                         c_par = int(course_obj.par) if course_obj else par_val
-                        course_hcp = round(handicap_index * slope / 113 + (c_par - rating))
-                        strokes_received += 1 if si_int <= course_hcp else 0
+                        # Rating fallback: a missing/zero tee rating must NOT
+                        # collapse to rating=0 -- that corrupts the Course
+                        # Handicap formula's (rating - par) term (WHS 2024
+                        # Rule 6.1a) and produces absurd stroke counts. Absent
+                        # a real rating, assume rating == par (a
+                        # scratch-neutral tee), which yields
+                        # Course Handicap ~= Handicap Index * slope/113 -- the
+                        # least-surprising approximation available with no
+                        # better data, rather than silently corrupting the
+                        # stat with a rating of 0.
+                        rating = float(first_tee.rating) if first_tee.rating else float(c_par)
+                        # Canonical WHS Course Handicap formula (2024 Rule
+                        # 6.1a) -- delegate to calc.handicap.calc_course_handicap
+                        # so there is a single source of truth; do not
+                        # reimplement the (rating - par) term inline here.
+                        course_hcp = calc_course_handicap(handicap_index, c_par, slope, rating)
+                        # WHS stroke rule (Rule 6.2b) 0/1/2/3 allocation via
+                        # the single shared helper (also used by
+                        # calc_hole_scores) instead of capping at 1 inline --
+                        # a hole receives an extra stroke once Course
+                        # Handicap >= Stroke Index + 18 (+ 36 for the third).
+                        strokes_received += calc_strokes_given(si_int, course_hcp)
                         holes_with_si += 1
                     except (ValueError, TypeError, StopIteration):
                         pass

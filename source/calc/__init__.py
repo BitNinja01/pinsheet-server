@@ -1,9 +1,14 @@
 from calc.handicap import (
     calc_hole_scores,
+    calc_strokes_given,
     calc_course_handicap,
+    calc_playing_handicap,
+    WHS_HANDICAP_ALLOWANCES,
     calc_round_dif,
     calc_adjusted_gross_score,
+    round_half_up,
     calc_expected_9hole_dif,
+    calc_9hole_dif,
     count_table_n,
     calc_effective_diffs,
     get_best_n_rounds,
@@ -15,6 +20,7 @@ from calc.handicap import (
     calc_career_low_handicap,
     apply_handicap_cap,
     WHS_HANDICAP_WINDOW,
+    WHS_MAX_HANDICAP_INDEX,
 )
 from calc.approach import (
     calc_fir_percent,
@@ -110,6 +116,7 @@ from calc.seasons import (
 from calc.composite import (
     compute_stat_bundle,
     StatBundle,
+    stat_arrow,
     last_n_rounds,
     best_n_rounds,
     current_and_previous_handicap_index,

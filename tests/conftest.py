@@ -3,6 +3,46 @@ import pytest
 from source.models import dict_to_round, dict_to_course, RoundData, CourseData
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _register_app_routes_once():
+    """Session-wide, one-time route/blueprint setup for the shared,
+    process-wide `main.app` singleton -- runs before ANY test body executes
+    (autouse + session-scoped, so it fires during the very first test's
+    fixture setup, before that test -- or any test in any file -- makes its
+    first request against `main.app`).
+
+    Why this is needed (found while adding `tests/test_api_v1.py`, Revision
+    1): Flask raises `AssertionError` if route/blueprint setup ("the setup
+    method ... can no longer be called") is attempted after the app has
+    served its first request. The existing per-file `test_app` fixture
+    pattern (`test_api_keys.py` etc.) wraps `register_routes(...)` in
+    `try/except AssertionError: pass` -- functionally relying on WHICHEVER
+    test file happens to run first (by pytest's file-collection order) to
+    "win" the one real registration attempt before any request is served.
+    That worked by accident for `register_routes` (some early-alphabetical
+    file's fixture always got there first). It silently failed for
+    `register_api_v1` (`source/routes/api_v1`): `test_api_v1.py` sorts after
+    `test_api_keys.py`, whose ~30 tests all made requests against the shared
+    app LONG before `test_api_v1.py`'s own fixture ever got a turn -- so
+    every v1 route 404'd (blueprints never registered) when running the full
+    suite, even though the identical fixture passed running `test_api_v1.py`
+    in isolation. This fixture removes the race entirely: it is the first
+    thing that touches `main.app`, before any test-specific fixture.
+    """
+    import main as main_mod
+    from source.routes import register_routes
+    from source.routes.api_v1 import register_api_v1
+
+    try:
+        register_routes(main_mod.app, main_mod.limiter, main_mod.csrf, main_mod.User)
+    except AssertionError:
+        pass
+    try:
+        register_api_v1(main_mod.app, main_mod.limiter, main_mod.csrf)
+    except AssertionError:
+        pass
+
+
 @pytest.fixture
 def make_round():
     """Factory fixture: returns a function that creates a RoundData."""

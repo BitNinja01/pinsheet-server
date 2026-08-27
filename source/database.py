@@ -46,6 +46,22 @@ def get_db() -> sqlite3.Connection:
         return _open_db_nolock()
 
 
+def _add_column_if_missing(db: sqlite3.Connection, table: str, column_def: str) -> None:
+    """Run `ALTER TABLE {table} ADD COLUMN {column_def}`, treating SQLite's
+    "duplicate column name" OperationalError (raised when this migration has
+    already run against this DB) as expected and safe to swallow. Any OTHER
+    OperationalError -- disk full, DB locked, malformed column_def, wrong
+    table name, etc. -- is deliberately RE-RAISED rather than caught by a
+    bare `except Exception: pass`, so a genuine migration failure surfaces
+    at startup instead of silently leaving the column missing."""
+    try:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
+        db.commit()
+    except sqlite3.OperationalError as exc:
+        if "duplicate column name" not in str(exc).lower():
+            raise
+
+
 def init_db() -> None:
     db = get_db()
     db.executescript("""
@@ -116,6 +132,26 @@ def init_db() -> None:
             course_name TEXT NOT NULL,
             date        TEXT NOT NULL,
             status      TEXT NOT NULL DEFAULT 'active',
+            -- WHS Rule 6.2 / Appendix C: Handicap Allowance percent applied
+            -- to the Course Handicap to derive the Playing Handicap for this
+            -- match's format. Default 100 preserves pre-Rule-6.2 behavior
+            -- (Playing Handicap == Course Handicap) for existing/unspecified
+            -- matches. IMMUTABLE in practice: set once at create_match()
+            -- time; there is no edit/update path, and match_rounds.net is
+            -- computed from this value only at link_round() time (never
+            -- recomputed), so a hypothetical future "edit allowance" feature
+            -- would need to re-link every already-linked round too.
+            allowance_percent INTEGER NOT NULL DEFAULT 100,
+            -- WHS Appendix C format key (matches WHS_HANDICAP_ALLOWANCES /
+            -- MATCH_FORMAT_LABELS keys in source/routes/matches.py), stored
+            -- alongside allowance_percent as the display/source-of-truth for
+            -- "which format produced this allowance" -- allowance_percent
+            -- ALONE is ambiguous for display (e.g. 95% is shared by both
+            -- individual_stroke and stableford_individual), so this column
+            -- exists purely to resolve that ambiguity in the UI.
+            -- allowance_percent (not this column) remains the value used in
+            -- net math. Same immutability caveat as allowance_percent.
+            format_key  TEXT NOT NULL DEFAULT 'individual_match',
             created_at  TEXT DEFAULT (datetime('now'))
         );
 
@@ -206,5 +242,27 @@ def init_db() -> None:
         db.commit()
     except Exception:
         pass  # column already exists
+    # WHS Rule 6.2: existing DBs predating the Playing Handicap allowance
+    # feature won't have this column yet -- backfill it with the
+    # non-breaking default (100 == no allowance reduction, matches prior
+    # behavior) so an existing DB loads without error. Uses the narrow
+    # duplicate-column-only guard (_add_column_if_missing), not a bare
+    # `except Exception: pass`, so an unrelated ALTER failure (e.g. a locked
+    # or corrupt DB) is not silently hidden.
+    _add_column_if_missing(db, "matches", "allowance_percent INTEGER NOT NULL DEFAULT 100")
+    # WHS Appendix C: existing DBs predating the format_key column backfill
+    # to 'individual_match' -- the same default format as allowance_percent's
+    # 100 default, so a pre-existing match row displays "Individual match
+    # play (100%)" (its actual pre-Rule-6.2 net behavior) rather than an
+    # ambiguous/incorrect label.
+    _add_column_if_missing(db, "matches", "format_key TEXT NOT NULL DEFAULT 'individual_match'")
+    # WHS Rule 5.6 / 5.1a: PCC (Playing Conditions Calculation) adjustment,
+    # an optional per-round input in [-1.0, +3.0] (see source.models.
+    # clamp_pcc), subtracted from (Adjusted Gross Score - Course Rating) in
+    # the Score Differential formula. Existing DBs predating this feature
+    # backfill to the non-breaking default 0.0 (PCC omitted -- the exact
+    # prior behavior), so every already-stored differential is unaffected
+    # and the DB loads without error.
+    _add_column_if_missing(db, "rounds", "pcc REAL NOT NULL DEFAULT 0")
     db.commit()
     db.close()

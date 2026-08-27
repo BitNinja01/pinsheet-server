@@ -25,10 +25,13 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
     (empty, or the "0" exclusion sentinel) are skipped when scanning for the
     two most recent held values.
 
-    Falls back to a fresh raw `calc_handicap_index()` call ONLY when NO
-    round in `rounds` has an established HI yet (WHS Rule 5.2
-    pre-establishment, e.g. fewer than 3 eligible scores) -- there is
-    nothing capped/stored to diverge from in that case.
+    When no round has an established HI yet (WHS Rule 5.2 pre-establishment,
+    e.g. fewer than 3 eligible scores) returns (None, None) -- there is no
+    Handicap Index to show. No fresh raw `calc_handicap_index()` fallback:
+    the stored `computed_handicap` written by `recompute_handicaps_for_user`
+    is the single source of truth for every displayed HI, and a raw
+    recalculation would return None in that same pre-establishment case
+    anyway while risking divergence from the capped/ESR-adjusted value.
     """
     found = []
     for r in rounds:
@@ -41,13 +44,9 @@ def current_and_previous_handicap_index(rounds, include_9hole: bool) -> tuple:
         if len(found) >= 2:
             break
 
-    if found:
-        current = found[0]
-        previous = found[1] if len(found) >= 2 else None
-        return current, previous
-
-    from calc.handicap import calc_handicap_index
-    return calc_handicap_index(rounds, include_9hole), calc_handicap_index(rounds[1:], include_9hole)
+    current = found[0] if found else None
+    previous = found[1] if len(found) >= 2 else None
+    return current, previous
 
 
 def handicap_trend_from_stored(all_rounds) -> list:
@@ -106,6 +105,37 @@ class StatPanel:
 @dataclass
 class StatBundle:
     panels: dict[str, StatPanel] = field(default_factory=dict)
+
+
+def stat_arrow(primary, secondary, higher_better, suffix="", precision=1):
+    """Directional delta between a primary and secondary stat value.
+
+    Returns None when either value is missing, matching the blank-card
+    behavior (no arrow rendered). Otherwise returns a small struct:
+
+      direction: "up" | "down" | "flat" — flat when the two values are equal
+                 at the displayed precision (rounding acts as the epsilon).
+      magnitude: absolute change, rounded to `precision`.
+      display:   magnitude formatted with `suffix` (e.g. "1.2%").
+      is_good:   whether the movement is favorable per `higher_better`.
+    """
+    if primary is None or secondary is None:
+        return None
+    diff = round(primary - secondary, precision)
+    if diff > 0:
+        direction = "up"
+    elif diff < 0:
+        direction = "down"
+    else:
+        direction = "flat"
+    is_good = direction != "flat" and (direction == "up") == higher_better
+    magnitude = abs(diff)
+    return {
+        "direction": direction,
+        "magnitude": magnitude,
+        "display": f"{magnitude:.{precision}f}{suffix}",
+        "is_good": is_good,
+    }
 
 
 def compute_stat_bundle(rounds, l20, b8, courses_dict, include_9hole) -> StatBundle:

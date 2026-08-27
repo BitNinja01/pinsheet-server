@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import render_template, request, jsonify, g, current_app, url_for, redirect
 from flask_login import login_required, current_user
 
+from auth_keys import require_permission
 from store import create_invite_code, get_invite_codes, get_plugin_states, generate_password_reset_token
 from calc import (
     calc_scoring_average, calc_fir_percent, calc_gir_percent,
@@ -59,11 +60,13 @@ def register_stats_routes(app):
 
     @app.route("/stats")
     @login_required
+    @require_permission("stats:read")
     def stats_redirect():
         return redirect("/stats/scoring")
 
     @app.route("/stats/scoring")
     @login_required
+    @require_permission("stats:read")
     def stats_scoring():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -112,6 +115,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/penalties")
     @login_required
+    @require_permission("stats:read")
     def stats_penalties():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -155,6 +159,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/fairways")
     @login_required
+    @require_permission("stats:read")
     def stats_fairways():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -181,6 +186,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/greens")
     @login_required
+    @require_permission("stats:read")
     def stats_greens():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -210,6 +216,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/putting")
     @login_required
+    @require_permission("stats:read")
     def stats_putting():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -242,6 +249,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/short-game")
     @login_required
+    @require_permission("stats:read")
     def stats_short_game():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -266,6 +274,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/momentum")
     @login_required
+    @require_permission("stats:read")
     def stats_momentum():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -323,6 +332,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/trends")
     @login_required
+    @require_permission("stats:read")
     def stats_trends():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
         settings = get_settings()
@@ -353,6 +363,7 @@ def register_stats_routes(app):
 
     @app.route("/stats/bests")
     @login_required
+    @require_permission("stats:read")
     def stats_bests():
         all_rounds, courses_dict, b8, l5, l10, l20 = _load_rounds()
 
@@ -374,6 +385,7 @@ def register_stats_routes(app):
 
     @app.route("/season")
     @login_required
+    @require_permission("stats:read")
     def season_summary():
         settings = get_settings()
         include_9hole = settings.get("include_9hole", True)

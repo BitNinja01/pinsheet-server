@@ -18,7 +18,8 @@ _repo_root = str(Path(__file__).resolve().parent.parent)
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-from flask import Flask, request, g, jsonify, redirect, url_for
+from flask import request, g, jsonify, redirect, url_for
+from apiflask import APIFlask
 
 from database import set_db_path, init_db
 from store import (
@@ -31,11 +32,34 @@ from source.plugin_loader import discover_plugins
 from source.routes import register_routes
 
 _log = logging.getLogger("pinsheet")
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+# %(asctime)s added (was: "%(levelname)s: %(message)s") so every log record --
+# including the ADR-004 `scope.would_block` audit entries (auth_keys.py) --
+# carries a timestamp from the formatter itself, rather than needing `ts` as
+# a duplicated message field (eng-lead §2.2 disclosed deviation; flagged as a
+# required backend change by eng-infra's env-config notes).
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
-app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
+# ADR-001: the root app must BE an APIFlask instance for /api/v1's OpenAPI
+# spec collection (Swagger/Redoc) to work at all -- APIFlask subclasses
+# flask.Flask, so every existing extension binding below (login_manager,
+# CSRFProtect, Limiter, all legacy @app.route/Blueprint views) is unaffected.
+# json_errors=False is NOT optional: at the APIFlask default (True), its
+# error_processor JSON-ifies every route's HTTP errors app-wide, including
+# legacy Jinja/`/api/*` 404s/405s/500s -- False keeps that legacy behavior
+# byte-identical (AC-7); v1's own Problem Details handling is wired
+# separately, per-blueprint, in source/routes/api_v1 (see errors.py).
+app = APIFlask(
+    __name__,
+    template_folder="web/templates",
+    static_folder="web/static",
+    title="PinSheet API",
+    version="1",
+    spec_path="/api/v1/openapi.json",
+    docs_path="/api/v1/docs",
+    json_errors=False,
+)
 
-from flask_login import LoginManager, current_user
+from flask_login import LoginManager, current_user, login_required
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -107,6 +131,7 @@ def _load_user_from_request(req):
     user.is_admin = False              # keys are never admin (admin stays session-only)
     user.via_api_key = True
     user.api_permissions = user_dict.get("permissions", [])
+    user.prefix = user_dict.get("prefix")  # non-secret display fragment (store.py:1010) -- audit correlator (M-1)
     return user
 
 
@@ -120,9 +145,70 @@ def _unauthorized():
     return redirect(url_for("login_page", next=request.path))
 
 
-from source.extensions import init_app
+from source.extensions import init_app, init_cors
 
 limiter, csrf = init_app(app)
+
+init_cors(app)  # ADR-005: /api/v1-scoped, default-deny CORS; never app-wide.
+
+from source.observability import init_tracing
+
+init_tracing(app)  # ADR-003: no-op default, no exporter (see observability.py).
+
+# Revision 1 (PM-3, coordinator-flagged): AC-5 requires Swagger UI AND ReDoc.
+# APIFlask 3.1.1's constructor only mounts ONE `docs_ui` template at
+# `docs_path` (default `swagger-ui`); it ships a `redoc` template
+# (`apiflask.ui_templates.ui_templates["redoc"]`) but has no second
+# constructor arg to mount it at a second path. Register it directly: the
+# template's own `Redoc.init(...)` call reads `url_for('openapi.spec')`
+# (the same spec_path already configured above), and its Jinja `config.*`
+# lookups (`REDOC_STANDALONE_JS`, `DOCS_FAVICON`, etc.) resolve against
+# APIFlask's own default config values (`apiflask/settings.py`) -- no extra
+# config needed.
+from apiflask.ui_templates import ui_templates
+from flask import render_template_string
+
+
+@app.route("/api/v1/redoc")
+@app.doc(hide=True)  # a docs-UI route shouldn't list itself as an API operation
+def api_v1_redoc():
+    return render_template_string(ui_templates["redoc"], title=app.title, version=app.version)
+
+
+# ADR-013: gate the OpenAPI docs/spec/redoc routes by environment. Open in
+# dev (FLASK_DEBUG truthy, or an explicit API_DOCS_PUBLIC=1); require an
+# authenticated caller (session or valid psk_ key) in prod (default) so the
+# OpenAPI document -- a machine-readable map of every v1 resource/scope --
+# isn't free reconnaissance for an anonymous caller (T-15). The openapi
+# blueprint's `spec`/`docs` views are already registered by the APIFlask
+# constructor above (spec_path/docs_path); `api_v1_redoc` was just added.
+_API_DOCS_PUBLIC = os.environ.get("API_DOCS_PUBLIC", "").lower() in ("1", "true", "yes")
+_DEV_MODE = os.environ.get("FLASK_DEBUG", "") not in ("", "0")
+if not (_DEV_MODE or _API_DOCS_PUBLIC):
+    for _docs_endpoint in ("openapi.spec", "openapi.docs", "api_v1_redoc"):
+        _docs_view = app.view_functions.get(_docs_endpoint)
+        if _docs_view is not None:
+            app.view_functions[_docs_endpoint] = login_required(_docs_view)
+
+
+# Revision 1 (found while verifying PM-2/PM-3, disclosed): APIFlask's spec
+# collection picks up EVERY `app.route`-registered view by default, not just
+# `APIBlueprint`-wrapped ones -- ADR-001's "regular Blueprints are skipped
+# from spec" claim (verified true) doesn't cover the legacy `register_*_
+# routes(app, ...)` functions, which bind directly on the APIFlask instance
+# via bare `@app.route(...)` (no Blueprint wrapper at all -- confirmed,
+# `source/routes/courses.py` etc.). Left alone, the generated
+# `/api/v1/openapi.json`/Swagger/Redoc would list every legacy Jinja/`/api/*`
+# route alongside the 13 real v1 endpoints. `spec_processor` only
+# post-processes the generated spec DICT at doc-request time -- it never
+# touches routing or request handling, so it cannot affect "legacy
+# untouched" (verified: filtering here does not remove or alter any
+# `app.view_functions`/`url_map` entry, only what `spec_processor` reports).
+@app.spec_processor
+def _scope_spec_to_v1(spec):
+    if isinstance(spec, dict) and "paths" in spec:
+        spec["paths"] = {p: v for p, v in spec["paths"].items() if p.startswith("/api/v1")}
+    return spec
 
 
 @app.before_request
@@ -233,6 +319,9 @@ def main():
         sys.exit(1)
     app.secret_key = secret_key
 
+    from source.auth_keys import check_scope_enforcement_sunset
+    check_scope_enforcement_sunset()  # ADR-004 PM-001: loud boot warning if permissive-pending has run past its sunset
+
     db_path = str(data_dir / "pinsheet.db")
     set_db_path(db_path)
     init_db()
@@ -268,6 +357,23 @@ def main():
             "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"
         )
         return response
+
+    from source.routes.api_v1 import register_api_v1
+    register_api_v1(app, limiter, csrf)
+
+    # eng-frontend (Step 3, parallel) owns source/routes/spa.py -- guarded so
+    # this backend build stays independently importable/runnable regardless
+    # of merge order between the two parallel Step-3 workstreams. Once
+    # source/routes/spa.py lands, this behaves identically to an
+    # unconditional `from source.routes.spa import register_spa_routes;
+    # register_spa_routes(app)` call (disclosed deviation from the plan's
+    # literal unconditional call -- see build notes).
+    try:
+        from source.routes.spa import register_spa_routes
+    except ImportError:
+        _log.warning("source.routes.spa not found -- /app SPA route not registered (eng-frontend build pending)")
+    else:
+        register_spa_routes(app)
 
     port = args.port if args.port is not None else find_free_port()
     url = f"http://{args.host}:{port}"
