@@ -1,0 +1,521 @@
+/* PinSheet SPA (/app) · Application Styles
+ * Mobile-first, on-course score entry. Aesthetic matches the main PinSheet
+ * web UI (source/web/static/app.css): editorial/tour-pro, JetBrains Mono,
+ * no rounded corners, no shadows, mint accent, hairline 1px rules. Dark
+ * theme by default (matches the main app's default theme).
+ * Self-hosted font (same-origin) so CSS is compatible with a strict
+ * `default-src 'self'` CSP with no explicit font-src carve-out. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono/JetBrainsMonoNLNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono/JetBrainsMonoNLNerdFontMono-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono/JetBrainsMonoNLNerdFontMono-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono/JetBrainsMonoNLNerdFontMono-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --ps-font: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --ps-radius: 0;
+  --ps-rule: 1px;
+  --ps-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ps-dark {
+  --ps-paper: #131312;
+  --ps-paper-2: #1c1c1a;
+  --ps-ink: #ecebe6;
+  --ps-ink-2: #a8a59d;
+  --ps-ink-3: #6c685f;
+  --ps-rule-c: #2a2925;
+  --ps-accent: #5db49a;
+  --ps-accent-dim: rgba(93, 180, 154, 0.14);
+  --ps-accent-fg: #0a0a0a;
+  --ps-warn: #d96a6a;
+  --ps-warn-dim: rgba(217, 106, 106, 0.12);
+}
+
+.ps-light {
+  --ps-paper: #faf6ec;
+  --ps-paper-2: #f1ebda;
+  --ps-ink: #16110a;
+  --ps-ink-2: #4a4239;
+  --ps-ink-3: #8a8174;
+  --ps-rule-c: #d6cdb8;
+  --ps-accent: #3d8a72;
+  --ps-accent-dim: rgba(61, 138, 114, 0.12);
+  --ps-accent-fg: #0a0a0a;
+  --ps-warn: #b04848;
+  --ps-warn-dim: rgba(176, 72, 72, 0.08);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+  font-family: var(--ps-font);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── App shell ─────────────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+  position: sticky;
+  top: 0;
+  background: var(--ps-paper);
+  z-index: 10;
+}
+
+.app-logo {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ── Key panel ─────────────────────────────────────────────────────── */
+
+.key-panel {
+  padding: 14px 16px;
+  border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+  background: var(--ps-paper-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.key-row {
+  display: flex;
+  gap: 8px;
+}
+
+.key-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.key-note {
+  font-size: 12px;
+  color: var(--ps-ink-3);
+  line-height: 1.5;
+}
+
+.key-note code {
+  color: var(--ps-ink-2);
+}
+
+.key-status {
+  font-size: 12px;
+  color: var(--ps-accent);
+}
+
+/* ── Error banner ──────────────────────────────────────────────────── */
+
+.error-banner {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border: var(--ps-rule) solid var(--ps-warn);
+  background: var(--ps-warn-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+.error-title {
+  color: var(--ps-warn);
+  font-size: 14px;
+}
+
+.error-detail, .error-meta {
+  font-size: 13px;
+  color: var(--ps-ink-2);
+}
+
+.error-dismiss {
+  align-self: flex-end;
+  margin-top: 4px;
+}
+
+/* ── Main view ─────────────────────────────────────────────────────── */
+
+.app-view {
+  flex: 1;
+  padding: 20px 16px 96px;
+}
+
+.view-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.view-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+  color: var(--ps-ink-2);
+}
+
+.view-sub {
+  font-size: 14px;
+  color: var(--ps-ink-2);
+  margin-bottom: 16px;
+}
+
+.empty-state {
+  font-size: 14px;
+  color: var(--ps-ink-3);
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+
+.btn-primary, .btn-ghost, .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--ps-rule) solid var(--ps-rule-c);
+  background: transparent;
+  color: var(--ps-ink);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ps-dur-base, 200ms) var(--ps-ease);
+}
+
+.btn-primary {
+  background: var(--ps-accent);
+  border-color: var(--ps-accent);
+  color: var(--ps-accent-fg);
+}
+
+.btn-primary:hover, .btn-primary:focus-visible {
+  filter: brightness(1.05);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn-ghost:hover, .btn-ghost:focus-visible {
+  background: var(--ps-paper-2);
+}
+
+.btn-danger {
+  color: var(--ps-warn);
+  border-color: var(--ps-warn);
+}
+
+.btn-danger:hover, .btn-danger:focus-visible {
+  background: var(--ps-warn-dim);
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+  margin-bottom: 16px;
+  text-decoration: none;
+}
+
+/* ── Forms ─────────────────────────────────────────────────────────── */
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.field-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ps-ink-3);
+}
+
+input, select, textarea {
+  background: var(--ps-paper-2);
+  border: var(--ps-rule) solid var(--ps-rule-c);
+  color: var(--ps-ink);
+  padding: 10px 12px;
+  font-size: 16px; /* prevents iOS auto-zoom on focus */
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: -1px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* ── Home ──────────────────────────────────────────────────────────── */
+
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.home-card {
+  display: block;
+  border: var(--ps-rule) solid var(--ps-rule-c);
+  padding: 16px;
+  background: var(--ps-paper-2);
+}
+
+.home-card:hover, .home-card:focus-visible {
+  border-color: var(--ps-accent);
+}
+
+.home-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.home-card-sub {
+  font-size: 13px;
+  color: var(--ps-ink-3);
+}
+
+/* ── Courses ───────────────────────────────────────────────────────── */
+
+.course-list, .round-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.course-item, .round-item {
+  padding: 12px 0;
+  border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+}
+
+.course-name {
+  font-weight: 600;
+}
+
+.course-loc {
+  font-size: 13px;
+  color: var(--ps-ink-3);
+  margin-top: 2px;
+}
+
+/* ── Rounds list ───────────────────────────────────────────────────── */
+
+.round-item-top {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.round-item-bottom {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ps-ink-2);
+}
+
+.round-diff, .round-holes {
+  color: var(--ps-ink-3);
+}
+
+/* ── Hole grid (score entry) ──────────────────────────────────────── */
+
+.hole-grid {
+  display: flex;
+  flex-direction: column;
+  border: var(--ps-rule) solid var(--ps-rule-c);
+  margin-bottom: 12px;
+}
+
+.hole-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr;
+  align-items: end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: var(--ps-rule) solid var(--ps-rule-c);
+}
+
+.hole-row:last-child {
+  border-bottom: none;
+}
+
+.hole-num {
+  font-weight: 600;
+  color: var(--ps-ink-3);
+  padding-bottom: 10px;
+}
+
+.hole-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ps-ink-3);
+}
+
+.hole-input-label input {
+  padding: 8px;
+}
+
+.round-total {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--ps-accent);
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────── */
+
+.stats-grid, .stats-subgroup {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.stats-section {
+  grid-column: 1 / -1;
+}
+
+.stat-card {
+  border: var(--ps-rule) solid var(--ps-rule-c);
+  background: var(--ps-paper-2);
+  padding: 12px;
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ps-ink-3);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.stats-value {
+  font-size: 14px;
+  color: var(--ps-ink-2);
+}
+
+/* ── Bottom nav ────────────────────────────────────────────────────── */
+
+.app-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  border-top: var(--ps-rule) solid var(--ps-rule-c);
+  background: var(--ps-paper);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-nav-link {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 12px;
+  color: var(--ps-ink-3);
+}
+
+.app-nav-link.is-active {
+  color: var(--ps-accent);
+  font-weight: 600;
+}
+
+.app-nav-link-cta {
+  color: var(--ps-accent);
+  font-weight: 600;
+}
+
+/* ── Small-desktop niceties (still mobile-first; base styles above are
+   the phone/on-course layout, this only relaxes width) ─────────────── */
+
+@media (min-width: 640px) {
+  .home-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hole-row {
+    grid-template-columns: 48px 1fr 1fr;
+  }
+}

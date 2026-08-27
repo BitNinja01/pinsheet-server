@@ -6,3 +6,8 @@ flask-login>=0.6,<0.7
 flask-limiter>=3.0,<5.0
 flask-wtf>=1.2,<2.0
 flask-talisman>=1.1,<2.0
+# --- /api/v1 (issue #50) additions; see pyproject.toml comments ---
+apiflask>=3.1.1,<4.0
+flask-cors>=6.0.0,<7.0
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0

@@ -127,6 +127,25 @@ def delete_course(course_name: str) -> None:
     _log.info("course deleted: %s", course_name)
 
 
+def course_in_use_by_anyone(course_name: str) -> bool:
+    """Revision 2, SEC-3: catalog-wide usage check. `courses` is a shared,
+    global table with no `user_id` (ADR-011) -- unlike `get_all_rounds(...)`,
+    which defaults to a SINGLE `user_id` (misleadingly `1` if uncalled with
+    an explicit id) and therefore can only ever see that one caller's own
+    rounds. A course-in-use conflict-check that only queries the CALLING
+    user's rounds misses every OTHER user's rounds referencing the same
+    shared course -- deleting it would silently orphan their round data
+    (`course_name` becomes a dangling reference with no matching catalog
+    entry). This queries `rounds` directly, across ALL users, for exactly
+    that reason."""
+    db = get_db()
+    row = db.execute(
+        "SELECT 1 FROM rounds WHERE course_name = ? LIMIT 1", (course_name,)
+    ).fetchone()
+    db.close()
+    return row is not None
+
+
 def rename_course(old_name: str, new_name: str) -> None:
     db = get_db()
     db.execute("UPDATE courses SET name = ? WHERE name = ?", (new_name, old_name))
@@ -275,7 +294,8 @@ def update_round(round_id: int, golf_round, date, index, user_id: int = 1) -> in
 
     Used by the edit path (including date changes) so the round keeps its id.
     A delete + INSERT-OR-REPLACE would mint a new id and orphan any
-    match_rounds rows that reference this round.
+    match_rounds rows that reference this round. (Also the v1 PUT path, which
+    pins date/index server-side so v1 edits keep the same date/index -- #50.)
 
     Returns the number of rows updated (0 if the round no longer exists or is
     owned by another user), so callers can detect a lost-row race.
@@ -1327,7 +1347,12 @@ def get_distinct_club_field_values(field: str, user_id: int) -> list[str]:
 # or logged. Lookup is constant-time via hmac.compare_digest.
 # ---------------------------------------------------------------------------
 
-API_KEY_PERMISSIONS = ("rounds:read", "rounds:write", "stats:read", "courses:write")
+API_KEY_PERMISSIONS = (
+    "rounds:read", "rounds:write", "rounds:delete",
+    "courses:read", "courses:write", "courses:delete",
+    "stats:read",
+    "settings:read", "settings:write",
+)
 
 # Fixed-length dummy hash compared on the "key not found" path so an unknown key
 # runs the same constant-time comparison as a known one (no existence timing oracle).
@@ -1433,7 +1458,7 @@ def get_user_by_api_key(plaintext: str) -> dict | None:
     key_hash = _hash_api_key(plaintext)
     db = get_db()
     row = db.execute(
-        "SELECT id, user_id, key_hash, permissions, expires_at, revoked_at "
+        "SELECT id, user_id, key_hash, prefix, permissions, expires_at, revoked_at "
         "FROM api_keys WHERE key_hash = ?",
         (key_hash,),
     ).fetchone()
@@ -1454,6 +1479,7 @@ def get_user_by_api_key(plaintext: str) -> dict | None:
     db.commit()
     user_id = row["user_id"]
     permissions = row["permissions"]
+    prefix = row["prefix"]
     db.close()
     user = get_user_by_id(user_id)
     if not user:
@@ -1461,4 +1487,5 @@ def get_user_by_api_key(plaintext: str) -> dict | None:
         return None
     user["is_admin"] = False  # keys are never admin — enforced at the store layer too
     user["permissions"] = _split_permissions(permissions)
+    user["prefix"] = prefix  # non-secret display fragment (store.py:1010) — audit-log correlator only
     return user
