@@ -10,11 +10,14 @@ import logging
 from apiflask import APIBlueprint
 from flask_login import current_user
 
+from datetime import datetime, timedelta
+
 from calc import (
     best_n_rounds,
     calc_fir_percent,
     calc_gir_percent,
     calc_handicap_index,
+    calc_handicap_pairs_in_range,
     calc_par_or_better_percent,
     calc_putts_per_round,
     calc_scoring_average,
@@ -53,6 +56,9 @@ def get_stats():
 
     b8 = best_n_rounds(all_rounds, 8)
 
+    cutoff = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+    trend = [{"date": d, "value": v} for d, v in calc_handicap_pairs_in_range(all_rounds, cutoff)]
+
     return {
         "rounds_total": len(all_rounds),
         "handicap_index": calc_handicap_index(all_rounds, include_9hole),
@@ -62,4 +68,5 @@ def get_stats():
         "putts_per_round": calc_putts_per_round(b8),
         "scramble_percent": calc_scramble_percent(b8, courses_dict),
         "par_or_better_percent": calc_par_or_better_percent(b8, courses_dict),
+        "handicap_trend": trend,
     }

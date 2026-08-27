@@ -442,3 +442,83 @@ def test_v1_write_rejects_form_content_type_from_session(test_app):
     )
     assert r.status_code == 415
     assert get_courses().get("Form Course") is None
+
+
+# --------------------------------------------------------------------------- #
+# Stats: handicap_trend (12-month stored-HI series, mirrors profile line graph)
+# --------------------------------------------------------------------------- #
+
+
+def test_stats_handicap_trend_matches_stored_computed_handicap(test_app):
+    """Trend must equal the per-round STORED computed_handicap values,
+    chronological (oldest -> newest), within the last 365 days."""
+    import store as store_mod
+    from datetime import datetime, timedelta
+
+    client, headers, user = _full_scope_client(test_app)
+    stored = []
+    for days_ago, hi in ((200, "20.0"), (40, "19.5"), (10, "18.1")):
+        date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        idx = store_mod.next_round_index(date, user["id"])
+        store_mod.save_round(
+            {"course": "Test GC", "tees": "White", "holes_played": "18",
+             "entry_mode": "score_only", "notes": "", "holes": {},
+             "total_gross": "85", "differential": "17.2",
+             "computed_handicap": hi},
+            date, idx, user["id"],
+        )
+        stored.append({"date": date, "value": float(hi)})
+
+    r = client.get("/api/v1/stats", headers=headers)
+    assert r.status_code == 200
+    assert r.get_json()["handicap_trend"] == stored
+
+
+def test_stats_handicap_trend_respects_12_month_cutoff(test_app):
+    """A round older than 365 days must not appear in the trend."""
+    import store as store_mod
+    from datetime import datetime, timedelta
+
+    client, headers, user = _full_scope_client(test_app)
+    old = (datetime.now() - timedelta(days=400)).strftime("%Y-%m-%d")
+    new = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+    for date in (old, new):
+        idx = store_mod.next_round_index(date, user["id"])
+        store_mod.save_round(
+            {"course": "Test GC", "tees": "White", "holes_played": "18",
+             "entry_mode": "score_only", "notes": "", "holes": {},
+             "total_gross": "85", "differential": "17.2",
+             "computed_handicap": "18.1"},
+            date, idx, user["id"],
+        )
+
+    trend = client.get("/api/v1/stats", headers=headers).get_json()["handicap_trend"]
+    assert [p["date"] for p in trend] == [new]
+
+
+def test_stats_handicap_trend_includes_excluded_rounds(test_app):
+    """Excluded rounds carry their stored HI into the trend, matching the
+    profile page chart (no exclusion filter)."""
+    import store as store_mod
+    from datetime import datetime, timedelta
+
+    client, headers, user = _full_scope_client(test_app)
+    for days_ago, hi, excluded in ((20, "18.5", True), (10, "18.1", False)):
+        date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        idx = store_mod.next_round_index(date, user["id"])
+        store_mod.save_round(
+            {"course": "Test GC", "tees": "White", "holes_played": "18",
+             "entry_mode": "score_only", "notes": "", "holes": {},
+             "total_gross": "85", "differential": "17.2",
+             "computed_handicap": hi, "excluded": excluded},
+            date, idx, user["id"],
+        )
+
+    trend = client.get("/api/v1/stats", headers=headers).get_json()["handicap_trend"]
+    assert [p["value"] for p in trend] == [18.5, 18.1]
+
+
+def test_stats_handicap_trend_empty_without_rounds(test_app):
+    client, headers, user = _full_scope_client(test_app, username="notrend")
+    body = client.get("/api/v1/stats", headers=headers).get_json()
+    assert body["handicap_trend"] == []

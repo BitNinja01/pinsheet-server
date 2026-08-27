@@ -300,6 +300,14 @@ class RoundListOutSchema(Schema):
 # ---------------------------------------------------------------------------
 
 
+class HandicapTrendPointSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    date = fields.Str()
+    value = fields.Float()
+
+
 class StatsOutSchema(Schema):
     class Meta:
         unknown = EXCLUDE
@@ -312,6 +320,7 @@ class StatsOutSchema(Schema):
     putts_per_round = fields.Float(allow_none=True)
     scramble_percent = fields.Float(allow_none=True)
     par_or_better_percent = fields.Float(allow_none=True)
+    handicap_trend = fields.List(fields.Nested(HandicapTrendPointSchema))
 
 
 # ---------------------------------------------------------------------------
