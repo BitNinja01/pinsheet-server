@@ -1,4 +1,4 @@
-from source.models import RoundData, CourseData, HoleDef
+from source.models import RoundData, CourseData, HoleDef, FIR_OB_CODES, GIR_OB_CODES
 
 
 def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
@@ -47,9 +47,6 @@ def calc_penalty_stats(rounds: list[RoundData], courses: dict[str, CourseData]) 
     }
 
 
-_OB_CODES = {"OBL", "OBR", "OBS", "OBLO"}
-
-
 def calc_penalty_hole_breakdown(rounds: list[RoundData]) -> dict:
     """Classify every played hole as clean, penalty, or OB (mutually exclusive).
 
@@ -65,7 +62,7 @@ def calc_penalty_hole_breakdown(rounds: list[RoundData]) -> dict:
         for h in r.holes.values():
             if not h.gross:
                 continue
-            if h.fairway in _OB_CODES or h.gir in _OB_CODES:
+            if h.fairway in FIR_OB_CODES or h.gir in GIR_OB_CODES:
                 ob += 1
             elif h.penalties > 0:
                 penalty += 1

@@ -1,5 +1,4 @@
-from source.models import RoundData, CourseData, HoleDef
-from calc.analysis import _OB_CODES
+from source.models import RoundData, CourseData, HoleDef, FIR_OB_CODES, GIR_OB_CODES
 from calc.scoring import calc_trend
 
 
@@ -271,8 +270,8 @@ def calc_scramble_by_par_type(rounds: list[RoundData], courses: dict[str, Course
 
 
 def calc_ob_stats(rounds: list[RoundData], courses: dict[str, CourseData]) -> dict:
-    _FIR_OB = _OB_CODES
-    _GIR_OB = _OB_CODES
+    _FIR_OB = FIR_OB_CODES
+    _GIR_OB = GIR_OB_CODES
     fir_ob_round_totals = []
     gir_ob_round_totals = []
     fir_ob_vs_par = []

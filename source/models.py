@@ -10,6 +10,20 @@ class HoleData:
     gir: str = ""
 
 
+# OB (out-of-bounds) classification code sets, SPLIT by shot field. Per the
+# 2026-06-15 directional-stats convention, a code that cannot apply to a given
+# field is a generic miss for that field -- ignored by its directional stats,
+# NOT counted as that field's OB. OBS (short) and OBLO (long) are approach-shot
+# (GIR) miss directions with no tee-shot meaning, so they count as OB only in
+# the GIR field, never in the fairway (FIR) field. Defined ONCE here as the
+# single source of truth and imported by both calc_ob_stats (calc/approach.py)
+# and calc_penalty_hole_breakdown (calc/analysis.py) so the two field sets can
+# never silently drift apart again (regression #133: PR #85 had collapsed them
+# into one combined set, wrongly counting fairway OBS/OBLO as tee-shot OB).
+FIR_OB_CODES = frozenset({"OBL", "OBR"})
+GIR_OB_CODES = frozenset({"OBL", "OBR", "OBS", "OBLO"})
+
+
 @dataclass
 class RoundData:
     id: int = 0

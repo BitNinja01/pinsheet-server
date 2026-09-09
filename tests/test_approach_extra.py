@@ -287,18 +287,27 @@ def test_ob_stats_ob_branches_and_worst_holes(make_course):
     assert result["fir_worst_holes"][0] == ("Test GC", "1", 1.0)
 
 
-def test_ob_stats_fairway_short_long_ob_counted(make_course):
-    """Fairway OBS/OBLO (enterable via shorthand) count as fairway OB (unified _OB_CODES)."""
+def test_ob_stats_fairway_gir_only_codes_not_fir_ob(make_course):
+    """Bug #133: GIR-only OB codes (OBS short / OBLO long) are approach-shot
+    miss directions with no tee-shot meaning. In the FAIRWAY field they are
+    generic misses per the 2026-06-15 directional-stats convention, so they must
+    NOT count as fairway (FIR) OB -- while the same codes in the GIR field DO
+    count as approach OB."""
     courses = make_course()
     r = _round_with_holes(
         {
-            "1": {"gross": "6", "putts": "2", "fairway": "OBS", "gir": "H", "penalties": "1"},   # par4
-            "2": {"gross": "8", "putts": "2", "fairway": "OBLO", "gir": "H", "penalties": "1"},  # par5
+            # par4: fairway OBS is a GIR-only code -> NOT fir OB; gir OBS IS gir OB
+            "1": {"gross": "6", "putts": "2", "fairway": "OBS", "gir": "OBS", "penalties": "1"},
+            # par5: fairway OBLO is a GIR-only code -> NOT fir OB
+            "2": {"gross": "8", "putts": "2", "fairway": "OBLO", "gir": "H", "penalties": "1"},
         },
         date_="2026-01-01",
     )
     result = calc_ob_stats([r], courses)
-    assert result["fir_ob_per_round"] == pytest.approx(2.0)
+    # neither fairway OBS nor OBLO is a tee-shot OB code
+    assert result["fir_ob_per_round"] == pytest.approx(0.0)
+    # gir OBS on hole 1 still counts as GIR OB
+    assert result["gir_ob_per_round"] == pytest.approx(1.0)
 
 
 # ---- per_round_hole_stats: full function (previously untested) ----
