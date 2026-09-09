@@ -16,12 +16,12 @@ from calc import (
     best_n_rounds,
     calc_fir_percent,
     calc_gir_percent,
-    calc_handicap_index,
     calc_handicap_pairs_in_range,
     calc_par_or_better_percent,
     calc_putts_per_round,
     calc_scoring_average,
     calc_scramble_percent,
+    current_and_previous_handicap_index,
 )
 from source.auth_keys import require_permission
 from source.models import dict_to_course
@@ -59,9 +59,18 @@ def get_stats():
     cutoff = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
     trend = [{"date": d, "value": v} for d, v in calc_handicap_pairs_in_range(all_rounds, cutoff)]
 
+    # Bug #135 / #98 single-source-of-truth: report the STORED, WHS-clamped
+    # Handicap Index (post-ESR Rule 5.9, post-cap Rule 5.8, post-54.0 Rule 5.3
+    # `computed_handicap` written by `recompute_handicaps_for_user`) that the
+    # dashboard hero, round detail, trend and rankings all display -- NOT a
+    # fresh raw `calc_handicap_index()`, which returns the pre-ESR/pre-cap
+    # value and diverges from every other surface. `current_and_previous_
+    # handicap_index` is the same reader the dashboard panel uses.
+    current_hi, _ = current_and_previous_handicap_index(all_rounds, include_9hole)
+
     return {
         "rounds_total": len(all_rounds),
-        "handicap_index": calc_handicap_index(all_rounds, include_9hole),
+        "handicap_index": current_hi,
         "scoring_average": calc_scoring_average(b8),
         "fir_percent": calc_fir_percent(b8, courses_dict),
         "gir_percent": calc_gir_percent(b8),
