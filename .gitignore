@@ -5,6 +5,7 @@ AGENTS.md
 CODEBASE_IMPROVEMENTS.md
 .claude/
 .opencode/
+.omp/
 .superpowers/
 /plugins/*
 !/plugins/.gitkeep
