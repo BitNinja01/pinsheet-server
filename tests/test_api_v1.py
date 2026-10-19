@@ -580,3 +580,62 @@ def test_v1_put_clamps_per_hole_gross_to_max(test_app):
     )
     assert r2.status_code == 200
     assert r2.get_json()["holes"]["1"]["gross"] == 20
+
+
+def _score_only_payload(date, holes_played, gross_total):
+    return {
+        "date": date, "course": "Pebble Beach", "tees": "White",
+        "entry_mode": "score_only", "holes_played": holes_played,
+        "gross_total": gross_total, "holes": {},
+    }
+
+
+@pytest.mark.parametrize("selection", ["front", "back", "front9", "back9", "9"])
+def test_v1_post_score_only_9hole_total_clamped_to_180(test_app, selection):
+    """Every 9-hole selection spelling must clamp to 20 * 9, not 20 * 18."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-03", selection, "999")
+    r = client.post("/api/v1/rounds", json=payload, headers=headers)
+    assert r.status_code == 201
+    assert r.get_json()["total_gross"] == "180"  # 20 * 9
+
+
+def test_v1_put_score_only_without_gross_total_preserves_stored_total(test_app):
+    """A partial PUT that omits gross_total must not 500 on the stored string
+    total (regression: `_safe_int(None, "80")` returned `"80"`)."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-04", "18", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"notes": "edited"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "80"
+
+
+def test_v1_put_score_only_front_nine_total_clamped_to_9_holes(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-05", "front", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"gross_total": "999"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "180"
+
+
+def test_v1_put_score_only_non_numeric_total_preserves_stored_total(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-06", "18", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"gross_total": "abc"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "80"
