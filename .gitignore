@@ -18,7 +18,6 @@ docs/BACKLOG.md
 docs/DECISIONS.md
 docs/CONTEXT.md
 docs/RUNBOOK.md
-docs/superpowers/
 docs/design/
 
 # Build scripts (internal only)
@@ -216,3 +215,9 @@ fonts/
 # Standalone social feature demos (source of truth for EPIC_001)
 PinSheet Social - Matches (Standalone).html
 PinSheet Social - The Board (Standalone).html
+
+# root context file is local working context
+CONTEXT.md
+
+# GitHub-hosted: superpowers plans and specs stay local
+docs/superpowers/
