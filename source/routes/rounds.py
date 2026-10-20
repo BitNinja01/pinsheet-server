@@ -37,6 +37,7 @@ from calc import (
 )
 from source.web.charts import sparkline_svg
 from calc import per_round_hole_stats
+from source.score_clamp import clamp_holes_in_place, clamp_total
 from source.models import dict_to_round, dict_to_course, clamp_pcc, effective_pcc, invalid_tee_numeric_reason
 from source.plugin import fire_hook, _plugins
 from source.request_data import get_settings, get_courses, get_all_rounds_for_user, base_context
@@ -111,28 +112,22 @@ def _expected_hole_count(course, holes_sel):
     return 9
 
 
-MAX_HOLE_GROSS = 20  # sane per-hole ceiling (issue #80, CWE-20)
-
-
 def _sanitize_scores(data, course, holes_sel):
     """Clamp score fields in place so a crafted or buggy client can't poison the
     submitter's handicap with negative or absurd scores (issue #80, CWE-20).
 
-    Consistent with the app's lenient contract (malformed input must not 500):
-    non-numeric/blank gross stays unscored via _safe_int's 0 fallback rather
-    than erroring. Per-hole gross is clamped to [0, MAX_HOLE_GROSS]; a
-    score-only total is clamped to [0, MAX_HOLE_GROSS * holes_played].
+    Delegates the per-hole clamp + ceiling to source.score_clamp (issue #134),
+    the single source of truth shared with the /api/v1 surface. The score-only
+    total ceiling still uses this surface's course-derived expected hole count.
+    Lenient contract preserved: blank/non-numeric gross stays unscored, no 500.
     """
-    for hole in (data.get("holes") or {}).values():
-        raw = hole.get("gross", "")
-        if raw in (None, ""):
-            continue
-        hole["gross"] = str(max(0, min(_safe_int(raw, 0), MAX_HOLE_GROSS)))
+    clamp_holes_in_place(data.get("holes"))
     if data.get("entry_mode") == "score_only":
         raw_total = data.get("gross_total", "")
         if raw_total not in (None, ""):
-            max_total = MAX_HOLE_GROSS * _expected_hole_count(course, holes_sel)
-            data["gross_total"] = str(max(0, min(_safe_int(raw_total, 0), max_total)))
+            data["gross_total"] = str(
+                clamp_total(raw_total, _expected_hole_count(course, holes_sel))
+            )
 
 
 def register_rounds_routes(app, csrf):

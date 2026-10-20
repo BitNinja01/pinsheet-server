@@ -522,3 +522,120 @@ def test_stats_handicap_trend_empty_without_rounds(test_app):
     client, headers, user = _full_scope_client(test_app, username="notrend")
     body = client.get("/api/v1/stats", headers=headers).get_json()
     assert body["handicap_trend"] == []
+
+
+# --------------------------------------------------------------------------- #
+# Issue #134: v1 rounds must clamp per-hole gross to MAX_HOLE_GROSS
+# --------------------------------------------------------------------------- #
+
+
+def test_v1_post_clamps_per_hole_gross_to_max(test_app):
+    """POST with an absurd per-hole gross must persist the clamped [0,20]
+    value, mirroring the legacy `_sanitize_scores` ceiling (issue #80/#134)."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = {
+        **VALID_ROUND,
+        "holes": {"1": {"gross": "99", "putts": "2", "fairway": "H",
+                        "gir": "H", "penalties": "0"}},
+    }
+    r = client.post("/api/v1/rounds", json=payload, headers=headers)
+    assert r.status_code == 201
+    assert r.get_json()["holes"]["1"]["gross"] == 20
+
+
+def test_v1_post_clamps_negative_per_hole_gross_to_zero(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    payload = {
+        **VALID_ROUND,
+        "holes": {"1": {"gross": "-3", "putts": "2", "fairway": "H",
+                        "gir": "H", "penalties": "0"}},
+    }
+    r = client.post("/api/v1/rounds", json=payload, headers=headers)
+    assert r.status_code == 201
+    assert r.get_json()["holes"]["1"]["gross"] == 0
+
+
+def test_v1_post_score_only_total_clamped_to_ceiling(test_app):
+    """score_only gross_total must clamp to MAX_HOLE_GROSS * holes_played."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = {
+        "date": "2026-05-02", "course": "Pebble Beach", "tees": "White",
+        "entry_mode": "score_only", "holes_played": "18",
+        "gross_total": "999", "holes": {},
+    }
+    r = client.post("/api/v1/rounds", json=payload, headers=headers)
+    assert r.status_code == 201
+    assert r.get_json()["total_gross"] == "360"  # 20 * 18
+
+
+def test_v1_put_clamps_per_hole_gross_to_max(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    r = client.post("/api/v1/rounds", json=VALID_ROUND, headers=headers)
+    round_id = r.get_json()["id"]
+    r2 = client.put(
+        f"/api/v1/rounds/{round_id}",
+        json={"holes": {"1": {"gross": "99", "putts": "2", "fairway": "H",
+                              "gir": "H", "penalties": "0"}}},
+        headers=headers,
+    )
+    assert r2.status_code == 200
+    assert r2.get_json()["holes"]["1"]["gross"] == 20
+
+
+def _score_only_payload(date, holes_played, gross_total):
+    return {
+        "date": date, "course": "Pebble Beach", "tees": "White",
+        "entry_mode": "score_only", "holes_played": holes_played,
+        "gross_total": gross_total, "holes": {},
+    }
+
+
+@pytest.mark.parametrize("selection", ["front", "back", "front9", "back9", "9"])
+def test_v1_post_score_only_9hole_total_clamped_to_180(test_app, selection):
+    """Every 9-hole selection spelling must clamp to 20 * 9, not 20 * 18."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-03", selection, "999")
+    r = client.post("/api/v1/rounds", json=payload, headers=headers)
+    assert r.status_code == 201
+    assert r.get_json()["total_gross"] == "180"  # 20 * 9
+
+
+def test_v1_put_score_only_without_gross_total_preserves_stored_total(test_app):
+    """A partial PUT that omits gross_total must not 500 on the stored string
+    total (regression: `_safe_int(None, "80")` returned `"80"`)."""
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-04", "18", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"notes": "edited"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "80"
+
+
+def test_v1_put_score_only_front_nine_total_clamped_to_9_holes(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-05", "front", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"gross_total": "999"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "180"
+
+
+def test_v1_put_score_only_non_numeric_total_preserves_stored_total(test_app):
+    client, headers, user = _full_scope_client(test_app)
+    payload = _score_only_payload("2026-05-06", "18", "80")
+    created = client.post("/api/v1/rounds", json=payload, headers=headers).get_json()
+    r = client.put(
+        f"/api/v1/rounds/{created['id']}",
+        json={"gross_total": "abc"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.get_json()["total_gross"] == "80"

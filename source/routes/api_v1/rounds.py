@@ -14,6 +14,7 @@ from apiflask import APIBlueprint
 from flask_login import current_user
 
 from source.auth_keys import require_permission
+from source.score_clamp import clamp_holes_in_place, clamp_total
 from source.routes.api_v1 import scopes
 from source.routes.api_v1.errors import problem, require_json_body
 from source.routes.api_v1.schemas import (
@@ -113,8 +114,13 @@ def create_round(json_data):
         "holes": json_data.get("holes", {}),
         "excluded": json_data.get("excluded", False),
     }
+    # Issue #134: clamp per-hole gross to [0, MAX_HOLE_GROSS] BEFORE summing,
+    # mirroring the legacy `_sanitize_scores` ceiling (routes/rounds.py:114).
+    # The v1 endpoints previously persisted whatever numeric gross a client
+    # sent (gross=999 / negatives), poisoning displayed scores and stats.
+    clamp_holes_in_place(golf_round["holes"])
     if json_data.get("entry_mode") == "score_only":
-        golf_round["total_gross"] = str(_safe_int(json_data.get("gross_total"), 0))
+        golf_round["total_gross"] = str(clamp_total(json_data.get("gross_total"), golf_round["holes_played"], 0))
     elif golf_round["holes"]:
         golf_round["total_gross"] = str(sum(_safe_int(h.get("gross"), 0) for h in golf_round["holes"].values()))
 
@@ -177,8 +183,10 @@ def update_round(round_id, json_data):
         # to 0.0.
         "pcc": row.pcc,
     }
+    # Issue #134: clamp per-hole gross before summing (see create_round).
+    clamp_holes_in_place(holes)
     if entry_mode == "score_only":
-        golf_round["total_gross"] = str(_safe_int(json_data.get("gross_total"), row.total_gross))
+        golf_round["total_gross"] = str(clamp_total(json_data.get("gross_total"), golf_round["holes_played"], row.total_gross))
     elif holes:
         golf_round["total_gross"] = str(sum(_safe_int(h.get("gross"), 0) for h in holes.values()))
     else:
