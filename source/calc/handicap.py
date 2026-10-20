@@ -246,14 +246,15 @@ def count_table_adjustment(count: int) -> float:
 def _is_eligible_diff_round(r: RoundData, include_9hole: bool) -> bool:
     """WHS Rule 5.2 acceptability: not excluded, has a real (non-sentinel)
     differential, and -- for 9-hole rounds -- only counts if 9-hole scores
-    are opted into the record and the round already has a computed
-    (non-zero) handicap to combine against."""
+    are opted into the record and the round has a computed handicap to
+    combine against. The legacy `"0"` string is the "no index" sentinel; a
+    genuine 0.0 Handicap Index is stored as `"0.0"` and must count."""
     if r.excluded:
         return False
     if not r.differential or r.differential == "0":
         return False
     if r.holes_selection != "all":
-        if not include_9hole or not r.computed_handicap or float(r.computed_handicap) == 0:
+        if not include_9hole or not r.computed_handicap or str(r.computed_handicap) == "0":
             return False
     return True
 

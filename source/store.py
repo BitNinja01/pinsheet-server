@@ -556,6 +556,16 @@ def recompute_handicaps_for_user(user_id: int) -> int:
         # slice of `chronological` on every iteration.
         idx = total - 1 - i
         history_most_recent_first = all_rounds[idx:]
+        # WHS Rule 5.1b: a 9-hole round's differential is valid only once it
+        # has been combined against a prior displayed Handicap Index.
+        # `_is_eligible_diff_round` gates 9-hole eligibility on the round's
+        # own stored `computed_handicap`, but that value is written later in
+        # this same iteration. Seed it from the prior displayed HI so the
+        # round counts toward its OWN index, exactly as an 18-hole round
+        # does. With no prior HI there is nothing to combine against, so the
+        # round stays ineligible.
+        if r.holes_selection != "all" and prior_displayed:
+            r.computed_handicap = str(prior_displayed[-1][1])
         raw_hi = calc_handicap_index(history_most_recent_first, include_9hole)
 
         # WHS Rule 5.9 (Exceptional Score Reduction): the HI "in effect when

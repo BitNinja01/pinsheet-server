@@ -330,6 +330,50 @@ def test_malformed_course_row_does_not_crash_stats(test_app):
     assert r.status_code == 200, "a malformed course row must not 500 the whole stats endpoint"
 
 
+def test_stats_handicap_index_uses_stored_capped_value(test_app):
+    """Bug #135: `GET /api/v1/stats` `handicap_index` must report the stored,
+    WHS-clamped `computed_handicap` (the #98 single source of truth the
+    dashboard hero, round detail, trend and rankings all display) -- NOT a
+    fresh RAW `calc_handicap_index()` recomputation, which skips the Rule 5.9
+    Exceptional Score Reduction, the Rule 5.8 soft/hard cap, AND the Rule 5.3
+    54.0 issued maximum (`handicap.py:217`).
+
+    Fabricate a record whose RAW differentials drive `calc_handicap_index`
+    ABOVE 54.0 (best-1 of three 65.0 diffs, minus the Rule 5.2a count=3
+    adjustment of -2.0 => 63.0), while the stored `computed_handicap` on the
+    most recent round is the capped 54.0. The buggy endpoint returns ~63.0
+    (raw); the fixed endpoint returns 54.0, matching the dashboard."""
+    import store as store_mod
+
+    client, headers, user = _full_scope_client(test_app, username="capgolfer")
+    for i, date in enumerate(("2026-05-03", "2026-05-02", "2026-05-01")):
+        store_mod.save_round(
+            {
+                "course": "Pebble Beach",
+                "tees": "White",
+                "holes_played": "18",
+                "entry_mode": "score_only",
+                "total_gross": "130",
+                "differential": "65.0",
+                # The stored, WHS-capped HI on each round -- `current` reads the
+                # most-recent one (index 0).
+                "computed_handicap": "54.0",
+            },
+            date,
+            0,
+            user["id"],
+        )
+
+    r = client.get("/api/v1/stats", headers=headers)
+    assert r.status_code == 200
+    hi = r.get_json()["handicap_index"]
+    assert hi == 54.0, (
+        f"stats handicap_index must equal the stored/clamped 54.0 (Rule 5.3 "
+        f"issued maximum), matching the dashboard's single-source-of-truth "
+        f"read; got {hi!r} (the RAW unclamped calc_handicap_index value)"
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Revision 2 regression: SEC-2 (courses scopes enforced now, others still
 # permissive-pending)
